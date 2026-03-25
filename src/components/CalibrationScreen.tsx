@@ -3,6 +3,8 @@ import { useCalibration } from '../hooks/useCalibration';
 import { css } from '@emotion/react';
 
 const CARD_WIDTH_MM = 85.60;
+const CONTAINER_CENTER_X = 200; // half of 400px container
+const CONTAINER_CENTER_Y = 150; // half of 300px container
 
 const containerStyle = css`
   display: flex;
@@ -83,8 +85,8 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
   const [rect, setRect] = useState<RectState>({
     width: 200,
     height: 126,
-    x: 100,
-    y: 87,
+    x: CONTAINER_CENTER_X - 100,
+    y: CONTAINER_CENTER_Y - 63,
   });
   const [isDragging, setIsDragging] = useState(false);
   const [ppmm, setPpmmLocal] = useState<number | null>(null);
@@ -98,16 +100,18 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
     if (!isDragging || !containerRef.current) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - containerRect.left;
+    const mouseX = e.clientX - containerRect.left;
 
-    const newWidth = Math.max(50, x);
-    const newHeight = Math.max(30, newWidth * (53.98 / 85.60));
+    const halfWidth = Math.max(25, mouseX - CONTAINER_CENTER_X);
+    const newWidth = halfWidth * 2;
+    const newHeight = newWidth * (53.98 / 85.60);
 
-    setRect((prev) => ({
-      ...prev,
+    setRect({
       width: newWidth,
       height: newHeight,
-    }));
+      x: CONTAINER_CENTER_X - halfWidth,
+      y: CONTAINER_CENTER_Y - newHeight / 2,
+    });
   };
 
   const handleMouseUp = () => {
@@ -132,8 +136,14 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
         <h1>Calibration: Align with Credit Card</h1>
         <p>
           Resize the red rectangle to match your physical credit card (85.60 mm × 53.98 mm).
-          Drag the bottom-right corner to adjust the size.
+          Drag anywhere on the rectangle to resize it from the center.
         </p>
+      </div>
+
+      <div css={buttonGroupStyle}>
+        <button css={buttonStyle} onClick={calculatePPMM}>
+          Calculate PPMM
+        </button>
       </div>
 
       <div css={canvasContainerStyle} ref={containerRef}>
@@ -147,12 +157,6 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
             top: `${rect.y}px`,
           }}
         />
-      </div>
-
-      <div css={buttonGroupStyle}>
-        <button css={buttonStyle} onClick={calculatePPMM}>
-          Calculate PPMM
-        </button>
       </div>
 
       {ppmm && (
