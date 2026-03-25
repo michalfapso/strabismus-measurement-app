@@ -49,6 +49,8 @@ const resizableRectStyle = css`
 const buttonGroupStyle = css`
   display: flex;
   gap: 10px;
+  position: relative;
+  z-index: 1;
 `;
 
 const buttonStyle = css`
@@ -140,12 +142,6 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
         </p>
       </div>
 
-      <div css={buttonGroupStyle}>
-        <button css={buttonStyle} onClick={calculatePPMM}>
-          Calculate PPMM
-        </button>
-      </div>
-
       <div css={canvasContainerStyle} ref={containerRef}>
         <div
           css={resizableRectStyle}
@@ -157,6 +153,12 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
             top: `${rect.y}px`,
           }}
         />
+      </div>
+
+      <div css={buttonGroupStyle}>
+        <button css={buttonStyle} onClick={calculatePPMM}>
+          Calculate PPMM
+        </button>
       </div>
 
       {ppmm && (
