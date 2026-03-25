@@ -101,7 +101,7 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
     const x = e.clientX - containerRect.left;
 
     const newWidth = Math.max(50, x);
-    const newHeight = Math.max(30, (newWidth / CARD_WIDTH_MM) * (85.60 / 53.98));
+    const newHeight = Math.max(30, newWidth * (53.98 / 85.60));
 
     setRect((prev) => ({
       ...prev,
