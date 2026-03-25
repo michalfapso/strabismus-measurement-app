@@ -592,7 +592,7 @@ git commit -m "feat: implement IndexedDB storage service with session and calibr
 - Create: `src/context/CalibrationContext.tsx`
 - Create: `src/hooks/useCalibration.ts`
 
-- [ ] **Step 1: Create CalibrationContext**
+- [x] **Step 1: Create CalibrationContext**
 
 ```typescript
 // src/context/CalibrationContext.tsx
@@ -646,7 +646,7 @@ export function CalibrationProvider({ children }: { children: ReactNode }) {
 }
 ```
 
-- [ ] **Step 2: Create useCalibration hook**
+- [x] **Step 2: Create useCalibration hook**
 
 ```typescript
 // src/hooks/useCalibration.ts
@@ -662,7 +662,7 @@ export function useCalibration() {
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/context/CalibrationContext.tsx src/hooks/useCalibration.ts
@@ -678,7 +678,7 @@ git commit -m "feat: add CalibrationContext and useCalibration hook"
 - Create: `src/hooks/useSession.ts`
 - Create: `src/hooks/useTimeSeries.ts`
 
-- [ ] **Step 1: Create SessionContext**
+- [x] **Step 1: Create SessionContext**
 
 ```typescript
 // src/context/SessionContext.tsx
@@ -755,7 +755,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 ```
 
-- [ ] **Step 2: Create useSession hook**
+- [x] **Step 2: Create useSession hook**
 
 ```typescript
 // src/hooks/useSession.ts
@@ -771,7 +771,7 @@ export function useSession() {
 }
 ```
 
-- [ ] **Step 3: Create useTimeSeries hook**
+- [x] **Step 3: Create useTimeSeries hook**
 
 ```typescript
 // src/hooks/useTimeSeries.ts
@@ -822,7 +822,7 @@ export function useTimeSeries() {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/context/SessionContext.tsx src/hooks/useSession.ts src/hooks/useTimeSeries.ts
@@ -837,7 +837,7 @@ git commit -m "feat: add SessionContext and session/time-series hooks"
 - Create: `src/services/export.ts`
 - Create: `src/__tests__/services/export.test.ts`
 
-- [ ] **Step 1: Write CSV export tests**
+- [x] **Step 1: Write CSV export tests**
 
 ```typescript
 // src/__tests__/services/export.test.ts
@@ -911,7 +911,7 @@ describe('CSV Export Service', () => {
 });
 ```
 
-- [ ] **Step 2: Implement CSV export**
+- [x] **Step 2: Implement CSV export**
 
 ```typescript
 // src/services/export.ts
@@ -963,13 +963,13 @@ export function downloadCSV(sessions: Session[]): void {
 }
 ```
 
-- [ ] **Step 3: Install vitest with mocking**
+- [x] **Step 3: Install vitest with mocking**
 
 ```bash
 npm install --save-dev vitest vi
 ```
 
-- [ ] **Step 4: Run export tests**
+- [x] **Step 4: Run export tests**
 
 ```bash
 npm test -- src/__tests__/services/export.test.ts
@@ -977,7 +977,7 @@ npm test -- src/__tests__/services/export.test.ts
 
 Expected: All tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/export.ts src/__tests__/services/export.test.ts
