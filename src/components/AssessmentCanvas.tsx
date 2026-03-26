@@ -5,19 +5,12 @@ import { useCalibration } from '../hooks/useCalibration';
 import { css } from '@emotion/react';
 
 const canvasWrapperStyle = css`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed;
+  inset: 0;
   background: #000;
 `;
 
-const CANVAS_WIDTH = 1200;
-const CANVAS_HEIGHT = 900;
-const HALF_WIDTH = CANVAS_WIDTH / 2;
-const HALF_HEIGHT = CANVAS_HEIGHT / 2;
-const DEFAULT_CM_TO_PX = 37.8;
+const DEFAULT_PPMM = 3.78;
 
 interface CrossState {
   x: number;
@@ -31,57 +24,57 @@ export function AssessmentCanvas({
   onPositionChange: (x: number, y: number, r: number) => void;
 }) {
   const { calibration } = useCalibration();
+  const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [userCross, setUserCross] = useState<CrossState>({
-    x: HALF_WIDTH,
-    y: HALF_HEIGHT,
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
     rotation: 0,
   });
   const [isRotating, setIsRotating] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
-  const groupRef = useRef<Konva.Group>(null);
 
-  const ppmm = calibration?.ppmm || DEFAULT_CM_TO_PX / 10;
-  const cmToPx = ppmm * 10; // ppmm * 10 = pixels per cm
+  const ppmm = calibration?.ppmm ?? DEFAULT_PPMM;
+  const cmToPx = ppmm * 10;
 
   useEffect(() => {
-    const xCm = (userCross.x - HALF_WIDTH) / cmToPx;
-    const yCm = (HALF_HEIGHT - userCross.y) / cmToPx;
-    onPositionChange(xCm, yCm, userCross.rotation);
-  }, [userCross, cmToPx]);
+    const handleResize = () =>
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
+  useEffect(() => {
+    const xCm = (userCross.x - size.width / 2) / cmToPx;
+    const yCm = (size.height / 2 - userCross.y) / cmToPx;
+    onPositionChange(xCm, yCm, userCross.rotation);
+  }, [userCross, cmToPx, size]);
+
+  // Left-click anywhere → move cross to that point
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button !== 0) return;
+    const pos = stageRef.current?.getPointerPosition();
+    if (!pos) return;
+    setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
+  };
+
+  // Right-click drag → rotate cross
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.evt.button === 2) {
-      setIsRotating(true);
-    }
+    if (e.evt.button === 2) setIsRotating(true);
   };
 
   const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!stageRef.current || !isRotating || !groupRef.current) return;
-
-    const pointerPos = stageRef.current.getPointerPosition();
-    if (!pointerPos) return;
-
-    const groupPos = groupRef.current.getAbsolutePosition();
-    const dx = pointerPos.x - groupPos.x;
-    const dy = pointerPos.y - groupPos.y;
-
-    const rotation = (Math.atan2(dy, dx) * 180) / Math.PI;
-    setUserCross((prev) => ({ ...prev, rotation }));
-  };
-
-  const handleMouseUp = () => {
-    setIsRotating(false);
-  };
-
-  const handleDragEnd = () => {
-    if (!groupRef.current) return;
-    const pos = groupRef.current.getAbsolutePosition();
+    if (!isRotating || !stageRef.current) return;
+    const pos = stageRef.current.getPointerPosition();
+    if (!pos) return;
+    const dx = pos.x - userCross.x;
+    const dy = pos.y - userCross.y;
     setUserCross((prev) => ({
       ...prev,
-      x: pos.x,
-      y: pos.y,
+      rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
     }));
   };
+
+  const handleMouseUp = () => setIsRotating(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -95,87 +88,58 @@ export function AssessmentCanvas({
         return next;
       });
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cmToPx]);
 
+  const halfW = size.width / 2;
+  const halfH = size.height / 2;
   const gridSpacing = cmToPx;
+  // Extend lines well beyond visible canvas so they always appear infinite
+  const lineExtent = Math.max(size.width, size.height) * 2;
 
   return (
     <div css={canvasWrapperStyle}>
       <Stage
         ref={stageRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
+        width={size.width}
+        height={size.height}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onClick={handleClick}
         onContextMenu={(e) => e.evt.preventDefault()}
       >
-        {/* Background Layer — static red cross with cm ticks */}
+        {/* Static red cross with cm tick marks */}
         <Layer>
-          {/* Vertical axis */}
-          <Line
-            points={[HALF_WIDTH, 0, HALF_WIDTH, CANVAS_HEIGHT]}
-            stroke="#ff0000"
-            strokeWidth={2}
-          />
-          {/* Horizontal axis */}
-          <Line
-            points={[0, HALF_HEIGHT, CANVAS_WIDTH, HALF_HEIGHT]}
-            stroke="#ff0000"
-            strokeWidth={2}
-          />
+          <Line points={[halfW, 0, halfW, size.height]} stroke="#ff0000" strokeWidth={2} />
+          <Line points={[0, halfH, size.width, halfH]} stroke="#ff0000" strokeWidth={2} />
 
-          {/* Vertical ticks */}
-          {Array.from({ length: Math.floor(CANVAS_HEIGHT / gridSpacing) + 1 }).map((_, i) => {
-            const offset = (i - Math.floor(CANVAS_HEIGHT / gridSpacing / 2)) * gridSpacing;
+          {Array.from({ length: Math.floor(size.height / gridSpacing) + 2 }).map((_, i) => {
+            const offset = (i - Math.floor(size.height / gridSpacing / 2) - 1) * gridSpacing;
             return (
-              <Line
-                key={`h-tick-${i}`}
-                points={[HALF_WIDTH - 5, HALF_HEIGHT + offset, HALF_WIDTH + 5, HALF_HEIGHT + offset]}
-                stroke="#ff0000"
-                strokeWidth={1}
-              />
+              <Line key={`ht-${i}`}
+                points={[halfW - 5, halfH + offset, halfW + 5, halfH + offset]}
+                stroke="#ff0000" strokeWidth={1} />
             );
           })}
 
-          {/* Horizontal ticks */}
-          {Array.from({ length: Math.floor(CANVAS_WIDTH / gridSpacing) + 1 }).map((_, i) => {
-            const offset = (i - Math.floor(CANVAS_WIDTH / gridSpacing / 2)) * gridSpacing;
+          {Array.from({ length: Math.floor(size.width / gridSpacing) + 2 }).map((_, i) => {
+            const offset = (i - Math.floor(size.width / gridSpacing / 2) - 1) * gridSpacing;
             return (
-              <Line
-                key={`v-tick-${i}`}
-                points={[HALF_WIDTH + offset, HALF_HEIGHT - 5, HALF_WIDTH + offset, HALF_HEIGHT + 5]}
-                stroke="#ff0000"
-                strokeWidth={1}
-              />
+              <Line key={`vt-${i}`}
+                points={[halfW + offset, halfH - 5, halfW + offset, halfH + 5]}
+                stroke="#ff0000" strokeWidth={1} />
             );
           })}
         </Layer>
 
-        {/* User-Controlled Layer — green draggable/rotatable cross */}
+        {/* Green cross — infinite lines, rotatable via right-drag */}
         <Layer>
-          <Group
-            ref={groupRef}
-            x={userCross.x}
-            y={userCross.y}
-            draggable
-            onDragEnd={handleDragEnd}
-            rotation={userCross.rotation}
-          >
-            <Line
-              points={[0, -50, 0, 50]}
-              stroke="#00ff00"
-              strokeWidth={2}
-            />
-            <Line
-              points={[-50, 0, 50, 0]}
-              stroke="#00ff00"
-              strokeWidth={2}
-            />
-            <Circle x={0} y={0} radius={5} fill="#00ff00" />
+          <Group x={userCross.x} y={userCross.y} rotation={userCross.rotation}>
+            <Line points={[0, -lineExtent, 0, lineExtent]} stroke="#00ff00" strokeWidth={2} />
+            <Line points={[-lineExtent, 0, lineExtent, 0]} stroke="#00ff00" strokeWidth={2} />
+            <Circle x={0} y={0} radius={4} fill="#00ff00" />
           </Group>
         </Layer>
       </Stage>
