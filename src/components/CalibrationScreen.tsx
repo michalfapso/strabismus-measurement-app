@@ -62,7 +62,7 @@ const calibrationAreaStyle = css`
   justify-content: center;
   position: relative;
   margin-bottom: 30px;
-  min-height: 400px;
+  min-height: 250px;
   width: 100%;
 `;
 
@@ -117,13 +117,6 @@ const resultStyle = css`
   margin-top: 20px;
   text-align: center;
   color: #00ff00;
-`;
-
-const lengthDisplayStyle = css`
-  font-size: 16px;
-  color: #00ff00;
-  text-align: center;
-  margin-top: 10px;
 `;
 
 const backButtonStyle = css`
@@ -318,6 +311,20 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     setPpiLocal(null);
   };
 
+  // Auto-calculate PPI when credit card rect dimensions change
+  useEffect(() => {
+    if (mode === 'credit-card') {
+      calculateCreditCardPPI();
+    }
+  }, [rect.width]);
+
+  // Auto-calculate PPI when A4 line dimensions change
+  useEffect(() => {
+    if (mode === 'a4-short' || mode === 'a4-long') {
+      calculateA4PPI();
+    }
+  }, [line.x1, line.x2]);
+
   // Mode selection view - show when no mode selected (Back button or initial selection)
   if (mode === null) {
     return (
@@ -371,23 +378,20 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
           />
         </div>
 
+        {ppi && (
+          <div css={resultStyle}>
+            <p>Calculated PPI: {ppi.toFixed(2)} pixels/inch</p>
+          </div>
+        )}
+
         <div css={buttonGroupStyle}>
           <button css={backButtonStyle} onClick={handleBack}>
             Back
           </button>
-          <button css={buttonStyle} onClick={calculateCreditCardPPI}>
-            Calculate PPI
+          <button css={buttonStyle} onClick={handleConfirm} disabled={!ppi}>
+            Confirm & Continue
           </button>
         </div>
-
-        {ppi && (
-          <div css={resultStyle}>
-            <p>PPI: {ppi.toFixed(2)} pixels/inch</p>
-            <button css={buttonStyle} onClick={handleConfirm} style={{ marginTop: '20px' }}>
-              Confirm & Continue
-            </button>
-          </div>
-        )}
       </div>
     );
   }
@@ -395,8 +399,6 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   // A4 paper mode
   const a4TargetMm = mode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
   const modeLabel = mode === 'a4-short' ? 'Short Edge (210 mm)' : 'Long Edge (297 mm)';
-  const currentPixelWidth = line.x2 - line.x1;
-  const currentLengthMm = currentPixelWidth / ((ppi || 1) / 25.4);
 
   return (
     <div
@@ -435,28 +437,20 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
         />
       </div>
 
-      <div css={lengthDisplayStyle}>
-        <p>Current width: {currentPixelWidth}px</p>
-        {ppi && <p>Calculated length: {currentLengthMm.toFixed(1)} mm</p>}
-      </div>
+      {ppi && (
+        <div css={resultStyle}>
+          <p>Calculated PPI: {ppi.toFixed(2)} pixels/inch</p>
+        </div>
+      )}
 
       <div css={buttonGroupStyle}>
         <button css={backButtonStyle} onClick={handleBack}>
           Back
         </button>
-        <button css={buttonStyle} onClick={calculateA4PPI}>
-          Calculate PPI
+        <button css={buttonStyle} onClick={handleConfirm} disabled={!ppi}>
+          Confirm & Continue
         </button>
       </div>
-
-      {ppi && (
-        <div css={resultStyle}>
-          <p>PPI: {ppi.toFixed(2)} pixels/inch</p>
-          <button css={buttonStyle} onClick={handleConfirm} style={{ marginTop: '20px' }}>
-            Confirm & Continue
-          </button>
-        </div>
-      )}
     </div>
   );
 }
