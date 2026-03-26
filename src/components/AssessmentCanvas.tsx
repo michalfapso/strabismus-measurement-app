@@ -12,6 +12,11 @@ const canvasWrapperStyle = css`
 
 const DEFAULT_PPMM = 3.78;
 
+// ── Rotation sensitivity ──────────────────────────────────────────────────────
+// Degrees of rotation produced per pixel of mouse movement while right-dragging.
+// Increase to rotate faster, decrease to rotate slower.
+const ROTATION_DEG_PER_PX = 0.25;
+
 interface CrossState {
   x: number;
   y: number;
@@ -36,10 +41,8 @@ export function AssessmentCanvas({
   // Mirrors userCross for use inside event handlers (avoids stale closures)
   const userCrossRef = useRef(userCross);
   useEffect(() => { userCrossRef.current = userCross; }, [userCross]);
-  // Records the angle+rotation snapshot taken at right-mousedown
-  const rotStartRef = useRef<{ angle: number; rotation: number } | null>(null);
-
-  const ROTATION_SENSITIVITY = 0.4;
+  // Last pointer position during a right-drag, used to compute per-frame movement
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   const ppmm = calibration?.ppmm ?? DEFAULT_PPMM;
   const cmToPx = ppmm * 10;
@@ -67,13 +70,7 @@ export function AssessmentCanvas({
     if (e.evt.button === 2) {
       setIsRotating(true);
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) {
-        const { x, y, rotation } = userCrossRef.current;
-        rotStartRef.current = {
-          angle: Math.atan2(pos.y - y, pos.x - x) * (180 / Math.PI),
-          rotation,
-        };
-      }
+      if (pos) lastMousePosRef.current = { x: pos.x, y: pos.y };
     }
   };
 
@@ -82,16 +79,23 @@ export function AssessmentCanvas({
     if (!pos) return;
     if (isMoving) {
       setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
-    } else if (isRotating && rotStartRef.current) {
-      const { x, y } = userCrossRef.current;
-      const currentAngle = Math.atan2(pos.y - y, pos.x - x) * (180 / Math.PI);
-      let delta = currentAngle - rotStartRef.current.angle;
-      // Normalise to [-180, 180] to avoid jumps at the ±180° boundary
-      if (delta > 180) delta -= 360;
-      if (delta < -180) delta += 360;
+    } else if (isRotating && lastMousePosRef.current) {
+      const dx = pos.x - lastMousePosRef.current.x;
+      const dy = pos.y - lastMousePosRef.current.y;
+      lastMousePosRef.current = { x: pos.x, y: pos.y };
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance === 0) return;
+
+      // Cross product of (center→mouse) × (movement) gives CW/CCW sign
+      const { x: cx, y: cy } = userCrossRef.current;
+      const toMouseX = lastMousePosRef.current.x - cx;
+      const toMouseY = lastMousePosRef.current.y - cy;
+      const sign = toMouseX * dy - toMouseY * dx >= 0 ? 1 : -1;
+
       setUserCross((prev) => ({
         ...prev,
-        rotation: rotStartRef.current!.rotation + delta * ROTATION_SENSITIVITY,
+        rotation: prev.rotation + sign * distance * ROTATION_DEG_PER_PX,
       }));
     }
   };
