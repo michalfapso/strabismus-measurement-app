@@ -62,7 +62,7 @@ const calibrationAreaStyle = css`
   justify-content: center;
   position: relative;
   margin-bottom: 30px;
-  min-height: 250px;
+  min-height: 350px;
   width: 100%;
 `;
 
@@ -82,8 +82,7 @@ const lineHandleStyle = css`
   background: #00ff00;
   position: absolute;
   cursor: ew-resize;
-  top: 50%;
-  transform: translateY(-50%);
+  top: calc(50% + 15px);
 
   &:hover {
     background: #00cc00;
@@ -211,10 +210,10 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
         x2: centerX + constrainedPixelWidth / 2,
       });
 
-      // Pre-fill PPI if we have a previous value (recalibration)
-      if (calibration?.previousPpi) {
-        setPpiLocal(calibration.previousPpi);
-      }
+      // Calculate PPI from constrained line width to avoid oscillation
+      // This ensures the value matches what auto-calc will compute
+      const calculatedPpi = (constrainedPixelWidth / targetMm) * 25.4;
+      setPpiLocal(calculatedPpi);
     }
   }, [mode, calibration?.previousPpi]);
 
@@ -228,17 +227,21 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     if (!isDragging || mode !== 'credit-card' || !containerRef.current) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
     const mouseX = e.clientX - containerRect.left;
 
-    const halfWidth = Math.max(25, mouseX - CONTAINER_CENTER_X);
+    const halfWidth = Math.max(25, mouseX - centerX);
     const newWidth = halfWidth * 2;
-    const newHeight = newWidth * (CARD_HEIGHT_MM / CARD_WIDTH_MM);
+    const newHeight = (newWidth / CARD_WIDTH_MM) * CARD_HEIGHT_MM;
 
     setRect({
       width: newWidth,
       height: newHeight,
-      x: CONTAINER_CENTER_X - halfWidth,
-      y: CONTAINER_CENTER_Y - newHeight / 2,
+      x: centerX - halfWidth,
+      y: centerY - newHeight / 2,
     });
   };
 
