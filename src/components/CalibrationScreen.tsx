@@ -54,16 +54,15 @@ const modeButtonStyle = css`
   }
 `;
 
-const canvasContainerStyle = css`
-  border: 2px solid #00ff00;
+const calibrationAreaStyle = css`
   background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 400px;
-  height: 300px;
   position: relative;
   margin-bottom: 30px;
+  min-height: 400px;
+  width: 100%;
 `;
 
 const resizableRectStyle = css`
@@ -193,6 +192,26 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     }
   }, [mode, calibration]);
 
+  // Pre-fill A4 lines on recalibration
+  useEffect(() => {
+    if (recalibrating && calibration?.lastMode && calibration?.previousPpi) {
+      if (calibration.lastMode === 'a4-short' || calibration.lastMode === 'a4-long') {
+        const targetMm = calibration.lastMode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
+        const pixelWidth = targetMm * calibration.previousPpi;
+        const containerWidth = containerRef.current?.clientWidth || 800;
+        const centerX = containerWidth / 2;
+
+        setLine({
+          x1: centerX - pixelWidth / 2,
+          x2: centerX + pixelWidth / 2,
+        });
+
+        // Pre-fill PPI so user can confirm without recalculating
+        setPpiLocal(calibration.previousPpi);
+      }
+    }
+  }, [recalibrating, calibration?.lastMode, calibration?.previousPpi]);
+
   const handleCreditCardMouseDown = () => {
     if (mode === 'credit-card') {
       setIsDragging(true);
@@ -285,8 +304,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     setPpiLocal(null);
   };
 
-  // Mode selection view - SKIP if recalibrating and lastMode exists
-  if (mode === null && !recalibrating && !calibration?.lastMode) {
+  // Mode selection view - show when no mode selected (Back button or initial selection)
+  if (mode === null) {
     return (
       <div css={containerStyle}>
         <div css={instructionStyle}>
@@ -325,7 +344,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
           </p>
         </div>
 
-        <div css={canvasContainerStyle} ref={containerRef}>
+        <div css={calibrationAreaStyle} ref={containerRef}>
           <div
             css={resizableRectStyle}
             onMouseDown={handleCreditCardMouseDown}
@@ -379,7 +398,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
         </p>
       </div>
 
-      <div css={canvasContainerStyle} ref={containerRef}>
+      <div css={calibrationAreaStyle} ref={containerRef}>
         <svg style={{ width: '100%', height: '100%', position: 'absolute' }}>
           <line
             x1={line.x1}
