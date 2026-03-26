@@ -41,8 +41,16 @@ export function AssessmentCanvas({
   // Mirrors userCross for use inside event handlers (avoids stale closures)
   const userCrossRef = useRef(userCross);
   useEffect(() => { userCrossRef.current = userCross; }, [userCross]);
-  // Last pointer position during a right-drag, used to compute per-frame movement
-  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  // Snapshot taken at right-mousedown: press position, starting rotation, and the
+  // tangent direction (perpendicular to center→press, in CW screen orientation).
+  // On each mousemove the total displacement from pressPos is projected onto this
+  // tangent to get a signed distance → rotation with no per-frame accumulation.
+  const rotStartRef = useRef<{
+    pressPos: { x: number; y: number };
+    startRotation: number;
+    tangentX: number;
+    tangentY: number;
+  } | null>(null);
 
   const ppmm = calibration?.ppmm ?? DEFAULT_PPMM;
   const cmToPx = ppmm * 10;
@@ -70,7 +78,20 @@ export function AssessmentCanvas({
     if (e.evt.button === 2) {
       setIsRotating(true);
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) lastMousePosRef.current = { x: pos.x, y: pos.y };
+      if (pos) {
+        const { x: cx, y: cy, rotation } = userCrossRef.current;
+        const toPressX = pos.x - cx;
+        const toPressY = pos.y - cy;
+        const len = Math.sqrt(toPressX * toPressX + toPressY * toPressY);
+        // Tangent = 90° CW rotation of center→press, normalised.
+        // Falls back to rightward (1, 0) if pressed exactly on the center.
+        rotStartRef.current = {
+          pressPos: { x: pos.x, y: pos.y },
+          startRotation: rotation,
+          tangentX: len > 0 ? toPressY / len : 1,
+          tangentY: len > 0 ? -toPressX / len : 0,
+        };
+      }
     }
   };
 
@@ -79,23 +100,13 @@ export function AssessmentCanvas({
     if (!pos) return;
     if (isMoving) {
       setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
-    } else if (isRotating && lastMousePosRef.current) {
-      const dx = pos.x - lastMousePosRef.current.x;
-      const dy = pos.y - lastMousePosRef.current.y;
-      lastMousePosRef.current = { x: pos.x, y: pos.y };
-
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance === 0) return;
-
-      // Cross product of (center→mouse) × (movement) gives CW/CCW sign
-      const { x: cx, y: cy } = userCrossRef.current;
-      const toMouseX = lastMousePosRef.current.x - cx;
-      const toMouseY = lastMousePosRef.current.y - cy;
-      const sign = toMouseX * dy - toMouseY * dx >= 0 ? 1 : -1;
-
+    } else if (isRotating && rotStartRef.current) {
+      const { pressPos, startRotation, tangentX, tangentY } = rotStartRef.current;
+      // Project total displacement from press onto the tangent → signed distance
+      const signedDist = (pos.x - pressPos.x) * tangentX + (pos.y - pressPos.y) * tangentY;
       setUserCross((prev) => ({
         ...prev,
-        rotation: prev.rotation + sign * distance * ROTATION_DEG_PER_PX,
+        rotation: startRotation + signedDist * ROTATION_DEG_PER_PX,
       }));
     }
   };
