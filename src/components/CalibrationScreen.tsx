@@ -181,8 +181,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
       const centerX = containerWidth / 2;
       const centerY = containerHeight / 2;
 
-      const newWidth = CARD_WIDTH_MM * ppiValue;
-      const newHeight = newWidth * (CARD_HEIGHT_MM / CARD_WIDTH_MM);
+      const newWidth = (CARD_WIDTH_MM / 25.4) * ppiValue;
+      const newHeight = (CARD_HEIGHT_MM / 25.4) * ppiValue;
 
       setRect({
         width: newWidth,
@@ -200,7 +200,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
       const ppiValue = calibration?.previousPpi || DEFAULT_PPI;
       const containerWidth = containerRef.current.clientWidth;
       const centerX = containerWidth / 2;
-      const pixelWidth = targetMm * ppiValue;
+      const pixelWidth = (targetMm / 25.4) * ppiValue;
 
       // Constrain line to page width with 20px margin
       const maxWidth = containerWidth - 40;
