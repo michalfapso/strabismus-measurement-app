@@ -30,6 +30,7 @@ export function AssessmentCanvas({
     y: window.innerHeight / 2,
     rotation: 0,
   });
+  const [isMoving, setIsMoving] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -49,32 +50,35 @@ export function AssessmentCanvas({
     onPositionChange(xCm, yCm, userCross.rotation);
   }, [userCross, cmToPx, size]);
 
-  // Left-click anywhere → move cross to that point
-  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.evt.button !== 0) return;
-    const pos = stageRef.current?.getPointerPosition();
-    if (!pos) return;
-    setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
-  };
-
-  // Right-click drag → rotate cross
+  // Left-button down/drag → move cross; right-button drag → rotate cross
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button === 0) {
+      setIsMoving(true);
+      const pos = stageRef.current?.getPointerPosition();
+      if (pos) setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
+    }
     if (e.evt.button === 2) setIsRotating(true);
   };
 
-  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isRotating || !stageRef.current) return;
-    const pos = stageRef.current.getPointerPosition();
+  const handleMouseMove = (_e: Konva.KonvaEventObject<MouseEvent>) => {
+    const pos = stageRef.current?.getPointerPosition();
     if (!pos) return;
-    const dx = pos.x - userCross.x;
-    const dy = pos.y - userCross.y;
-    setUserCross((prev) => ({
-      ...prev,
-      rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
-    }));
+    if (isMoving) {
+      setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
+    } else if (isRotating) {
+      const dx = pos.x - userCross.x;
+      const dy = pos.y - userCross.y;
+      setUserCross((prev) => ({
+        ...prev,
+        rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
+      }));
+    }
   };
 
-  const handleMouseUp = () => setIsRotating(false);
+  const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button === 0) setIsMoving(false);
+    if (e.evt.button === 2) setIsRotating(false);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,7 +111,6 @@ export function AssessmentCanvas({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onClick={handleClick}
         onContextMenu={(e) => e.evt.preventDefault()}
       >
         {/* Static red cross with cm tick marks */}
