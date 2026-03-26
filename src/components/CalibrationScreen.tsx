@@ -210,10 +210,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
         x2: centerX + constrainedPixelWidth / 2,
       });
 
-      // Calculate PPI from constrained line width to avoid oscillation
-      // This ensures the value matches what auto-calc will compute
-      const calculatedPpi = (constrainedPixelWidth / targetMm) * 25.4;
-      setPpiLocal(calculatedPpi);
+      // Don't set ppi here - let auto-calc effect calculate it from line positions
+      // This avoids oscillation from multiple ppi calculations
     }
   }, [mode, calibration?.previousPpi]);
 
@@ -383,11 +381,12 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
 
         {ppi && (
           <div css={resultStyle}>
+            <p>Size: {Math.round(rect.width)} × {Math.round(rect.height)} pixels</p>
             <p>Calculated PPI: {ppi.toFixed(2)} pixels/inch</p>
           </div>
         )}
 
-        <div css={buttonGroupStyle}>
+        <div css={buttonGroupStyle} style={{ marginTop: '20px' }}>
           <button css={backButtonStyle} onClick={handleBack}>
             Back
           </button>
@@ -442,11 +441,12 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
 
       {ppi && (
         <div css={resultStyle}>
+          <p>Size: {Math.round(line.x2 - line.x1)} pixels</p>
           <p>Calculated PPI: {ppi.toFixed(2)} pixels/inch</p>
         </div>
       )}
 
-      <div css={buttonGroupStyle}>
+      <div css={buttonGroupStyle} style={{ marginTop: '20px' }}>
         <button css={backButtonStyle} onClick={handleBack}>
           Back
         </button>
