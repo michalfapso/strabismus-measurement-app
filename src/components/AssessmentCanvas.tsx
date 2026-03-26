@@ -33,6 +33,13 @@ export function AssessmentCanvas({
   const [isMoving, setIsMoving] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
+  // Mirrors userCross for use inside event handlers (avoids stale closures)
+  const userCrossRef = useRef(userCross);
+  useEffect(() => { userCrossRef.current = userCross; }, [userCross]);
+  // Records the angle+rotation snapshot taken at right-mousedown
+  const rotStartRef = useRef<{ angle: number; rotation: number } | null>(null);
+
+  const ROTATION_SENSITIVITY = 0.4;
 
   const ppmm = calibration?.ppmm ?? DEFAULT_PPMM;
   const cmToPx = ppmm * 10;
@@ -57,7 +64,17 @@ export function AssessmentCanvas({
       const pos = stageRef.current?.getPointerPosition();
       if (pos) setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
     }
-    if (e.evt.button === 2) setIsRotating(true);
+    if (e.evt.button === 2) {
+      setIsRotating(true);
+      const pos = stageRef.current?.getPointerPosition();
+      if (pos) {
+        const { x, y, rotation } = userCrossRef.current;
+        rotStartRef.current = {
+          angle: Math.atan2(pos.y - y, pos.x - x) * (180 / Math.PI),
+          rotation,
+        };
+      }
+    }
   };
 
   const handleMouseMove = (_e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -65,12 +82,16 @@ export function AssessmentCanvas({
     if (!pos) return;
     if (isMoving) {
       setUserCross((prev) => ({ ...prev, x: pos.x, y: pos.y }));
-    } else if (isRotating) {
-      const dx = pos.x - userCross.x;
-      const dy = pos.y - userCross.y;
+    } else if (isRotating && rotStartRef.current) {
+      const { x, y } = userCrossRef.current;
+      const currentAngle = Math.atan2(pos.y - y, pos.x - x) * (180 / Math.PI);
+      let delta = currentAngle - rotStartRef.current.angle;
+      // Normalise to [-180, 180] to avoid jumps at the ±180° boundary
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
       setUserCross((prev) => ({
         ...prev,
-        rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
+        rotation: rotStartRef.current!.rotation + delta * ROTATION_SENSITIVITY,
       }));
     }
   };
