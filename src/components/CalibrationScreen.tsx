@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCalibration } from '../hooks/useCalibration';
 import { CalibrationMode, CanvasState } from '../types';
 import { css } from '@emotion/react';
@@ -173,14 +173,14 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-load last mode on recalibration
-  React.useEffect(() => {
+  useEffect(() => {
     if (recalibrating && calibration?.lastMode) {
       setMode(calibration.lastMode);
     }
   }, [recalibrating, calibration?.lastMode]);
 
   // Initialize credit card with previous PPI if available
-  React.useEffect(() => {
+  useEffect(() => {
     if (mode === 'credit-card' && calibration?.previousPpi) {
       const previousPixelWidth = CARD_WIDTH_MM * calibration.previousPpi;
       const newHeight = previousPixelWidth * (CARD_HEIGHT_MM / CARD_WIDTH_MM);
@@ -320,7 +320,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
         <div css={instructionStyle}>
           <h1>Calibration: Credit Card</h1>
           <p>
-            Resize the red rectangle to match your physical credit card (85.60 mm × 53.98 mm).
+            Resize the green rectangle to match your physical credit card (85.60 mm × 53.98 mm).
             Drag anywhere on the rectangle to resize it from the center.
           </p>
         </div>
