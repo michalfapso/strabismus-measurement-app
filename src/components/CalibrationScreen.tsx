@@ -7,8 +7,9 @@ const CARD_WIDTH_MM = 85.60;
 const CARD_HEIGHT_MM = 53.98;
 const A4_SHORT_MM = 210;
 const A4_LONG_MM = 297;
-const CONTAINER_CENTER_X = 200; // half of 400px container
-const CONTAINER_CENTER_Y = 150; // half of 300px container
+const DEFAULT_PPI = 96; // Default pixels per inch before first calibration
+const CONTAINER_CENTER_X = 200; // legacy, kept for compatibility
+const CONTAINER_CENTER_Y = 150; // legacy, kept for compatibility
 
 const containerStyle = css`
   display: flex;
@@ -178,39 +179,51 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     }
   }, [recalibrating, calibration?.lastMode]);
 
-  // Initialize credit card with previous PPI if available
+  // Initialize credit card with previous PPI or default PPI
   useEffect(() => {
-    if (mode === 'credit-card' && calibration?.previousPpi) {
-      const previousPixelWidth = CARD_WIDTH_MM * calibration.previousPpi;
-      const newHeight = previousPixelWidth * (CARD_HEIGHT_MM / CARD_WIDTH_MM);
+    if (mode === 'credit-card' && containerRef.current) {
+      const ppiValue = calibration?.previousPpi || DEFAULT_PPI;
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const centerX = containerWidth / 2;
+      const centerY = containerHeight / 2;
+
+      const newWidth = CARD_WIDTH_MM * ppiValue;
+      const newHeight = newWidth * (CARD_HEIGHT_MM / CARD_WIDTH_MM);
+
       setRect({
-        width: previousPixelWidth,
+        width: newWidth,
         height: newHeight,
-        x: CONTAINER_CENTER_X - previousPixelWidth / 2,
-        y: CONTAINER_CENTER_Y - newHeight / 2,
+        x: centerX - newWidth / 2,
+        y: centerY - newHeight / 2,
       });
     }
-  }, [mode, calibration]);
+  }, [mode, calibration?.previousPpi]);
 
-  // Pre-fill A4 lines on recalibration
+  // Initialize/pre-fill A4 lines on mode change or recalibration
   useEffect(() => {
-    if (recalibrating && calibration?.lastMode && calibration?.previousPpi) {
-      if (calibration.lastMode === 'a4-short' || calibration.lastMode === 'a4-long') {
-        const targetMm = calibration.lastMode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
-        const pixelWidth = targetMm * calibration.previousPpi;
-        const containerWidth = containerRef.current?.clientWidth || 800;
-        const centerX = containerWidth / 2;
+    if ((mode === 'a4-short' || mode === 'a4-long') && containerRef.current) {
+      const targetMm = mode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
+      const ppiValue = calibration?.previousPpi || DEFAULT_PPI;
+      const containerWidth = containerRef.current.clientWidth;
+      const centerX = containerWidth / 2;
+      const pixelWidth = targetMm * ppiValue;
 
-        setLine({
-          x1: centerX - pixelWidth / 2,
-          x2: centerX + pixelWidth / 2,
-        });
+      // Constrain line to page width with 20px margin
+      const maxWidth = containerWidth - 40;
+      const constrainedPixelWidth = Math.min(pixelWidth, maxWidth);
 
-        // Pre-fill PPI so user can confirm without recalculating
+      setLine({
+        x1: centerX - constrainedPixelWidth / 2,
+        x2: centerX + constrainedPixelWidth / 2,
+      });
+
+      // Pre-fill PPI if we have a previous value (recalibration)
+      if (calibration?.previousPpi) {
         setPpiLocal(calibration.previousPpi);
       }
     }
-  }, [recalibrating, calibration?.lastMode, calibration?.previousPpi]);
+  }, [mode, calibration?.previousPpi]);
 
   const handleCreditCardMouseDown = () => {
     if (mode === 'credit-card') {
@@ -251,12 +264,13 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     const containerWidth = containerRef.current.clientWidth;
     const screenCenter = containerWidth / 2;
     const mouseX = e.clientX - containerRect.left;
+    const margin = 20; // margin from page edges
 
     if (draggingEndpoint === 'left') {
       // When dragging left endpoint, expand both from center
       const distance = screenCenter - mouseX;
-      const newX1 = Math.max(10, screenCenter - Math.abs(distance));
-      const newX2 = screenCenter + Math.abs(distance);
+      const newX1 = Math.max(margin, screenCenter - Math.abs(distance));
+      const newX2 = Math.min(containerWidth - margin, screenCenter + Math.abs(distance));
 
       setLine({
         x1: newX1,
@@ -265,8 +279,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     } else {
       // When dragging right endpoint, expand both from center
       const distance = mouseX - screenCenter;
-      const newX2 = Math.min(containerWidth - 10, screenCenter + Math.abs(distance));
-      const newX1 = screenCenter - Math.abs(distance);
+      const newX2 = Math.min(containerWidth - margin, screenCenter + Math.abs(distance));
+      const newX1 = Math.max(margin, screenCenter - Math.abs(distance));
 
       setLine({
         x1: newX1,
