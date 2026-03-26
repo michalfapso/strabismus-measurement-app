@@ -174,7 +174,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   // Initialize credit card with previous PPI or default PPI
   useEffect(() => {
     if (mode === 'credit-card' && containerRef.current) {
-      const ppiValue = calibration?.previousPpi || DEFAULT_PPI;
+      const ppiValue = calibration?.ppi || DEFAULT_PPI;
       const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight;
       const centerX = containerWidth / 2;
@@ -196,7 +196,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   useEffect(() => {
     if ((mode === 'a4-short' || mode === 'a4-long') && containerRef.current) {
       const targetMm = mode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
-      const ppiValue = calibration?.previousPpi || DEFAULT_PPI;
+      const ppiValue = calibration?.ppi || DEFAULT_PPI;
       const containerWidth = containerRef.current.clientWidth;
       const centerX = containerWidth / 2;
       const pixelWidth = (targetMm / 25.4) * ppiValue;
