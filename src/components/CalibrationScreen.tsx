@@ -205,19 +205,6 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
       const maxWidth = containerWidth - 40;
       const constrainedPixelWidth = Math.min(pixelWidth, maxWidth);
 
-      console.log('[INIT A4]', {
-        mode,
-        targetMm,
-        previousPpi: calibration?.previousPpi,
-        ppiValue,
-        containerWidth,
-        pixelWidth: pixelWidth.toFixed(2),
-        maxWidth,
-        constrainedPixelWidth: constrainedPixelWidth.toFixed(2),
-        x1: (centerX - constrainedPixelWidth / 2).toFixed(2),
-        x2: (centerX + constrainedPixelWidth / 2).toFixed(2),
-      });
-
       setLine({
         x1: centerX - constrainedPixelWidth / 2,
         x2: centerX + constrainedPixelWidth / 2,
@@ -310,13 +297,11 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     const targetMm = mode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
     const pixelWidth = line.x2 - line.x1;
     const ppiValue = pixelWidth / targetMm * 25.4;
-    console.log('[CALC A4 PPI]', { targetMm, pixelWidth: pixelWidth.toFixed(2), ppiValue: ppiValue.toFixed(2) });
     setPpiLocal(ppiValue);
   };
 
   const handleConfirm = async () => {
     if (ppi && mode) {
-      console.log('[CONFIRM]', { mode, ppi: ppi.toFixed(2) });
       await setPpi(ppi, mode);
       onComplete();
     }
@@ -337,7 +322,6 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   // Auto-calculate PPI when A4 line dimensions change
   useEffect(() => {
     if (mode === 'a4-short' || mode === 'a4-long') {
-      console.log('[AUTO-CALC A4] line changed', { x1: line.x1.toFixed(2), x2: line.x2.toFixed(2), width: (line.x2 - line.x1).toFixed(2) });
       calculateA4PPI();
     }
   }, [line.x1, line.x2]);
