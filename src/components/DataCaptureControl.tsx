@@ -70,8 +70,8 @@ export function DataCaptureControl() {
   const [elapsed, setElapsed] = useState(0);
 
   const handleStart = () => {
-    if (calibration?.ppmm) {
-      startSession(selectedExercise, calibration.ppmm);
+    if (calibration?.ppi) {
+      startSession(selectedExercise, calibration.ppi);
       startCapture();
       setElapsed(0);
     }

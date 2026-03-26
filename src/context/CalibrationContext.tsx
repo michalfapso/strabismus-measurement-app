@@ -4,11 +4,11 @@ import { getCalibration, saveCalibration } from '../services/storage';
 
 export const CalibrationContext = createContext<{
   calibration: CalibrationState | null;
-  setPpmm: (ppmm: number) => Promise<void>;
+  setPpi: (ppi: number) => Promise<void>;
   isLoading: boolean;
 }>({
   calibration: null,
-  setPpmm: async () => {},
+  setPpi: async () => {},
   isLoading: true,
 });
 
@@ -30,17 +30,18 @@ export function CalibrationProvider({ children }: { children: ReactNode }) {
     load();
   }, []);
 
-  const setPpmm = async (ppmm: number) => {
+  const setPpi = async (ppi: number) => {
     const newCalibration: CalibrationState = {
-      ppmm,
+      ppi,
       timestamp: new Date().toISOString(),
+      previousPpi: calibration?.ppi ?? undefined,
     };
     await saveCalibration(newCalibration);
     setCalibration(newCalibration);
   };
 
   return (
-    <CalibrationContext.Provider value={{ calibration, setPpmm, isLoading }}>
+    <CalibrationContext.Provider value={{ calibration, setPpi, isLoading }}>
       {children}
     </CalibrationContext.Provider>
   );

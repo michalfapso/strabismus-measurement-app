@@ -26,8 +26,24 @@ export interface Session {
  * Calibration state
  */
 export interface CalibrationState {
-  ppmm: number | null; // null if not yet calibrated
+  ppi: number | null; // pixels per inch (replaces ppmm)
   timestamp: string; // ISO8601, when last calibrated
+  previousPpi?: number; // Store previous PPI for recalibration pre-fill
+  lastMode?: CalibrationMode; // Track last-used calibration method
+}
+
+/**
+ * Calibration mode type
+ */
+export type CalibrationMode = 'a4-short' | 'a4-long' | 'credit-card';
+
+/**
+ * Canvas state (position and rotation)
+ */
+export interface CanvasState {
+  x: number; // pixel x coordinate
+  y: number; // pixel y coordinate
+  rotation: number; // degrees
 }
 
 /**

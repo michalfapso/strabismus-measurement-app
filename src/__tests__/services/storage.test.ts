@@ -72,7 +72,7 @@ describe('Storage Service', () => {
 
   it('should save and retrieve calibration', async () => {
     const calibration: CalibrationState = {
-      ppmm: 37.8,
+      ppi: 96,
       timestamp: new Date().toISOString(),
     };
 

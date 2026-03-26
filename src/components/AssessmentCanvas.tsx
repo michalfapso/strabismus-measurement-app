@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Circle, Group } from 'react-konva';
 import Konva from 'konva';
 import { useCalibration } from '../hooks/useCalibration';
+import { CanvasState } from '../types';
 import { css } from '@emotion/react';
 
 const canvasWrapperStyle = css`
@@ -10,12 +11,15 @@ const canvasWrapperStyle = css`
   background: #000;
 `;
 
-const DEFAULT_PPMM = 3.78;
+const DEFAULT_PPI = 96; // Standard screen DPI
 
 // ── Rotation sensitivity ──────────────────────────────────────────────────────
 // Degrees of rotation produced per pixel of mouse movement while right-dragging.
 // Increase to rotate faster, decrease to rotate slower.
 const ROTATION_DEG_PER_PX = 0.25;
+// Degrees of rotation produced per wheel notch (deltaY of 100 ≈ one notch).
+// Increase to rotate faster on scroll, decrease to rotate slower.
+const ROTATION_DEG_PER_WHEEL_NOTCH = 1.0;
 
 interface CrossState {
   x: number;
@@ -25,8 +29,12 @@ interface CrossState {
 
 export function AssessmentCanvas({
   onPositionChange,
+  restoredState,
+  onStateRestored,
 }: {
   onPositionChange: (x: number, y: number, r: number) => void;
+  restoredState?: { x: number; y: number; rotation: number };
+  onStateRestored?: () => void;
 }) {
   const { calibration } = useCalibration();
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -41,6 +49,29 @@ export function AssessmentCanvas({
   // Mirrors userCross for use inside event handlers (avoids stale closures)
   const userCrossRef = useRef(userCross);
   useEffect(() => { userCrossRef.current = userCross; }, [userCross]);
+
+  // Restore canvas state when returning from calibration
+  useEffect(() => {
+    if (restoredState) {
+      const cmToPx = (calibration?.ppi ?? DEFAULT_PPI) / 2.54;
+      const centerX = size.width / 2;
+      const centerY = size.height / 2;
+
+      // Convert from cm to pixels: x_px = center + x_cm * cmToPx
+      const pixelX = centerX + restoredState.x * cmToPx;
+      const pixelY = centerY - restoredState.y * cmToPx;
+
+      setUserCross({
+        x: pixelX,
+        y: pixelY,
+        rotation: restoredState.rotation,
+      });
+
+      if (onStateRestored) {
+        onStateRestored();
+      }
+    }
+  }, [restoredState, calibration, size, onStateRestored]);
   // Snapshot taken at right-mousedown: press position, starting rotation, and the
   // tangent direction (perpendicular to center→press, in CW screen orientation).
   // On each mousemove the total displacement from pressPos is projected onto this
@@ -52,8 +83,8 @@ export function AssessmentCanvas({
     tangentY: number;
   } | null>(null);
 
-  const ppmm = calibration?.ppmm ?? DEFAULT_PPMM;
-  const cmToPx = ppmm * 10;
+  const ppi = calibration?.ppi ?? DEFAULT_PPI;
+  const cmToPx = ppi / 2.54;
 
   useEffect(() => {
     const handleResize = () =>
@@ -116,6 +147,12 @@ export function AssessmentCanvas({
     if (e.evt.button === 2) setIsRotating(false);
   };
 
+  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const delta = (e.evt.deltaY / 100) * ROTATION_DEG_PER_WHEEL_NOTCH;
+    setUserCross((prev) => ({ ...prev, rotation: prev.rotation + delta }));
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const step = cmToPx * 0.1;
@@ -147,6 +184,7 @@ export function AssessmentCanvas({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onWheel={handleWheel}
         onContextMenu={(e) => e.evt.preventDefault()}
       >
         {/* Static red cross with cm tick marks */}
