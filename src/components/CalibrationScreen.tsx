@@ -67,8 +67,8 @@ const canvasContainerStyle = css`
 `;
 
 const resizableRectStyle = css`
-  background: rgba(255, 0, 0, 0.2);
-  border: 3px dashed #ff0000;
+  background: rgba(0, 255, 0, 0.1);
+  border: 3px solid #00ff00;
   cursor: nwse-resize;
   position: absolute;
   min-width: 50px;
@@ -151,9 +151,10 @@ interface LineState {
 interface CalibrationScreenProps {
   onComplete: () => void;
   restoredCanvasState?: CanvasState;
+  recalibrating?: boolean;
 }
 
-export function CalibrationScreen({ onComplete, restoredCanvasState }: CalibrationScreenProps) {
+export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrating }: CalibrationScreenProps) {
   const { calibration, setPpi } = useCalibration();
   const [mode, setMode] = useState<CalibrationMode | null>(null);
   const [rect, setRect] = useState<RectState>({
@@ -170,6 +171,13 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
   const [draggingEndpoint, setDraggingEndpoint] = useState<'left' | 'right' | null>(null);
   const [ppi, setPpiLocal] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-load last mode on recalibration
+  React.useEffect(() => {
+    if (recalibrating && calibration?.lastMode) {
+      setMode(calibration.lastMode);
+    }
+  }, [recalibrating, calibration?.lastMode]);
 
   // Initialize credit card with previous PPI if available
   React.useEffect(() => {
@@ -221,18 +229,30 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
     if (mode !== 'a4-short' && mode !== 'a4-long') return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRef.current.clientWidth;
+    const screenCenter = containerWidth / 2;
     const mouseX = e.clientX - containerRect.left;
 
     if (draggingEndpoint === 'left') {
-      setLine((prev) => ({
-        x1: Math.max(10, Math.min(mouseX, prev.x2 - 50)),
-        x2: prev.x2,
-      }));
+      // When dragging left endpoint, expand both from center
+      const distance = screenCenter - mouseX;
+      const newX1 = Math.max(10, screenCenter - Math.abs(distance));
+      const newX2 = screenCenter + Math.abs(distance);
+
+      setLine({
+        x1: newX1,
+        x2: newX2,
+      });
     } else {
-      setLine((prev) => ({
-        x1: prev.x1,
-        x2: Math.min(390, Math.max(mouseX, prev.x1 + 50)),
-      }));
+      // When dragging right endpoint, expand both from center
+      const distance = mouseX - screenCenter;
+      const newX2 = Math.min(containerWidth - 10, screenCenter + Math.abs(distance));
+      const newX1 = screenCenter - Math.abs(distance);
+
+      setLine({
+        x1: newX1,
+        x2: newX2,
+      });
     }
   };
 
@@ -241,12 +261,12 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
     setDraggingEndpoint(null);
   };
 
-  const calculateCreditCardPpi = () => {
+  const calculateCreditCardPPI = () => {
     const ppiValue = rect.width / CARD_WIDTH_MM * 25.4;
     setPpiLocal(ppiValue);
   };
 
-  const calculateA4Ppi = () => {
+  const calculateA4PPI = () => {
     const targetMm = mode === 'a4-short' ? A4_SHORT_MM : A4_LONG_MM;
     const pixelWidth = line.x2 - line.x1;
     const ppiValue = pixelWidth / targetMm * 25.4;
@@ -254,8 +274,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
   };
 
   const handleConfirm = async () => {
-    if (ppi) {
-      await setPpi(ppi);
+    if (ppi && mode) {
+      await setPpi(ppi, mode);
       onComplete();
     }
   };
@@ -265,8 +285,8 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
     setPpiLocal(null);
   };
 
-  // Mode selection view
-  if (mode === null) {
+  // Mode selection view - SKIP if recalibrating and lastMode exists
+  if (mode === null && !recalibrating && !calibration?.lastMode) {
     return (
       <div css={containerStyle}>
         <div css={instructionStyle}>
@@ -322,7 +342,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
           <button css={backButtonStyle} onClick={handleBack}>
             Back
           </button>
-          <button css={buttonStyle} onClick={calculateCreditCardPpi}>
+          <button css={buttonStyle} onClick={calculateCreditCardPPI}>
             Calculate PPI
           </button>
         </div>
@@ -391,7 +411,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState }: Calibrati
         <button css={backButtonStyle} onClick={handleBack}>
           Back
         </button>
-        <button css={buttonStyle} onClick={calculateA4Ppi}>
+        <button css={buttonStyle} onClick={calculateA4PPI}>
           Calculate PPI
         </button>
       </div>

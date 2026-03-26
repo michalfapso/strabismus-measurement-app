@@ -35,7 +35,7 @@ describe('Storage Service', () => {
       sessionId: 'test-123',
       timestamp: new Date().toISOString(),
       exerciseTag: 'Pencil Push-ups',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [{ t: 0, x: 0, y: 0, r: 0 }],
     };
 
@@ -50,14 +50,14 @@ describe('Storage Service', () => {
       sessionId: 'test-1',
       timestamp: new Date().toISOString(),
       exerciseTag: 'Brock String',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [],
     };
     const session2: Session = {
       sessionId: 'test-2',
       timestamp: new Date().toISOString(),
       exerciseTag: 'No Exercise/Control',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [],
     };
 

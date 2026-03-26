@@ -7,7 +7,7 @@ describe('TypeScript Types', () => {
       sessionId: 'uuid-123',
       timestamp: new Date().toISOString(),
       exerciseTag: 'Pencil Push-ups',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [],
     };
     expect(session.sessionId).toBeDefined();

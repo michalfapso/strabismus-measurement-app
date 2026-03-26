@@ -9,7 +9,7 @@ describe('CSV Export Service', () => {
       sessionId: 'test-123',
       timestamp: '2026-03-25T10:00:00Z',
       exerciseTag: 'Pencil Push-ups',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [],
     };
 
@@ -29,7 +29,7 @@ describe('CSV Export Service', () => {
       sessionId: 'test-123',
       timestamp: '2026-03-25T10:00:00Z',
       exerciseTag: 'Brock String',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [
         { t: 0, x: 0, y: 0, r: 0 },
         { t: 100, x: 0.5, y: -1.2, r: 5.5 },
@@ -51,7 +51,7 @@ describe('CSV Export Service', () => {
       sessionId: 'test-123',
       timestamp: '2026-03-25T10:00:00Z',
       exerciseTag: 'No Exercise/Control',
-      ppmm: 37.8,
+      ppi: 37.8,
       timeSeries: [{ t: 0, x: 0, y: 0, r: 0 }],
     };
 

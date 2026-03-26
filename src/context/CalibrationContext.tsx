@@ -1,10 +1,10 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import { CalibrationState } from '../types';
+import { CalibrationState, CalibrationMode } from '../types';
 import { getCalibration, saveCalibration } from '../services/storage';
 
 export const CalibrationContext = createContext<{
   calibration: CalibrationState | null;
-  setPpi: (ppi: number) => Promise<void>;
+  setPpi: (ppi: number, mode: CalibrationMode) => Promise<void>;
   isLoading: boolean;
 }>({
   calibration: null,
@@ -30,11 +30,12 @@ export function CalibrationProvider({ children }: { children: ReactNode }) {
     load();
   }, []);
 
-  const setPpi = async (ppi: number) => {
+  const setPpi = async (ppi: number, mode: CalibrationMode) => {
     const newCalibration: CalibrationState = {
       ppi,
       timestamp: new Date().toISOString(),
       previousPpi: calibration?.ppi ?? undefined,
+      lastMode: mode,
     };
     await saveCalibration(newCalibration);
     setCalibration(newCalibration);

@@ -18,7 +18,7 @@ export interface Session {
   sessionId: string; // UUID
   timestamp: string; // ISO8601
   exerciseTag: string; // e.g., "Pencil Push-ups"
-  ppmm: number; // pixels per millimeter (calibration)
+  ppi: number; // pixels per inch (calibration)
   timeSeries: TimeSeries[]; // array of measurements
 }
 

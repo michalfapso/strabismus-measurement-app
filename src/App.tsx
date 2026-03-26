@@ -7,6 +7,7 @@ import { DataCaptureControl } from './components/DataCaptureControl';
 import { SessionExplorer } from './components/SessionExplorer';
 import { useCalibration } from './hooks/useCalibration';
 import { useSession } from './hooks/useSession';
+import { CanvasState } from './types';
 import { css } from '@emotion/react';
 
 /* ── overlay container (top-right corner) ─────────────────────── */
@@ -78,17 +79,46 @@ function AppContent() {
   const [showControls, setShowControls] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [canvasData, setCanvasData] = useState({ x: 0, y: 0, r: 0 });
+  const [savedCanvasState, setSavedCanvasState] = useState<CanvasState | undefined>();
+  const [restoredCanvasState, setRestoredCanvasState] = useState<CanvasState | undefined>();
 
   if (isLoading) return null;
 
   if (!calibration || showCalibration) {
-    return <CalibrationScreen onComplete={() => setShowCalibration(false)} />;
+    return (
+      <CalibrationScreen
+        onComplete={() => {
+          setShowCalibration(false);
+          // Restore saved canvas state if it was a recalibration
+          if (savedCanvasState) {
+            setRestoredCanvasState(savedCanvasState);
+            setSavedCanvasState(undefined);
+          }
+        }}
+        restoredCanvasState={restoredCanvasState}
+        recalibrating={!!calibration?.lastMode}
+      />
+    );
   }
+
+  const handleRecalibrate = () => {
+    // Save current canvas state before entering calibration
+    setSavedCanvasState({
+      x: canvasData.x,
+      y: canvasData.y,
+      rotation: canvasData.r,
+    });
+    setShowCalibration(true);
+  };
 
   return (
     <>
       {/* Canvas fills entire screen */}
-      <AssessmentCanvas onPositionChange={(x, y, r) => setCanvasData({ x, y, r })} />
+      <AssessmentCanvas
+        onPositionChange={(x, y, r) => setCanvasData({ x, y, r })}
+        restoredState={restoredCanvasState}
+        onStateRestored={() => setRestoredCanvasState(undefined)}
+      />
 
       {/* Floating overlay */}
       <div css={overlayStyle}>
@@ -109,7 +139,7 @@ function AppContent() {
           <button css={chipStyle} onClick={() => setShowHistory((v) => !v)}>
             History
           </button>
-          <button css={chipStyle} onClick={() => setShowCalibration(true)}>
+          <button css={chipStyle} onClick={handleRecalibrate}>
             Recalibrate
           </button>
         </div>

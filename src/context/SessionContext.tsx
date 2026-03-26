@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const SessionContext = createContext<{
   currentSession: Session | null;
-  startSession: (exerciseTag: string, ppmm: number) => void;
+  startSession: (exerciseTag: string, ppi: number) => void;
   addTimeSeriesPoint: (point: TimeSeries) => void;
   endSession: () => Promise<void>;
   clearSession: () => void;
@@ -22,12 +22,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  const startSession = (exerciseTag: string, ppmm: number) => {
+  const startSession = (exerciseTag: string, ppi: number) => {
     const session: Session = {
       sessionId: uuidv4(),
       timestamp: new Date().toISOString(),
       exerciseTag,
-      ppmm,
+      ppi,
       timeSeries: [],
     };
     setCurrentSession(session);
