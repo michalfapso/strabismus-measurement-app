@@ -4,7 +4,8 @@ import { SessionProvider } from './context/SessionContext';
 import { CalibrationScreen } from './components/CalibrationScreen';
 import { AssessmentCanvas } from './components/AssessmentCanvas';
 import { DataCaptureControl } from './components/DataCaptureControl';
-import { SessionExplorer } from './components/SessionExplorer';
+import { HistoryPage } from './components/HistoryPage';
+import { ResultsPanel } from './components/ResultsPanel';
 import { useCalibration } from './hooks/useCalibration';
 import { useSession } from './hooks/useSession';
 import { CanvasState } from './types';
@@ -74,7 +75,7 @@ const hudStyle = css`
 
 function AppContent() {
   const { calibration, isLoading } = useCalibration();
-  const { currentSession } = useSession();
+  const { currentSession, showResults, setShowResults } = useSession();
   const [showCalibration, setShowCalibration] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -120,6 +121,11 @@ function AppContent() {
         onStateRestored={() => setRestoredCanvasState(undefined)}
       />
 
+      {/* Full-screen history page */}
+      {showHistory && (
+        <HistoryPage onNavigateBack={() => setShowHistory(false)} />
+      )}
+
       {/* Floating overlay */}
       <div css={overlayStyle}>
 
@@ -137,7 +143,7 @@ function AppContent() {
             {showControls ? '✕ Controls' : '☰ Controls'}
           </button>
           <button css={chipStyle} onClick={() => setShowHistory((v) => !v)}>
-            History
+            {showHistory ? '✕ History' : '📊 History'}
           </button>
           <button css={chipStyle} onClick={handleRecalibrate}>
             Recalibrate
@@ -151,12 +157,12 @@ function AppContent() {
           </div>
         )}
 
-        {/* Collapsible session history panel */}
-        {showHistory && (
-          <div css={panelStyle}>
-            <SessionExplorer />
-          </div>
-        )}
+        {/* Results panel after measurement */}
+        <ResultsPanel
+          session={currentSession}
+          visible={showResults}
+          onDismiss={() => setShowResults(false)}
+        />
 
       </div>
     </>
