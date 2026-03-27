@@ -8,6 +8,7 @@ import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
 import { SessionDetailPanel } from './SessionDetailPanel';
 import { AggregateResultsPanel } from './AggregateResultsPanel';
+import { downloadCSV } from '../services/export';
 
 export interface HistoryPageProps {
   onNavigateBack: () => void;
@@ -42,8 +43,9 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
       .map(id => allSessions.find(s => s.sessionId === id))
       .filter(s => s !== undefined) as Session[];
 
-    // TODO: Implement CSV export
-    console.log('Exporting', selectedSessions.length, 'sessions');
+    if (selectedSessions.length > 0) {
+      downloadCSV(selectedSessions);
+    }
   };
 
   const selectedCount = selectedIds.size;
