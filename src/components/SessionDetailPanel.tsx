@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use UnifiedSessionPanel instead. This component is kept for reference only.
+ * All functionality has been migrated to UnifiedSessionPanel.
+ */
+
 import { Session } from '../types';
 import { useSessionStats } from '../hooks/useSessionStats';
 import { prepareSessionGraphData } from '../services/graphData';

@@ -7,8 +7,7 @@ import { DateFilterBar } from './DateFilterBar';
 import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
-import { SessionDetailPanel } from './SessionDetailPanel';
-import { AggregateResultsPanel } from './AggregateResultsPanel';
+import { UnifiedSessionPanel } from './UnifiedSessionPanel';
 import { downloadCSV } from '../services/export';
 
 export interface HistoryPageProps {}
@@ -152,28 +151,14 @@ export function HistoryPage({}: HistoryPageProps) {
         </div>
 
         {/* Detail side */}
-        {selectedCount === 1 && (
+        {selectedCount > 0 && (
           <div style={{
             flex: 1,
             borderLeft: '1px solid rgba(255,255,255,0.1)',
             overflow: 'auto',
             position: 'relative',
           }}>
-            <SessionDetailPanel
-              session={selectedSessions[0]}
-              onClose={() => {}}
-            />
-          </div>
-        )}
-
-        {selectedCount > 1 && (
-          <div style={{
-            flex: 1,
-            borderLeft: '1px solid rgba(255,255,255,0.1)',
-            overflow: 'auto',
-            position: 'relative',
-          }}>
-            <AggregateResultsPanel
+            <UnifiedSessionPanel
               sessions={selectedSessions}
             />
           </div>

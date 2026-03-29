@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use UnifiedSessionPanel instead. This component is kept for reference only.
+ * All functionality has been migrated to UnifiedSessionPanel.
+ */
+
 import { useState } from 'react';
 import { Session } from '../types';
 import { calculateStats, linearRegression } from '../utils/stats';

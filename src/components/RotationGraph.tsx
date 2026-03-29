@@ -31,7 +31,7 @@ export function RotationGraph({ data, title = 'Rotation Over Time' }: RotationGr
           <Tooltip
             contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid #444', borderRadius: '4px' }}
             labelStyle={{ color: '#fff' }}
-            formatter={(value) => value.toFixed(1)}
+            formatter={(value: any) => (typeof value === 'number' ? value.toFixed(1) : value)}
           />
           <Legend wrapperStyle={{ color: '#fff' }} />
           <Line
