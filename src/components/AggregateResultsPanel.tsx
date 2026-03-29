@@ -473,26 +473,20 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
                 <Line
                   key={`session${sessionIdx}`}
                   dataKey={`session${sessionIdx}`}
-                  stroke="rgba(200,200,200,0.4)"
+                  stroke="rgba(180,180,180,0.3)"
                   dot={false}
                   strokeWidth={1}
                   isAnimationActive={false}
                 />
               ))}
 
-              {/* Standard deviation band (semitransparent green area) */}
+              {/* Filled standard deviation band (semi-transparent green) */}
               <Area
                 type="monotone"
                 dataKey="upper"
-                fill="rgba(0,255,0,0.15)"
+                fill="rgba(0,255,0,0.18)"
                 stroke="none"
-                isAnimationActive={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="lower"
-                fill="rgba(0,255,0,0.15)"
-                stroke="none"
+                fillOpacity={0.6}
                 isAnimationActive={false}
               />
 
@@ -502,9 +496,9 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
                 dataKey="mean"
                 stroke="#00ff00"
                 dot={false}
-                strokeWidth={2.5}
+                strokeWidth={3}
                 isAnimationActive={false}
-                name="Mean"
+                name="Mean ± 1σ"
               />
             </ComposedChart>
           </ResponsiveContainer>
