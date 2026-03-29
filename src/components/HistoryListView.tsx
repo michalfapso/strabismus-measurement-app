@@ -4,7 +4,7 @@ import { getSessionDuration, getPositionRange } from '../services/stats';
 export interface HistoryListViewProps {
   sessions: Session[];
   selectedIds: Set<string>;
-  onRowClick: (id: string, ctrlKey: boolean, shiftKey: boolean) => void;
+  onRowClick: (id: string, ctrlKey: boolean, shiftKey: boolean, visibleIds: string[]) => void;
   onSessionSelect: (session: Session) => void;
 }
 
@@ -34,6 +34,8 @@ export function HistoryListView({
     );
   }
 
+  const visibleIds = sessions.map(s => s.sessionId);
+
   return (
     <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
       {sessions.map((session) => {
@@ -49,7 +51,7 @@ export function HistoryListView({
               const shift = (e as any).shiftKey;
 
               if (ctrl || shift) {
-                onRowClick(session.sessionId, ctrl, shift);
+                onRowClick(session.sessionId, ctrl, shift, visibleIds);
               } else {
                 onSessionSelect(session);
               }
@@ -81,7 +83,7 @@ export function HistoryListView({
               checked={isSelected}
               onChange={(e) => {
                 e.stopPropagation();
-                onRowClick(session.sessionId, true, false);
+                onRowClick(session.sessionId, true, false, visibleIds);
               }}
               style={{ cursor: 'pointer', width: '16px', height: '16px' }}
             />
