@@ -67,3 +67,24 @@ export const PREDEFINED_EXERCISES: ExerciseType[] = [
   'Left-Tendon-Stretch',
   'Right-Tendon-Stretch',
 ];
+
+/**
+ * Session statistics (computed from timeSeries)
+ */
+export interface SessionStats {
+  positionRange?: {
+    xMin: number;
+    xMax: number;
+    xRange: number;
+    yMin: number;
+    yMax: number;
+    yRange: number;
+  };
+  rotationRange?: {
+    rMin: number;
+    rMax: number;
+    range: number;
+  };
+  duration: number;
+  meanDeviation: number;
+}

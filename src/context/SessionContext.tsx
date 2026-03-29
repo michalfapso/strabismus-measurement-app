@@ -1,5 +1,5 @@
 import React, { createContext, useState, ReactNode } from 'react';
-import { Session, TimeSeries } from '../types';
+import { Session, TimeSeries, SessionStats } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 export const SessionContext = createContext<{
@@ -9,6 +9,11 @@ export const SessionContext = createContext<{
   endSession: () => Promise<void>;
   clearSession: () => void;
   sessions: Session[];
+  showResults: boolean;
+  setShowResults: (show: boolean) => void;
+  selectedSessionIds: Set<string>;
+  setSelectedSessionIds: (ids: Set<string>) => void;
+  loadHistoricalSessions: (from?: Date, to?: Date) => Promise<Session[]>;
 }>({
   currentSession: null,
   startSession: () => {},
@@ -16,11 +21,18 @@ export const SessionContext = createContext<{
   endSession: async () => {},
   clearSession: () => {},
   sessions: [],
+  showResults: false,
+  setShowResults: () => {},
+  selectedSessionIds: new Set(),
+  setSelectedSessionIds: () => {},
+  loadHistoricalSessions: async () => [],
 });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [showResults, setShowResults] = useState<boolean>(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
   const startSession = (exerciseTag: string, ppi: number) => {
     const session: Session = {
@@ -47,11 +59,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const { saveSession } = await import('../services/storage');
     await saveSession(currentSession);
     setSessions([currentSession, ...sessions]);
+    setShowResults(true);
     setCurrentSession(null);
   };
 
   const clearSession = () => {
     setCurrentSession(null);
+  };
+
+  const loadHistoricalSessions = async (from?: Date, to?: Date): Promise<Session[]> => {
+    const { getAllSessions } = await import('../services/storage');
+    const allSessions = await getAllSessions();
+
+    if (!from && !to) return allSessions;
+
+    return allSessions.filter((session) => {
+      const sessionDate = new Date(session.timestamp);
+      const passesFrom = !from || sessionDate >= from;
+      const passesTo = !to || sessionDate <= to;
+      return passesFrom && passesTo;
+    });
   };
 
   return (
@@ -63,6 +90,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         endSession,
         clearSession,
         sessions,
+        showResults,
+        setShowResults,
+        selectedSessionIds,
+        setSelectedSessionIds,
+        loadHistoricalSessions,
       }}
     >
       {children}
