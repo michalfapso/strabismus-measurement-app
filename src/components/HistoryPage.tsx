@@ -11,15 +11,12 @@ import { SessionDetailPanel } from './SessionDetailPanel';
 import { AggregateResultsPanel } from './AggregateResultsPanel';
 import { downloadCSV } from '../services/export';
 
-export interface HistoryPageProps {
-  onNavigateBack: () => void;
-}
+export interface HistoryPageProps {}
 
-export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
+export function HistoryPage({}: HistoryPageProps) {
   const { loadHistoricalSessions } = useContext(SessionContext);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [detailSession, setDetailSession] = useState<Session | null>(null);
 
   const {
     dateRange,
@@ -90,23 +87,7 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
         backgroundColor: 'rgba(0,0,0,0.3)',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h1 style={{ margin: 0, fontSize: '20px', color: '#fff' }}>Session History</h1>
-          <button
-            onClick={onNavigateBack}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '4px',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            ← Back to Measurement
-          </button>
-        </div>
+        <h1 style={{ margin: '0 0 12px 0', fontSize: '20px', color: '#fff' }}>Session History</h1>
         <DateFilterBar currentRange={dateRange} onDateChange={setDateRange} />
         <ExerciseTypeFilterBar
           distinctTypes={distinctExerciseTypes}
@@ -123,7 +104,8 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
       }}>
         {/* List side */}
         <div style={{
-          flex: 1,
+          width: '300px',
+          flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -145,7 +127,6 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
                 sessions={filteredSessions}
                 selectedIds={selectedIds}
                 onRowClick={handleRowClick}
-                onSessionSelect={setDetailSession}
               />
               {selectedCount > 0 && (
                 <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -160,25 +141,23 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
         </div>
 
         {/* Detail side */}
-        {detailSession && (
+        {selectedCount === 1 && (
           <div style={{
-            width: '400px',
-            maxWidth: '40%',
+            flex: 1,
             borderLeft: '1px solid rgba(255,255,255,0.1)',
             overflow: 'auto',
             position: 'relative',
           }}>
             <SessionDetailPanel
-              session={detailSession}
-              onClose={() => setDetailSession(null)}
+              session={selectedSessions[0]}
+              onClose={() => {}}
             />
           </div>
         )}
 
-        {selectedCount > 1 && !detailSession && (
+        {selectedCount > 1 && (
           <div style={{
-            width: '400px',
-            maxWidth: '40%',
+            flex: 1,
             borderLeft: '1px solid rgba(255,255,255,0.1)',
             overflow: 'auto',
             position: 'relative',

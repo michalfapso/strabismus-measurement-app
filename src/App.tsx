@@ -16,7 +16,7 @@ const overlayStyle = css`
   position: fixed;
   top: 16px;
   right: 16px;
-  z-index: 100;
+  z-index: 200;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -77,15 +77,15 @@ function AppContent() {
   const { calibration, isLoading } = useCalibration();
   const { currentSession, showResults, setShowResults } = useSession();
   const [showCalibration, setShowCalibration] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
+  const [activePage, setActivePage] = useState<'measurement' | 'history'>('measurement');
   const [canvasData, setCanvasData] = useState({ x: 0, y: 0, r: 0 });
   const [savedCanvasState, setSavedCanvasState] = useState<CanvasState | undefined>();
   const [restoredCanvasState, setRestoredCanvasState] = useState<CanvasState | undefined>();
 
   if (isLoading) return null;
 
-  if (!calibration || showCalibration) {
+  // Case 1: First-time calibration — no toolbar, full takeover
+  if (!calibration) {
     return (
       <CalibrationScreen
         onComplete={() => {
@@ -97,8 +97,41 @@ function AppContent() {
           }
         }}
         restoredCanvasState={restoredCanvasState}
-        recalibrating={!!calibration?.lastMode}
+        recalibrating={false}
       />
+    );
+  }
+
+  // Case 2: Recalibrating — show toolbar above CalibrationScreen
+  if (showCalibration) {
+    return (
+      <>
+        <CalibrationScreen
+          onComplete={() => {
+            setShowCalibration(false);
+            // Restore saved canvas state if it was a recalibration
+            if (savedCanvasState) {
+              setRestoredCanvasState(savedCanvasState);
+              setSavedCanvasState(undefined);
+            }
+          }}
+          restoredCanvasState={restoredCanvasState}
+          recalibrating={true}
+        />
+        <div css={overlayStyle}>
+          <div css={chipRowStyle}>
+            <button css={chipStyle} onClick={() => setShowCalibration(false)}>
+              ☰ Measurement
+            </button>
+            <button css={chipStyle} onClick={() => {
+              setShowCalibration(false);
+              setActivePage('history');
+            }}>
+              📊 History
+            </button>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -122,8 +155,8 @@ function AppContent() {
       />
 
       {/* Full-screen history page */}
-      {showHistory && (
-        <HistoryPage onNavigateBack={() => setShowHistory(false)} />
+      {activePage === 'history' && (
+        <HistoryPage />
       )}
 
       {/* Floating overlay */}
@@ -131,27 +164,29 @@ function AppContent() {
 
         {/* Top chip row — always visible */}
         <div css={chipRowStyle}>
-          <div css={hudStyle}>
-            {canvasData.x.toFixed(2)}&thinsp;cm&ensp;
-            {canvasData.y.toFixed(2)}&thinsp;cm&ensp;
-            {canvasData.r.toFixed(1)}°
-            {currentSession && (
-              <>&ensp;· {currentSession.timeSeries.length}&thinsp;pts</>
-            )}
-          </div>
-          <button css={chipStyle} onClick={() => setShowControls((v) => !v)}>
-            {showControls ? '✕ Controls' : '☰ Controls'}
+          {activePage === 'measurement' && (
+            <div css={hudStyle}>
+              {canvasData.x.toFixed(2)}&thinsp;cm&ensp;
+              {canvasData.y.toFixed(2)}&thinsp;cm&ensp;
+              {canvasData.r.toFixed(1)}°
+              {currentSession && (
+                <>&ensp;· {currentSession.timeSeries.length}&thinsp;pts</>
+              )}
+            </div>
+          )}
+          <button css={chipStyle} onClick={() => setActivePage('measurement')}>
+            ☰ Measurement
           </button>
-          <button css={chipStyle} onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? '✕ History' : '📊 History'}
+          <button css={chipStyle} onClick={() => setActivePage('history')}>
+            📊 History
           </button>
-          <button css={chipStyle} onClick={handleRecalibrate}>
+          <button css={chipStyle} onClick={handleRecalibrate} disabled={activePage === 'history'}>
             Recalibrate
           </button>
         </div>
 
         {/* Collapsible controls panel */}
-        {showControls && (
+        {activePage === 'measurement' && (
           <div css={panelStyle}>
             <DataCaptureControl />
           </div>
