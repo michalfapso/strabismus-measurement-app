@@ -7,6 +7,7 @@ export interface DateRange {
 }
 
 const STORAGE_KEY = 'historyDateRange';
+const EXERCISE_TYPES_STORAGE_KEY = 'historyExerciseTypes';
 
 /**
  * Hook to manage date filtering for history page
@@ -48,13 +49,42 @@ export function useHistoryFilters(sessions: Session[]) {
     );
   };
 
-  // Filter sessions based on date range
+  // Compute distinct exercise types from sessions
+  const distinctExerciseTypes = useMemo(() => {
+    const types = new Set(sessions.map((s) => s.exerciseTag).filter(Boolean));
+    return Array.from(types).sort();
+  }, [sessions]);
+
+  // Initialize selectedExerciseTypes from storage or default to all types
+  const [selectedExerciseTypes, setSelectedExerciseTypesState] = useState<Set<string>>(() => {
+    const stored = sessionStorage.getItem(EXERCISE_TYPES_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        return new Set(parsed);
+      } catch {
+        // Ignore parse errors, fall through to default
+      }
+    }
+    // Default: all types selected
+    return new Set(distinctExerciseTypes);
+  });
+
+  const setSelectedExerciseTypes = (types: Set<string>) => {
+    setSelectedExerciseTypesState(types);
+    // Persist to sessionStorage
+    sessionStorage.setItem(EXERCISE_TYPES_STORAGE_KEY, JSON.stringify(Array.from(types)));
+  };
+
+  // Filter sessions based on date range AND exercise type
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => {
       const sessionDate = new Date(session.timestamp);
-      return sessionDate >= dateRange.from && sessionDate <= dateRange.to;
+      const inDateRange = sessionDate >= dateRange.from && sessionDate <= dateRange.to;
+      const inSelectedTypes = selectedExerciseTypes.has(session.exerciseTag);
+      return inDateRange && inSelectedTypes;
     });
-  }, [sessions, dateRange]);
+  }, [sessions, dateRange, selectedExerciseTypes]);
 
   // Preset helpers
   const setPresetLast7Days = () => {
@@ -91,5 +121,8 @@ export function useHistoryFilters(sessions: Session[]) {
     setPresetLast30Days,
     setPresetThisMonth,
     setPresetAllTime,
+    distinctExerciseTypes,
+    selectedExerciseTypes,
+    setSelectedExerciseTypes,
   };
 }
