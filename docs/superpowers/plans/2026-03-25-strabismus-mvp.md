@@ -991,7 +991,7 @@ git commit -m "feat: implement CSV export service with download functionality"
 **Files:**
 - Create: `src/components/CalibrationScreen.tsx`
 
-- [ ] **Step 1: Create CalibrationScreen component**
+- [x] **Step 1: Create CalibrationScreen component**
 
 ```typescript
 // src/components/CalibrationScreen.tsx
@@ -1165,7 +1165,7 @@ export function CalibrationScreen({ onComplete }: { onComplete: () => void }) {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/components/CalibrationScreen.tsx
@@ -1179,7 +1179,7 @@ git commit -m "feat: implement CalibrationScreen with credit card PPMM calibrati
 **Files:**
 - Create: `src/components/AssessmentCanvas.tsx`
 
-- [ ] **Step 1: Create AssessmentCanvas with react-konva**
+- [x] **Step 1: Create AssessmentCanvas with react-konva**
 
 ```typescript
 // src/components/AssessmentCanvas.tsx
@@ -1381,7 +1381,7 @@ export function AssessmentCanvas({
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/components/AssessmentCanvas.tsx
@@ -1396,7 +1396,7 @@ git commit -m "feat: implement AssessmentCanvas with react-konva drag/rotate int
 - Create: `src/components/DataCaptureControl.tsx`
 - Create: `src/components/ExerciseSelector.tsx`
 
-- [ ] **Step 1: Create ExerciseSelector**
+- [x] **Step 1: Create ExerciseSelector**
 
 ```typescript
 // src/components/ExerciseSelector.tsx
@@ -1447,7 +1447,7 @@ export function ExerciseSelector({
 }
 ```
 
-- [ ] **Step 2: Create DataCaptureControl**
+- [x] **Step 2: Create DataCaptureControl**
 
 ```typescript
 // src/components/DataCaptureControl.tsx
@@ -1593,7 +1593,7 @@ export function DataCaptureControl() {
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/components/ExerciseSelector.tsx src/components/DataCaptureControl.tsx
@@ -1607,7 +1607,7 @@ git commit -m "feat: implement exercise selector and data capture control panel"
 **Files:**
 - Create: `src/components/SessionExplorer.tsx`
 
-- [ ] **Step 1: Create SessionExplorer**
+- [x] **Step 1: Create SessionExplorer**
 
 ```typescript
 // src/components/SessionExplorer.tsx
@@ -1759,7 +1759,7 @@ export function SessionExplorer() {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/components/SessionExplorer.tsx
@@ -1773,7 +1773,7 @@ git commit -m "feat: implement session explorer with history and export function
 **Files:**
 - Create: `src/App.tsx`
 
-- [ ] **Step 1: Create App with context providers**
+- [x] **Step 1: Create App with context providers**
 
 ```typescript
 // src/App.tsx
@@ -1919,7 +1919,7 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/App.tsx
@@ -1933,7 +1933,7 @@ git commit -m "feat: implement App root component with layout and context provid
 **Files:**
 - Create: `.github/workflows/deploy.yml`
 
-- [ ] **Step 1: Create GitHub Actions deployment workflow**
+- [x] **Step 1: Create GitHub Actions deployment workflow**
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -1972,13 +1972,13 @@ jobs:
           cname: strabismus.local
 ```
 
-- [ ] **Step 2: Update package.json with gh-pages dependency**
+- [x] **Step 2: Update package.json with gh-pages dependency**
 
 ```bash
 npm install --save-dev gh-pages
 ```
 
-- [ ] **Step 3: Add homepage to package.json**
+- [x] **Step 3: Add homepage to package.json**
 
 ```json
 {
@@ -1986,7 +1986,7 @@ npm install --save-dev gh-pages
 }
 ```
 
-- [ ] **Step 4: Create deployment README**
+- [x] **Step 4: Create deployment README**
 
 ```markdown
 # Deployment Guide
@@ -2034,7 +2034,7 @@ Verify:
 - CSV export generates valid file
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/deploy.yml
