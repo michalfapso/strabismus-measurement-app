@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Session } from '../types';
 
 export interface DateRange {
@@ -37,14 +37,15 @@ export function useHistoryFilters(sessions: Session[]) {
   });
 
   const setDateRange = (from: Date, to: Date) => {
-    const range = { from, to };
-    setDateRangeState(range);
+    // Swap if reversed
+    const [actualFrom, actualTo] = from <= to ? [from, to] : [to, from];
+    setDateRangeState({ from: actualFrom, to: actualTo });
     // Persist to sessionStorage
     sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        from: from.toISOString(),
-        to: to.toISOString(),
+        from: actualFrom.toISOString(),
+        to: actualTo.toISOString(),
       })
     );
   };
@@ -76,6 +77,32 @@ export function useHistoryFilters(sessions: Session[]) {
     sessionStorage.setItem(EXERCISE_TYPES_STORAGE_KEY, JSON.stringify(Array.from(types)));
   };
 
+  // When distinct types change, ensure selected types stays in sync
+  useEffect(() => {
+    const currentSelected = new Set(selectedExerciseTypes);
+    const newDistinct = new Set(distinctExerciseTypes);
+
+    // Remove any selected types that no longer exist
+    const filtered = new Set(
+      Array.from(currentSelected).filter((type) =>
+        newDistinct.has(type)
+      )
+    );
+
+    // Add any new types that appeared
+    newDistinct.forEach((type) => {
+      if (!filtered.has(type)) {
+        filtered.add(type);
+      }
+    });
+
+    // Only update if changed
+    if (filtered.size !== currentSelected.size ||
+        Array.from(filtered).some((t) => !currentSelected.has(t))) {
+      setSelectedExerciseTypes(filtered);
+    }
+  }, [distinctExerciseTypes]);
+
   // Filter sessions based on date range AND exercise type
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => {
@@ -87,31 +114,31 @@ export function useHistoryFilters(sessions: Session[]) {
   }, [sessions, dateRange, selectedExerciseTypes]);
 
   // Preset helpers
-  const setPresetLast7Days = () => {
+  const setPresetLast7Days = useCallback(() => {
     const to = new Date();
     const from = new Date(to);
     from.setDate(from.getDate() - 7);
     setDateRange(from, to);
-  };
+  }, []);
 
-  const setPresetLast30Days = () => {
+  const setPresetLast30Days = useCallback(() => {
     const to = new Date();
     const from = new Date(to);
     from.setDate(from.getDate() - 30);
     setDateRange(from, to);
-  };
+  }, []);
 
-  const setPresetThisMonth = () => {
+  const setPresetThisMonth = useCallback(() => {
     const to = new Date();
     const from = new Date(to.getFullYear(), to.getMonth(), 1);
     setDateRange(from, to);
-  };
+  }, []);
 
-  const setPresetAllTime = () => {
+  const setPresetAllTime = useCallback(() => {
     const from = new Date('2000-01-01');
     const to = new Date();
     setDateRange(from, to);
-  };
+  }, []);
 
   return {
     dateRange,
