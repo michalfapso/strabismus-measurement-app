@@ -256,48 +256,93 @@ function TrendChart({ sessions }: { sessions: Session[] }) {
 
 type OverlayMetric = 'x' | 'y' | 'rotation';
 
+// Linear interpolation helper
+function interpolate(t: number, points: Array<[number, number]>): number | null {
+  if (points.length === 0) return null;
+  if (points.length === 1) return points[0][1];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const [t1, v1] = points[i];
+    const [t2, v2] = points[i + 1];
+    if (t >= t1 && t <= t2) {
+      if (t1 === t2) return v1;
+      const ratio = (t - t1) / (t2 - t1);
+      return v1 + (v2 - v1) * ratio;
+    }
+  }
+
+  return null;
+}
+
+// Resample session data to a fixed time grid using linear interpolation
+function resampleSession(
+  session: Session,
+  metric: OverlayMetric,
+  timeGrid: number[]
+): Array<[number, number]> {
+  // Create sorted time-series data points
+  const points: Array<[number, number]> = session.timeSeries.map((ts) => {
+    let value = 0;
+    if (metric === 'x') {
+      value = ts.x;
+    } else if (metric === 'y') {
+      value = ts.y;
+    } else if (metric === 'rotation') {
+      value = ts.r;
+    }
+    return [ts.t, value];
+  });
+
+  // Resample at fixed time grid
+  return timeGrid
+    .map((t) => [t, interpolate(t, points)] as const)
+    .filter(([, v]) => v !== null) as Array<[number, number]>;
+}
+
 function OverlayChart({ sessions }: { sessions: Session[] }) {
   const [metric, setMetric] = useState<OverlayMetric>('rotation');
   const [timeMode, setTimeMode] = useState<'absolute' | 'relative'>('absolute');
 
-  // Prepare chart data with individual session lines and mean/stddev band
+  // Prepare chart data with resampled data on fixed time grid
   const prepareChartData = () => {
     if (sessions.length === 0) return null;
 
-    // Get max duration for normalization
-    const maxDuration = Math.max(
-      ...sessions.map((s) =>
-        s.timeSeries.length > 0
-          ? s.timeSeries[s.timeSeries.length - 1].t
-          : 0
-      )
-    );
-
-    // Create a map of time points -> values across all sessions
-    const timePointsMap = new Map<number, number[]>();
+    // Determine time range and sampling interval in absolute mode
+    let minTime = Infinity;
+    let maxTime = -Infinity;
 
     sessions.forEach((session) => {
-      const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
-
-      session.timeSeries.forEach((ts) => {
-        let value = 0;
-        if (metric === 'x') {
-          value = ts.x;
-        } else if (metric === 'y') {
-          value = ts.y;
-        } else if (metric === 'rotation') {
-          value = ts.r;
-        }
-
-        const key = timeMode === 'absolute' ? ts.t : Math.round((ts.t / maxT) * 100);
-        if (!timePointsMap.has(key)) {
-          timePointsMap.set(key, []);
-        }
-        timePointsMap.get(key)!.push(value);
-      });
+      if (session.timeSeries.length > 0) {
+        minTime = Math.min(minTime, session.timeSeries[0].t);
+        maxTime = Math.max(maxTime, session.timeSeries[session.timeSeries.length - 1].t);
+      }
     });
 
-    // Calculate mean and stddev for each time point
+    if (minTime === Infinity) return null;
+
+    // Create fixed time grid - sample every 50ms or based on total duration
+    const totalDuration = maxTime - minTime;
+    const sampleInterval = Math.max(
+      50,
+      Math.ceil(totalDuration / 200) // Aim for ~200 samples max
+    );
+
+    const absoluteTimeGrid: number[] = [];
+    for (let t = minTime; t <= maxTime; t += sampleInterval) {
+      absoluteTimeGrid.push(t);
+    }
+    if (absoluteTimeGrid[absoluteTimeGrid.length - 1] !== maxTime) {
+      absoluteTimeGrid.push(maxTime);
+    }
+
+    // Resample all sessions to the fixed time grid
+    const resampledSessions = sessions.map((session) => {
+      const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
+      const relativeTimeGrid = absoluteTimeGrid.map((t) => minTime + ((t - minTime) / (maxTime - minTime)) * maxT);
+      return resampleSession(session, metric, absoluteTimeGrid);
+    });
+
+    // Build chart data
     const chartData: Array<{
       t: number;
       mean: number;
@@ -306,46 +351,40 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
       [key: string]: number;
     }> = [];
 
-    Array.from(timePointsMap.entries())
-      .sort(([a], [b]) => a - b)
-      .forEach(([timePoint, values]) => {
+    absoluteTimeGrid.forEach((timePoint) => {
+      const values: number[] = [];
+
+      resampledSessions.forEach((resampledData) => {
+        const point = resampledData.find(([t]) => Math.abs(t - timePoint) < 0.1);
+        if (point) {
+          values.push(point[1]);
+        }
+      });
+
+      if (values.length > 0) {
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
         const variance =
           values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
           values.length;
         const stddev = Math.sqrt(variance);
 
-        chartData.push({
-          t: timePoint,
+        const entry: any = {
+          t: timeMode === 'absolute' ? timePoint : ((timePoint - minTime) / (maxTime - minTime)) * 100,
           mean,
           upper: mean + stddev,
           lower: mean - stddev,
+        };
+
+        // Add individual session data
+        resampledSessions.forEach((resampledData, sessionIdx) => {
+          const point = resampledData.find(([t]) => Math.abs(t - timePoint) < 0.1);
+          if (point) {
+            entry[`session${sessionIdx}`] = point[1];
+          }
         });
-      });
 
-    // Add individual session lines to the data
-    sessions.forEach((session, sessionIdx) => {
-      const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
-      const sessionKey = `session${sessionIdx}`;
-
-      session.timeSeries.forEach((ts) => {
-        let value = 0;
-        if (metric === 'x') {
-          value = ts.x;
-        } else if (metric === 'y') {
-          value = ts.y;
-        } else if (metric === 'rotation') {
-          value = ts.r;
-        }
-
-        const timePoint =
-          timeMode === 'absolute' ? ts.t : Math.round((ts.t / maxT) * 100);
-        const existingPoint = chartData.find((p) => p.t === timePoint);
-
-        if (existingPoint) {
-          existingPoint[sessionKey] = value;
-        }
-      });
+        chartData.push(entry);
+      }
     });
 
     return chartData;
