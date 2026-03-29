@@ -1,11 +1,10 @@
 export interface SelectionBarProps {
   selectedCount: number;
   onExport: () => void;
-  onClear: () => void;
   disabled?: boolean;
 }
 
-export function SelectionBar({ selectedCount, onExport, onClear, disabled = false }: SelectionBarProps) {
+export function SelectionBar({ selectedCount, onExport, disabled = false }: SelectionBarProps) {
   if (selectedCount === 0) {
     return null;
   }
@@ -41,23 +40,6 @@ export function SelectionBar({ selectedCount, onExport, onClear, disabled = fals
         }}
       >
         📥 Export CSV
-      </button>
-
-      <button
-        onClick={onClear}
-        disabled={disabled}
-        style={{
-          padding: '6px 12px',
-          fontSize: '12px',
-          color: '#00ff00',
-          backgroundColor: 'transparent',
-          border: '1px solid #00ff00',
-          borderRadius: '3px',
-          cursor: disabled ? 'default' : 'pointer',
-          opacity: disabled ? 0.5 : 1,
-        }}
-      >
-        ✕ Clear
       </button>
     </div>
   );

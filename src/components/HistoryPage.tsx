@@ -127,7 +127,6 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
                   <SelectionBar
                     selectedCount={selectedCount}
                     onExport={handleExport}
-                    onClear={clearSelection}
                   />
                 </div>
               )}
@@ -161,7 +160,6 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
           }}>
             <AggregateResultsPanel
               sessions={selectedSessions}
-              onClose={clearSelection}
             />
           </div>
         )}
