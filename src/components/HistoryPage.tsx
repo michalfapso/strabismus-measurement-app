@@ -4,6 +4,7 @@ import { SessionContext } from '../context/SessionContext';
 import { useHistoryFilters } from '../hooks/useHistoryFilters';
 import { useMultiSelect } from '../hooks/useMultiSelect';
 import { DateFilterBar } from './DateFilterBar';
+import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
 import { SessionDetailPanel } from './SessionDetailPanel';
@@ -20,8 +21,21 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
   const [loading, setLoading] = useState(true);
   const [detailSession, setDetailSession] = useState<Session | null>(null);
 
-  const { dateRange, filteredSessions, setDateRange } = useHistoryFilters(allSessions);
-  const { selectedIds, handleRowClick, clearSelection, getSelectedArray } = useMultiSelect();
+  const {
+    dateRange,
+    filteredSessions,
+    setDateRange,
+    distinctExerciseTypes,
+    selectedExerciseTypes,
+    setSelectedExerciseTypes,
+  } = useHistoryFilters(allSessions);
+  const {
+    selectedIds,
+    handleRowClick,
+    clearSelection,
+    updateSelectionAfterFilter,
+    getSelectedArray,
+  } = useMultiSelect();
 
   // Load sessions on mount
   useEffect(() => {
@@ -37,6 +51,12 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
     };
     loadSessions();
   }, [loadHistoricalSessions]);
+
+  // Update selection when filters change
+  useEffect(() => {
+    const visibleIds = filteredSessions.map((s) => s.sessionId);
+    updateSelectionAfterFilter(visibleIds);
+  }, [filteredSessions, updateSelectionAfterFilter]);
 
   const handleExport = () => {
     const selectedSessions = getSelectedArray()
@@ -88,6 +108,11 @@ export function HistoryPage({ onNavigateBack }: HistoryPageProps) {
           </button>
         </div>
         <DateFilterBar currentRange={dateRange} onDateChange={setDateRange} />
+        <ExerciseTypeFilterBar
+          distinctTypes={distinctExerciseTypes}
+          selectedTypes={selectedExerciseTypes}
+          onSelectedTypesChange={setSelectedExerciseTypes}
+        />
       </div>
 
       {/* Main content */}
