@@ -10,6 +10,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ComposedChart,
+  Area,
+  AreaChart,
 } from 'recharts';
 
 export interface AggregateResultsPanelProps {
@@ -256,28 +259,99 @@ type OverlayMetric = 'x' | 'y' | 'rotation';
 function OverlayChart({ sessions }: { sessions: Session[] }) {
   const [metric, setMetric] = useState<OverlayMetric>('rotation');
   const [timeMode, setTimeMode] = useState<'absolute' | 'relative'>('absolute');
-  const [visibleSessionIds, setVisibleSessionIds] = useState<Set<string>>(
-    new Set(sessions.map((s) => s.sessionId))
-  );
 
-  const toggleSessionVisibility = (sessionId: string) => {
-    const next = new Set(visibleSessionIds);
-    if (next.has(sessionId)) {
-      next.delete(sessionId);
-    } else {
-      next.add(sessionId);
-    }
-    setVisibleSessionIds(next);
+  // Prepare chart data with individual session lines and mean/stddev band
+  const prepareChartData = () => {
+    if (sessions.length === 0) return null;
+
+    // Get max duration for normalization
+    const maxDuration = Math.max(
+      ...sessions.map((s) =>
+        s.timeSeries.length > 0
+          ? s.timeSeries[s.timeSeries.length - 1].t
+          : 0
+      )
+    );
+
+    // Create a map of time points -> values across all sessions
+    const timePointsMap = new Map<number, number[]>();
+
+    sessions.forEach((session) => {
+      const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
+
+      session.timeSeries.forEach((ts) => {
+        let value = 0;
+        if (metric === 'x') {
+          value = ts.x;
+        } else if (metric === 'y') {
+          value = ts.y;
+        } else if (metric === 'rotation') {
+          value = ts.r;
+        }
+
+        const key = timeMode === 'absolute' ? ts.t : Math.round((ts.t / maxT) * 100);
+        if (!timePointsMap.has(key)) {
+          timePointsMap.set(key, []);
+        }
+        timePointsMap.get(key)!.push(value);
+      });
+    });
+
+    // Calculate mean and stddev for each time point
+    const chartData: Array<{
+      t: number;
+      mean: number;
+      upper: number;
+      lower: number;
+      [key: string]: number;
+    }> = [];
+
+    Array.from(timePointsMap.entries())
+      .sort(([a], [b]) => a - b)
+      .forEach(([timePoint, values]) => {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const variance =
+          values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+          values.length;
+        const stddev = Math.sqrt(variance);
+
+        chartData.push({
+          t: timePoint,
+          mean,
+          upper: mean + stddev,
+          lower: mean - stddev,
+        });
+      });
+
+    // Add individual session lines to the data
+    sessions.forEach((session, sessionIdx) => {
+      const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
+      const sessionKey = `session${sessionIdx}`;
+
+      session.timeSeries.forEach((ts) => {
+        let value = 0;
+        if (metric === 'x') {
+          value = ts.x;
+        } else if (metric === 'y') {
+          value = ts.y;
+        } else if (metric === 'rotation') {
+          value = ts.r;
+        }
+
+        const timePoint =
+          timeMode === 'absolute' ? ts.t : Math.round((ts.t / maxT) * 100);
+        const existingPoint = chartData.find((p) => p.t === timePoint);
+
+        if (existingPoint) {
+          existingPoint[sessionKey] = value;
+        }
+      });
+    });
+
+    return chartData;
   };
 
-  // Prepare overlay data
-  const maxDuration = Math.max(
-    ...sessions.map((s) =>
-      s.timeSeries.length > 0
-        ? s.timeSeries[s.timeSeries.length - 1].t
-        : 0
-    )
-  );
+  const chartData = prepareChartData();
 
   return (
     <div style={{ marginBottom: '20px' }}>
@@ -352,18 +426,18 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
           border: '1px solid rgba(0,255,0,0.2)',
           borderRadius: '4px',
           minHeight: '250px',
-          marginBottom: '12px',
           width: '100%',
         }}
       >
-        {sessions.length > 0 && visibleSessionIds.size > 0 ? (
+        {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart
+            <ComposedChart
+              data={chartData}
               margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis
-                dataKey={timeMode === 'absolute' ? 't' : 'pct'}
+                dataKey="t"
                 stroke="#888"
                 style={{ fontSize: '10px' }}
                 label={{
@@ -393,96 +467,52 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
                 }}
                 labelStyle={{ color: '#0f0' }}
               />
-              <Legend />
-              {sessions
-                .filter((s) => visibleSessionIds.has(s.sessionId))
-                .map((session, idx) => {
-                  const colors = [
-                    '#00ff00',
-                    '#00ffff',
-                    '#ff00ff',
-                    '#ffff00',
-                    '#ff6666',
-                    '#66ff66',
-                  ];
-                  const color = colors[idx % colors.length];
 
-                  // Prepare data points for this session
-                  const points: Array<{t: number; pct: number; value: number}> = [];
-                  const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
+              {/* Individual session lines (thin grey) */}
+              {sessions.map((_, sessionIdx) => (
+                <Line
+                  key={`session${sessionIdx}`}
+                  dataKey={`session${sessionIdx}`}
+                  stroke="rgba(200,200,200,0.4)"
+                  dot={false}
+                  strokeWidth={1}
+                  isAnimationActive={false}
+                />
+              ))}
 
-                  session.timeSeries.forEach((ts) => {
-                    let value = 0;
-                    if (metric === 'x') {
-                      value = ts.x;
-                    } else if (metric === 'y') {
-                      value = ts.y;
-                    } else if (metric === 'rotation') {
-                      value = ts.r;
-                    }
-                    points.push({
-                      t: ts.t,
-                      pct: (ts.t / maxT) * 100,
-                      value,
-                    });
-                  });
+              {/* Standard deviation band (semitransparent green area) */}
+              <Area
+                type="monotone"
+                dataKey="upper"
+                fill="rgba(0,255,0,0.15)"
+                stroke="none"
+                isAnimationActive={false}
+              />
+              <Area
+                type="monotone"
+                dataKey="lower"
+                fill="rgba(0,255,0,0.15)"
+                stroke="none"
+                isAnimationActive={false}
+              />
 
-                  const dataKey = `session-${idx}`;
-                  return (
-                    <Line
-                      key={session.sessionId}
-                      dataKey="value"
-                      data={points}
-                      stroke={color}
-                      dot={false}
-                      strokeWidth={1}
-                      opacity={0.7}
-                      isAnimationActive={false}
-                      name={new Date(session.timestamp).toLocaleDateString()}
-                    />
-                  );
-                })}
-            </LineChart>
+              {/* Mean line (thick green, rendered last so it's on top) */}
+              <Line
+                type="monotone"
+                dataKey="mean"
+                stroke="#00ff00"
+                dot={false}
+                strokeWidth={2.5}
+                isAnimationActive={false}
+                name="Mean"
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         ) : (
           <div style={{ color: '#888', fontSize: '10px' }}>
-            No visible sessions to display
+            No data available
           </div>
         )}
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '6px',
-          fontSize: '11px',
-        }}
-      >
-        {sessions.map((session) => {
-          const isVisible = visibleSessionIds.has(session.sessionId);
-          return (
-            <button
-              key={session.sessionId}
-              onClick={() => toggleSessionVisibility(session.sessionId)}
-              style={{
-                padding: '4px 6px',
-                backgroundColor: isVisible
-                  ? 'rgba(0,255,0,0.2)'
-                  : 'rgba(255,255,255,0.05)',
-                border: isVisible
-                  ? '1px solid #0f0'
-                  : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '2px',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '10px',
-              }}
-            >
-              {isVisible ? '✓' : '○'} {new Date(session.timestamp).toLocaleDateString()}
-            </button>
-          );
-        })}
       </div>
     </div>
   );
