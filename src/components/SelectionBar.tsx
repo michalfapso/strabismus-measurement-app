@@ -1,10 +1,11 @@
 export interface SelectionBarProps {
   selectedCount: number;
   onExport: () => void;
+  onDelete: () => void;
   disabled?: boolean;
 }
 
-export function SelectionBar({ selectedCount, onExport, disabled = false }: SelectionBarProps) {
+export function SelectionBar({ selectedCount, onExport, onDelete, disabled = false }: SelectionBarProps) {
   if (selectedCount === 0) {
     return null;
   }
@@ -40,6 +41,23 @@ export function SelectionBar({ selectedCount, onExport, disabled = false }: Sele
         }}
       >
         📥 Export CSV
+      </button>
+
+      <button
+        onClick={onDelete}
+        disabled={disabled}
+        style={{
+          padding: '6px 12px',
+          fontSize: '12px',
+          color: '#ff6b6b',
+          backgroundColor: 'transparent',
+          border: '1px solid #ff6b6b',
+          borderRadius: '3px',
+          cursor: disabled ? 'default' : 'pointer',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        🗑 Delete
       </button>
     </div>
   );

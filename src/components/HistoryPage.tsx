@@ -14,7 +14,7 @@ import { downloadCSV } from '../services/export';
 export interface HistoryPageProps {}
 
 export function HistoryPage({}: HistoryPageProps) {
-  const { loadHistoricalSessions } = useContext(SessionContext);
+  const { loadHistoricalSessions, deleteSelectedSessions } = useContext(SessionContext);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,6 +62,16 @@ export function HistoryPage({}: HistoryPageProps) {
 
     if (selectedSessions.length > 0) {
       downloadCSV(selectedSessions);
+    }
+  };
+
+  const handleDelete = async () => {
+    const selectedSessionIds = getSelectedArray();
+    if (selectedSessionIds.length === 0) return;
+
+    if (window.confirm(`Delete ${selectedSessionIds.length} session${selectedSessionIds.length > 1 ? 's' : ''}?`)) {
+      await deleteSelectedSessions(selectedSessionIds);
+      setAllSessions(allSessions.filter(s => !selectedSessionIds.includes(s.sessionId)));
     }
   };
 
@@ -133,6 +143,7 @@ export function HistoryPage({}: HistoryPageProps) {
                   <SelectionBar
                     selectedCount={selectedCount}
                     onExport={handleExport}
+                    onDelete={handleDelete}
                   />
                 </div>
               )}

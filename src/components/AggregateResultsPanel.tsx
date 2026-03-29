@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { Session } from '../types';
 import { calculateStats, linearRegression } from '../utils/stats';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 export interface AggregateResultsPanelProps {
   sessions: Session[];
@@ -191,23 +201,50 @@ function TrendChart({ sessions }: { sessions: Session[] }) {
           border: '1px solid rgba(0,255,0,0.2)',
           borderRadius: '4px',
           minHeight: '200px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-around',
+          width: '100%',
         }}
       >
         {trendPoints.length > 0 ? (
-          <div style={{ width: '100%', height: '100%', color: '#888' }}>
-            <div style={{ fontSize: '11px', marginTop: '4px' }}>
+          <>
+            <div style={{ fontSize: '11px', marginBottom: '8px', color: '#888' }}>
               Trend: {trend} ({regression.slope.toFixed(3)}/session)
             </div>
-            {/* Placeholder for actual chart - requires recharts or similar */}
-            <div style={{ fontSize: '10px', color: '#666' }}>
-              Chart visualization (recharts recommended)
-            </div>
-          </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart
+                data={trendPoints.map(([index, value]) => ({ index, value }))}
+                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis
+                  dataKey="index"
+                  stroke="#888"
+                  style={{ fontSize: '10px' }}
+                />
+                <YAxis
+                  stroke="#888"
+                  style={{ fontSize: '10px' }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(10, 10, 10, 0.95)',
+                    border: '1px solid #0f0',
+                    borderRadius: '4px',
+                  }}
+                  labelStyle={{ color: '#0f0' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#00ff00"
+                  dot={false}
+                  strokeWidth={2}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </>
         ) : (
-          <div>No data available</div>
+          <div style={{ color: '#888' }}>No data available</div>
         )}
       </div>
     </div>
@@ -316,14 +353,102 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
           borderRadius: '4px',
           minHeight: '250px',
           marginBottom: '12px',
-          color: '#888',
+          width: '100%',
         }}
       >
-        {/* Placeholder for actual chart - requires recharts or similar */}
-        <div style={{ fontSize: '10px' }}>
-          Overlay time-series visualization ({sessions.length} sessions, {metric} metric,{' '}
-          {timeMode} time)
-        </div>
+        {sessions.length > 0 && visibleSessionIds.size > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+              <XAxis
+                dataKey={timeMode === 'absolute' ? 't' : 'pct'}
+                stroke="#888"
+                style={{ fontSize: '10px' }}
+                label={{
+                  value: timeMode === 'absolute' ? 'Time (ms)' : 'Duration (%)',
+                  position: 'insideBottomRight',
+                  offset: -5,
+                  fill: '#888',
+                  fontSize: 10,
+                }}
+              />
+              <YAxis
+                stroke="#888"
+                style={{ fontSize: '10px' }}
+                label={{
+                  value: metric.charAt(0).toUpperCase() + metric.slice(1),
+                  angle: -90,
+                  position: 'insideLeft',
+                  fill: '#888',
+                  fontSize: 10,
+                }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(10, 10, 10, 0.95)',
+                  border: '1px solid #0f0',
+                  borderRadius: '4px',
+                }}
+                labelStyle={{ color: '#0f0' }}
+              />
+              <Legend />
+              {sessions
+                .filter((s) => visibleSessionIds.has(s.sessionId))
+                .map((session, idx) => {
+                  const colors = [
+                    '#00ff00',
+                    '#00ffff',
+                    '#ff00ff',
+                    '#ffff00',
+                    '#ff6666',
+                    '#66ff66',
+                  ];
+                  const color = colors[idx % colors.length];
+
+                  // Prepare data points for this session
+                  const points: Array<{t: number; pct: number; value: number}> = [];
+                  const maxT = session.timeSeries[session.timeSeries.length - 1]?.t || 1;
+
+                  session.timeSeries.forEach((ts) => {
+                    let value = 0;
+                    if (metric === 'x') {
+                      value = ts.x;
+                    } else if (metric === 'y') {
+                      value = ts.y;
+                    } else if (metric === 'rotation') {
+                      value = ts.r;
+                    }
+                    points.push({
+                      t: ts.t,
+                      pct: (ts.t / maxT) * 100,
+                      value,
+                    });
+                  });
+
+                  const dataKey = `session-${idx}`;
+                  return (
+                    <Line
+                      key={session.sessionId}
+                      dataKey="value"
+                      data={points}
+                      stroke={color}
+                      dot={false}
+                      strokeWidth={1}
+                      opacity={0.7}
+                      isAnimationActive={false}
+                      name={new Date(session.timestamp).toLocaleDateString()}
+                    />
+                  );
+                })}
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ color: '#888', fontSize: '10px' }}>
+            No visible sessions to display
+          </div>
+        )}
       </div>
 
       <div

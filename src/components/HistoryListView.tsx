@@ -5,7 +5,6 @@ export interface HistoryListViewProps {
   sessions: Session[];
   selectedIds: Set<string>;
   onRowClick: (id: string, ctrlKey: boolean, shiftKey: boolean, visibleIds: string[]) => void;
-  onSessionSelect: (session: Session) => void;
 }
 
 function formatDuration(ms: number): string {
@@ -19,7 +18,6 @@ export function HistoryListView({
   sessions,
   selectedIds,
   onRowClick,
-  onSessionSelect,
 }: HistoryListViewProps) {
   if (sessions.length === 0) {
     return (
@@ -49,12 +47,7 @@ export function HistoryListView({
             onClick={(e) => {
               const ctrl = (e as any).ctrlKey || (e as any).metaKey;
               const shift = (e as any).shiftKey;
-
-              if (ctrl || shift) {
-                onRowClick(session.sessionId, ctrl, shift, visibleIds);
-              } else {
-                onSessionSelect(session);
-              }
+              onRowClick(session.sessionId, ctrl, shift, visibleIds);
             }}
             style={{
               display: 'flex',
@@ -62,9 +55,11 @@ export function HistoryListView({
               gap: '12px',
               padding: '12px 16px',
               borderBottom: '1px solid rgba(255,255,255,0.05)',
-              backgroundColor: isSelected ? 'rgba(0,255,0,0.08)' : 'transparent',
+              backgroundColor: isSelected ? 'rgba(0,255,0,0.15)' : 'transparent',
+              borderLeft: isSelected ? '3px solid #00ff00' : '3px solid transparent',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
+              paddingLeft: '13px',
             }}
             onMouseEnter={(e) => {
               if (!isSelected) {
@@ -77,17 +72,6 @@ export function HistoryListView({
               }
             }}
           >
-            {/* Checkbox */}
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
-                e.stopPropagation();
-                onRowClick(session.sessionId, true, false, visibleIds);
-              }}
-              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-            />
-
             {/* Exercise & Time */}
             <div style={{ minWidth: '140px' }}>
               <div style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>
@@ -120,16 +104,6 @@ export function HistoryListView({
             )}
 
             <div style={{ flex: 1 }} />
-
-            {/* Selection indicator */}
-            {isSelected && (
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#0f0',
-              }} />
-            )}
           </div>
         );
       })}

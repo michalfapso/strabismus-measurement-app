@@ -14,6 +14,7 @@ export const SessionContext = createContext<{
   selectedSessionIds: Set<string>;
   setSelectedSessionIds: (ids: Set<string>) => void;
   loadHistoricalSessions: (from?: Date, to?: Date) => Promise<Session[]>;
+  deleteSelectedSessions: (sessionIds: string[]) => Promise<void>;
 }>({
   currentSession: null,
   startSession: () => {},
@@ -26,6 +27,7 @@ export const SessionContext = createContext<{
   selectedSessionIds: new Set(),
   setSelectedSessionIds: () => {},
   loadHistoricalSessions: async () => [],
+  deleteSelectedSessions: async () => {},
 });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -81,6 +83,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const deleteSelectedSessions = async (sessionIds: string[]) => {
+    const { deleteSession } = await import('../services/storage');
+    for (const sessionId of sessionIds) {
+      await deleteSession(sessionId);
+    }
+    // Update the sessions list to remove deleted sessions
+    setSessions(sessions.filter(s => !sessionIds.includes(s.sessionId)));
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -95,6 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         selectedSessionIds,
         setSelectedSessionIds,
         loadHistoricalSessions,
+        deleteSelectedSessions,
       }}
     >
       {children}

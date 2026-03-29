@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  claude-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-code-sandbox
+
+    # Enable interactive terminal
+    stdin_open: true
+    tty: true
+
+    # Mount volumes
+    volumes:
+      # Mount the project directory to /workspace
+      - ${PROJECT_PATH:-.}:/workspace
+
+      # Mount SSH keys for git operations (optional)
+      # Uncomment to enable SSH-based git access
+      # - ~/.ssh:/home/claude/.ssh:ro
+
+      # Mount npm cache for faster installs (optional)
+      # - ~/.npm:/home/claude/.npm
+
+    # Environment variables
+    environment:
+      # Enable skip permissions mode for automated operations
+      CLAUDE_CODE_SKIP_PERMISSIONS: 'true'
+      NODE_ENV: 'production'
+
+      # Pass through your Claude API credentials (if needed)
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+    # Working directory
+    working_dir: /workspace
+
+    # Override default command to start interactive shell
+    # You can override this with specific commands when running
+    command: /bin/bash
+
+    # Restart policy
+    restart: 'no'
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Resource limits (optional - adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 512M
+
+# Named volumes for persistent data (optional)
+volumes:
+  npm-cache:
+    driver: local
