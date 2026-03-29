@@ -27,6 +27,7 @@ export function calculateStats(values: number[]): StatsResult {
 /**
  * Calculate linear regression for trend analysis
  * Points: array of [x, y] pairs
+ * Returns zeros if insufficient data or collinear points (vertical line)
  */
 export function linearRegression(
   points: Array<[number, number]>
@@ -45,7 +46,18 @@ export function linearRegression(
   const sumXY = points.reduce((acc, [x, y]) => acc + x * y, 0);
   const sumX2 = points.reduce((acc, [x]) => acc + x * x, 0);
 
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const denominator = n * sumX2 - sumX * sumX;
+
+  // Guard against division by zero (collinear points with same X)
+  if (denominator === 0) {
+    return {
+      slope: 0,
+      intercept: mean(points.map(([, y]) => y)),
+      predict: (x: number) => mean(points.map(([, y]) => y)),
+    };
+  }
+
+  const slope = (n * sumXY - sumX * sumY) / denominator;
   const intercept = (sumY - slope * sumX) / n;
 
   return {
@@ -57,24 +69,28 @@ export function linearRegression(
 
 /**
  * Calculate mean of a metric across multiple sessions
+ * Generic helper to extract metric from session array
  */
-export function sessionsMean(
-  sessions: Array<{ value: number }>,
-  extractor: (s: any) => number
+export function sessionsMean<T>(
+  sessions: T[],
+  extractor: (s: T) => number
 ): number {
   if (sessions.length === 0) return 0;
-  const values = sessions.map(extractor);
+  const values = sessions.map(extractor).filter(v => isFinite(v));
+  if (values.length === 0) return 0;
   return mean(values);
 }
 
 /**
  * Calculate standard deviation of a metric across sessions
+ * Generic helper to extract metric from session array
  */
-export function sessionsStdDev(
-  sessions: Array<{ value: number }>,
-  extractor: (s: any) => number
+export function sessionsStdDev<T>(
+  sessions: T[],
+  extractor: (s: T) => number
 ): number {
   if (sessions.length < 2) return 0;
-  const values = sessions.map(extractor);
+  const values = sessions.map(extractor).filter(v => isFinite(v));
+  if (values.length < 2) return 0;
   return standardDeviation(values);
 }
