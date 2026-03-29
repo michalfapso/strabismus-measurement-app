@@ -519,13 +519,23 @@ function OverlayChart({ sessions }: { sessions: Session[] }) {
                 />
               ))}
 
-              {/* Filled standard deviation band (semi-transparent green) */}
-              <Area
+              {/* Upper standard deviation bound */}
+              <Line
                 type="monotone"
                 dataKey="upper"
-                fill="rgba(0,255,0,0.18)"
-                stroke="none"
-                fillOpacity={0.6}
+                stroke="rgba(0,255,0,0.4)"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+              />
+
+              {/* Lower standard deviation bound */}
+              <Line
+                type="monotone"
+                dataKey="lower"
+                stroke="rgba(0,255,0,0.4)"
+                dot={false}
+                strokeWidth={1.5}
                 isAnimationActive={false}
               />
 
