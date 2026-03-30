@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Session } from '../types';
 import {
   BarChart,
@@ -32,7 +33,7 @@ const METRIC_COLORS: Record<HistogramMetric, string> = {
 /**
  * Helper component to render a single metric's histogram
  */
-function HistogramBar({
+const HistogramBar = memo(function HistogramBar({
   metric,
   data,
 }: {
@@ -87,12 +88,9 @@ function HistogramBar({
                 borderRadius: '4px',
                 color: '#fff',
               }}
-              formatter={(value: any) => {
-                if (typeof value === 'number') {
-                  return `${value.toFixed(2)}s`;
-                }
-                return `${value}s`;
-              }}
+              formatter={(value: number) =>
+                typeof value === 'number' ? `${value.toFixed(2)}s` : `${value}s`
+              }
               labelStyle={{ color: '#888' }}
             />
             <Bar
@@ -109,7 +107,7 @@ function HistogramBar({
       )}
     </div>
   );
-}
+});
 
 export function HistogramChart({ sessions, isSingleSession }: HistogramChartProps) {
   const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = useViewState();
@@ -127,7 +125,7 @@ export function HistogramChart({ sessions, isSingleSession }: HistogramChartProp
   // Calculate histogram data for each metric
   const histogramDataMap = new Map<HistogramMetric, HistogramBin[]>();
   for (const metric of metricsToShow) {
-    const data = isSingleSession
+    const data = isSingleSession && sessions.length > 0
       ? calculateSessionHistogram(sessions[0], metric)
       : calculateAggregateHistogram(sessions, metric, displayMode);
     histogramDataMap.set(metric, data);
