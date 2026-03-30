@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Session } from '../types';
 import {
   BarChart,
@@ -14,6 +14,7 @@ import {
   calculateAggregateHistogram,
   HistogramMetric,
   HistogramBin,
+  HistogramBinWithSessions,
 } from '../utils/histogram';
 import { useViewState } from '../hooks/useViewState';
 
@@ -31,21 +32,98 @@ const METRIC_COLORS: Record<HistogramMetric, string> = {
 };
 
 /**
+ * Custom bar shape that renders individual session lines
+ */
+function createCustomBarShape(
+  metric: HistogramMetric,
+  showIndividualLines: boolean
+) {
+  return (props: any) => {
+    const { x, y, width, height, payload } = props;
+
+    if (!payload) return null;
+
+    const elements = [];
+
+    // Draw individual session lines if available
+    if (showIndividualLines && payload.sessionDurations && payload.sessionDurations.length > 0) {
+      const totalDuration = payload.duration;
+      let accumulatedHeight = 0;
+
+      payload.sessionDurations.forEach((sd: { sessionId: string; duration: number }, idx: number) => {
+        const lineHeight = (sd.duration / totalDuration) * height;
+        const lineY = y + height - accumulatedHeight - lineHeight;
+
+        elements.push(
+          <line
+            key={`session-${idx}`}
+            x1={x + width * 0.15}
+            y1={lineY + lineHeight / 2}
+            x2={x + width * 0.85}
+            y2={lineY + lineHeight / 2}
+            stroke="#999999"
+            strokeOpacity={0.4}
+            strokeWidth={1}
+          />
+        );
+
+        accumulatedHeight += lineHeight;
+      });
+    }
+
+    // Draw the main bar
+    elements.push(
+      <rect
+        key="bar"
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={METRIC_COLORS[metric]}
+        rx={3}
+        ry={3}
+      />
+    );
+
+    return <g>{elements}</g>;
+  };
+}
+
+/**
  * Helper component to render a single metric's histogram
  */
 const HistogramBar = memo(function HistogramBar({
   metric,
   data,
+  displayModes,
+  isSingleSession,
 }: {
   metric: HistogramMetric;
-  data: HistogramBin[];
+  data: HistogramBin[] | HistogramBinWithSessions[];
+  displayModes: Set<'individual' | 'meanStddev'>;
+  isSingleSession: boolean;
 }) {
-  const chartData = data.map((bin) => ({
-    label: bin.label,
-    duration: parseFloat(bin.duration.toFixed(2)),
-  }));
+  // Check if data contains session info (only in aggregate mode)
+  const hasSessionInfo = !isSingleSession && data.length > 0 && 'sessionDurations' in data[0];
+  const showIndividualLines = !isSingleSession && displayModes.has('individual');
+
+  const chartData = useMemo(() => {
+    return data.map((bin) => ({
+      label: bin.label,
+      duration: parseFloat(bin.duration.toFixed(2)),
+      sessionDurations: hasSessionInfo && 'sessionDurations' in bin
+        ? (bin as HistogramBinWithSessions).sessionDurations
+        : [],
+    }));
+  }, [data, hasSessionInfo]);
 
   const chartTitle = `${metric.charAt(0).toUpperCase() + metric.slice(1)} Range`;
+
+  // Create custom bar shape only if needed
+  const barShape = useMemo(
+    () => showIndividualLines && hasSessionInfo ? createCustomBarShape(metric, showIndividualLines) : undefined,
+    [showIndividualLines, hasSessionInfo, metric]
+  );
 
   return (
     <div
@@ -100,6 +178,7 @@ const HistogramBar = memo(function HistogramBar({
               dataKey="duration"
               fill={METRIC_COLORS[metric]}
               radius={[3, 3, 0, 0]}
+              shape={barShape}
             />
           </BarChart>
         </ResponsiveContainer>
@@ -115,18 +194,19 @@ const HistogramBar = memo(function HistogramBar({
 export function HistogramChart({ sessions, isSingleSession }: HistogramChartProps) {
   const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = useViewState();
 
-  // Determine display mode: 'individual' (default) or 'mean' if 'meanStddev' is selected
-  const displayMode: 'individual' | 'mean' = state.histogramDisplayModes.has('meanStddev')
-    ? 'mean'
-    : 'individual';
-
   // For single session, always show deviation; for aggregate, use selected metrics from state
   const metricsToShow: HistogramMetric[] = isSingleSession
     ? ['deviation']
     : Array.from(state.histogramMetrics) as HistogramMetric[];
 
+  // Determine display mode for histogram calculation
+  // When 'individual' is enabled, calculate individual mode data (with session tracking)
+  // When 'meanStddev' is enabled, calculate mean mode data
+  const shouldShowIndividualMode = state.histogramDisplayModes.has('individual');
+  const displayMode: 'individual' | 'mean' = shouldShowIndividualMode ? 'individual' : 'mean';
+
   // Calculate histogram data for each metric
-  const histogramDataMap = new Map<HistogramMetric, HistogramBin[]>();
+  const histogramDataMap = new Map<HistogramMetric, HistogramBin[] | HistogramBinWithSessions[]>();
   for (const metric of metricsToShow) {
     const data = isSingleSession && sessions.length > 0
       ? calculateSessionHistogram(sessions[0], metric)
@@ -213,6 +293,8 @@ export function HistogramChart({ sessions, isSingleSession }: HistogramChartProp
               key={metric}
               metric={metric}
               data={histogramDataMap.get(metric) || []}
+              displayModes={state.histogramDisplayModes}
+              isSingleSession={isSingleSession}
             />
           ))
         ) : (

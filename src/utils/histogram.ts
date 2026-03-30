@@ -19,6 +19,11 @@ export interface HistogramBin {
   label: string;
 }
 
+export interface HistogramBinWithSessions extends HistogramBin {
+  // For individual mode: track duration per session
+  sessionDurations: Array<{ sessionId: string; duration: number }>;
+}
+
 /**
  * Get metric value from a TimeSeries data point
  */
@@ -116,13 +121,13 @@ export function calculateSessionHistogram(
  * @param sessions Array of sessions
  * @param metric Which metric to analyze
  * @param mode 'mean' | 'individual' - how to aggregate
- * @returns Histogram bins
+ * @returns Histogram bins with session tracking for individual mode
  */
 export function calculateAggregateHistogram(
   sessions: Session[],
   metric: HistogramMetric,
   mode: 'mean' | 'individual' = 'individual'
-): HistogramBin[] {
+): HistogramBinWithSessions[] {
   if (sessions.length === 0) {
     return [];
   }
@@ -131,23 +136,31 @@ export function calculateAggregateHistogram(
     // Calculate histogram for each session and sum durations per bin
     const binDurations: Map<string, number> = new Map();
     const binLabels: Map<string, [number, number]> = new Map();
+    const binSessionDurations: Map<string, Array<{ sessionId: string; duration: number }>> = new Map();
 
-    const sessionHistograms = sessions.map((session) =>
-      calculateSessionHistogram(session, metric)
-    );
+    const sessionHistograms = sessions.map((session, idx) => ({
+      sessionId: session.sessionId,
+      histogram: calculateSessionHistogram(session, metric),
+    }));
 
     // Aggregate all bins
-    for (const histogram of sessionHistograms) {
+    for (const { sessionId, histogram } of sessionHistograms) {
       for (const bin of histogram) {
         const key = `${bin.rangeStart}-${bin.rangeEnd}`;
         binDurations.set(key, (binDurations.get(key) || 0) + bin.duration);
         binLabels.set(key, [bin.rangeStart, bin.rangeEnd]);
+
+        // Track per-session durations
+        if (!binSessionDurations.has(key)) {
+          binSessionDurations.set(key, []);
+        }
+        binSessionDurations.get(key)!.push({ sessionId, duration: bin.duration });
       }
     }
 
-    // Convert to HistogramBin array
+    // Convert to HistogramBinWithSessions array
     const unit = getMetricUnit(metric);
-    const result: HistogramBin[] = [];
+    const result: HistogramBinWithSessions[] = [];
 
     binLabels.forEach(([start, end], key) => {
       result.push({
@@ -155,6 +168,7 @@ export function calculateAggregateHistogram(
         rangeEnd: end,
         duration: binDurations.get(key) || 0,
         label: `${start.toFixed(0)}-${end.toFixed(0)}${unit}`,
+        sessionDurations: binSessionDurations.get(key) || [],
       });
     });
 
@@ -180,6 +194,7 @@ export function calculateAggregateHistogram(
     const binEnd = Math.ceil(maxMean / binSize) * binSize;
 
     const bins: Map<number, number> = new Map();
+    const binSessionDurations: Map<string, Array<{ sessionId: string; duration: number }>> = new Map();
 
     // Initialize bins
     for (let start = binStart; start < binEnd; start += binSize) {
@@ -202,20 +217,29 @@ export function calculateAggregateHistogram(
 
       // Find which bin this mean belongs to
       const binStart = Math.floor(meanValue / binSize) * binSize;
+      const key = `${binStart}-${binStart + binSize}`;
       const currentDuration = bins.get(binStart) || 0;
       bins.set(binStart, currentDuration + sessionDuration);
+
+      // Track per-session duration
+      if (!binSessionDurations.has(key)) {
+        binSessionDurations.set(key, []);
+      }
+      binSessionDurations.get(key)!.push({ sessionId: session.sessionId, duration: sessionDuration });
     }
 
-    // Convert to HistogramBin array
+    // Convert to HistogramBinWithSessions array
     const unit = getMetricUnit(metric);
-    const result: HistogramBin[] = [];
+    const result: HistogramBinWithSessions[] = [];
 
     bins.forEach((duration, start) => {
+      const key = `${start}-${start + binSize}`;
       result.push({
         rangeStart: start,
         rangeEnd: start + binSize,
         duration,
         label: `${start.toFixed(0)}-${(start + binSize).toFixed(0)}${unit}`,
+        sessionDurations: binSessionDurations.get(key) || [],
       });
     });
 
