@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { metricButtonStyle } from '../styles/chartControlsStyles';
 
 export interface TrendChartProps {
   sessions: Session[];
@@ -64,20 +65,9 @@ export function TrendChart({ sessions }: TrendChartProps) {
         {(['meanDeviation', 'rotationRange', 'xRange', 'yRange'] as TrendMetric[]).map((m) => (
           <button
             key={m}
+            css={metricButtonStyle}
+            data-active={metric === m}
             onClick={() => setMetric(m)}
-            style={{
-              padding: '4px 8px',
-              backgroundColor:
-                metric === m ? 'rgba(0,255,0,0.2)' : 'rgba(255,255,255,0.05)',
-              border:
-                metric === m
-                  ? '1px solid #0f0'
-                  : '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '3px',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
           >
             {m === 'meanDeviation'
               ? 'Mean Dev'
