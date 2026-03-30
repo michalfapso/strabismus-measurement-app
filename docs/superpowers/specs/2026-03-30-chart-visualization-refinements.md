@@ -59,6 +59,7 @@ Recent implementation of unified chart controls revealed several usability and v
 
 **New:** Display each metric in its own separate graph, stacked vertically
 - Each graph: own y-axis scaled to its metric's value range
+- **Shared x-axis:** All graphs share the same x-axis scale and time range; only the bottommost graph shows x-axis labels to avoid repetition
 - Removes visual clutter and makes metric comparison clearer
 - User can still select multiple metrics; each gets its own view
 
@@ -69,7 +70,8 @@ Recent implementation of unified chart controls revealed several usability and v
 **New:**
 - Round all numeric values to 2 decimals
 - Remove individual session names/data from tooltip
-- Show aggregate stats only (if applicable—e.g., mean of selected sessions)
+- In aggregate view: show mean ± std dev at the hovered x position
+- In single-session view: show the session's value at the hovered x position
 
 ---
 
@@ -95,6 +97,12 @@ Recent implementation of unified chart controls revealed several usability and v
 - **Hover behavior:** Hovering over the "87%" label shows a tooltip/data overlay popup with expanded text: "87% of measurements (n=87 of 100)"
 - This makes representativeness explicit and interactive without cluttering the chart
 
+**Degenerate cases (low sample count):**
+- **n=1:** Show only a single horizontal line (the one data point); no box, no whiskers; coverage label still shown (e.g., "1%")
+- **n=2:** Show only min/max as whisker endpoints and median line; quartile box omitted
+- **n≥3:** Full box plot (median, quartile box, whiskers, outliers)
+- These rules ensure the visualization never renders statistically meaningless IQR boxes
+
 **Metrics:** Keep metric selection as-is (deviation, x, y, rotation toggles)
 
 #### Hover Background Opacity
@@ -104,7 +112,7 @@ Recent implementation of unified chart controls revealed several usability and v
 
 #### Layout
 
-Recent commits (`4b8d3ad`, `54744cf`) have addressed empty space below x-axis. Confirm fixes are present; no further action needed.
+Empty space below x-axis is still present and needs to be fixed. Diagnose via browser devtools: inspect the SVG/ResponsiveContainer height, BarChart margins, and x-axis label offset. Likely culprits: excessive bottom margin on BarChart, or ResponsiveContainer height not matching chart content height.
 
 ---
 
@@ -136,8 +144,8 @@ When Relative mode active:
 
 ### HistogramChart Box Plot Rendering
 
-- Use existing recharts components or `recharts-box-plot` library (TBD from earlier spike)
-- If custom: use `Line`, `Area`, and dot components to assemble quartile box + whiskers + outliers
+- **Library decision required during implementation:** Evaluate `recharts-box-plot` (check npm maintenance, bundle size, API). If unmaintained or too large, build custom using recharts `Line`, `Area`, and `Scatter` components to assemble quartile box + whiskers + outliers
+- Custom approach is straightforward given the well-defined box plot structure above; prefer it if library evaluation is inconclusive
 - Sample coverage: calculate `(measurements with data in bin) / (total measurements) * 100`
 
 ### Color Consistency
@@ -203,7 +211,7 @@ When Relative mode active:
 - [ ] HistogramChart: Sample coverage label "87%" displayed; hover shows expanded "87% of measurements (n=87/100)"
 - [ ] HistogramChart: Hover background opacity 30%
 - [ ] TrendChart: neon green borders removed; lighter background on active metric buttons
-- [ ] All color schemes (metric colors) consistent across both charts
+- [ ] All color schemes (metric colors) consistent across all three charts
 - [ ] Unit tests updated/added for all behavioral changes
 - [ ] Manual testing completed per strategy above
 - [ ] `docs/styling.md` reviewed/updated if color definitions changed
