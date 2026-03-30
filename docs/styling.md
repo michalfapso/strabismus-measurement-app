@@ -23,9 +23,10 @@
 
 ### TimeSeriesGraph
 
+#### Individual Sessions
 | Element | Style |
 |---------|-------|
-| Individual session lines | `rgba(180,180,180,0.3)` thin grey, 1px |
+| Individual session lines | metric color, opacity 0.7, 1px |
 | Mean line | metric color, 2.5px solid |
 | Stddev bounds | metric color, 1.5px dashed, opacity 0.5 |
 
