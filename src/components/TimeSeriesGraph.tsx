@@ -17,7 +17,7 @@ export interface TimeSeriesGraphProps {
 }
 
 type MetricType = 'deviation' | 'x' | 'y' | 'rotation';
-type DisplayMode = 'mean' | 'stddev' | 'individual';
+type DisplayMode = 'meanStddev' | 'individual';
 
 // Metric colors from the plan
 const METRIC_COLORS: Record<MetricType, string> = {
@@ -95,7 +95,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
     new Set(['deviation'])
   );
   const [displayMode, setDisplayMode] = useState<Set<DisplayMode>>(
-    new Set(['mean', 'stddev', 'individual'])
+    new Set(['meanStddev', 'individual'])
   );
   const [timeMode, setTimeMode] = useState<'absolute' | 'relative'>('absolute');
 
@@ -296,7 +296,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
             }}
           >
             <div style={{ fontSize: '11px', color: '#888' }}>Display:</div>
-            {(['mean', 'stddev', 'individual'] as DisplayMode[]).map((mode) => (
+            {(['meanStddev', 'individual'] as DisplayMode[]).map((mode) => (
               <label
                 key={mode}
                 style={{
@@ -320,7 +320,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
                   onChange={() => toggleDisplayMode(mode)}
                   style={{ cursor: 'pointer' }}
                 />
-                <span>{mode === 'stddev' ? 'Std Dev' : mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
+                <span>{mode === 'meanStddev' ? 'Mean & Std Dev' : 'Individual'}</span>
               </label>
             ))}
           </div>
@@ -451,7 +451,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
                   />
                 ))
               ) : (
-                // Aggregate: show individual, mean, and stddev lines
+                // Aggregate: show individual, and mean & stddev lines
                 <>
                   {Array.from(selectedMetrics).map((metric) => (
                     <div key={metric}>
@@ -469,8 +469,8 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
                           />
                         ))}
 
-                      {/* Stddev bounds */}
-                      {displayMode.has('stddev') && (
+                      {/* Mean & Std Dev: render both bounds and mean line together */}
+                      {displayMode.has('meanStddev') && (
                         <>
                           <Line
                             key={`${metric}_upper`}
@@ -494,21 +494,17 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
                             isAnimationActive={false}
                             opacity={0.5}
                           />
+                          <Line
+                            key={`${metric}_mean`}
+                            yAxisId={metric === 'rotation' ? 'right' : 'left'}
+                            dataKey={`${metric}_mean`}
+                            stroke={METRIC_COLORS[metric]}
+                            dot={false}
+                            strokeWidth={2.5}
+                            isAnimationActive={false}
+                            name={metric.charAt(0).toUpperCase() + metric.slice(1) + ' (mean)'}
+                          />
                         </>
-                      )}
-
-                      {/* Mean line */}
-                      {displayMode.has('mean') && (
-                        <Line
-                          key={`${metric}_mean`}
-                          yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                          dataKey={`${metric}_mean`}
-                          stroke={METRIC_COLORS[metric]}
-                          dot={false}
-                          strokeWidth={2.5}
-                          isAnimationActive={false}
-                          name={metric.charAt(0).toUpperCase() + metric.slice(1) + ' (mean)'}
-                        />
                       )}
                     </div>
                   ))}
