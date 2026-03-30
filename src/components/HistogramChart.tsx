@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { css } from '@emotion/react';
 import { Session } from '../types';
 import {
   BarChart,
@@ -8,6 +9,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Scatter,
 } from 'recharts';
 import {
   calculateSessionHistogram,
@@ -18,6 +22,7 @@ import {
   HistogramBinWithSessions,
   BoxPlotData,
 } from '../utils/histogram';
+import { calculateQuartiles, calculateWhiskers, identifyOutliers } from '../utils/chartUtils';
 import { TimeSeries } from '../types';
 import { useViewState, type ViewState } from '../hooks/useViewState';
 
@@ -35,6 +40,22 @@ export interface BinData {
 }
 
 /**
+ * Represents box plot elements for rendering
+ */
+export interface BoxPlotElements {
+  type: 'full' | 'minmax' | 'line';
+  median?: number;
+  q1?: number;
+  q3?: number;
+  min?: number;
+  max?: number;
+  whiskerLower?: number;
+  whiskerUpper?: number;
+  outliers?: number[];
+  value?: number; // for single value case
+}
+
+/**
  * Get metric value from a TimeSeries data point
  */
 function getMetricValue(point: TimeSeries, metric: HistogramMetric): number {
@@ -48,6 +69,49 @@ function getMetricValue(point: TimeSeries, metric: HistogramMetric): number {
     return point.r;
   }
   return 0;
+}
+
+/**
+ * Calculate box plot elements based on degenerate case handling
+ * Handles n=0 (line at 0), n=1 (single line), n=2 (minmax line), n>=3 (full box plot)
+ */
+function calcBoxPlotElements(
+  values: number[],
+  quartiles: ReturnType<typeof calculateQuartiles> | null,
+  whiskers: ReturnType<typeof calculateWhiskers> | null
+): BoxPlotElements {
+  if (values.length === 0) {
+    return { type: 'line', value: 0 };
+  }
+
+  if (values.length === 1) {
+    return { type: 'line', value: values[0] };
+  }
+
+  if (values.length === 2 && quartiles) {
+    return {
+      type: 'minmax',
+      median: quartiles.median,
+      min: quartiles.min,
+      max: quartiles.max,
+    };
+  }
+
+  // n >= 3: full box plot
+  if (quartiles && whiskers) {
+    const outliers = identifyOutliers(values, whiskers);
+    return {
+      type: 'full',
+      median: quartiles.median,
+      q1: quartiles.q1,
+      q3: quartiles.q3,
+      whiskerLower: whiskers.lower,
+      whiskerUpper: whiskers.upper,
+      outliers,
+    };
+  }
+
+  return { type: 'line', value: 0 };
 }
 
 /**
@@ -115,6 +179,45 @@ export function aggregateHistogramData(
     .sort((a, b) => a.binStart - b.binStart);
 
   return result;
+}
+
+/**
+ * Custom tooltip component for box plot displays
+ * Shows coverage percentage and measurement count
+ */
+function BoxPlotTooltip({ active, payload }: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: {
+      coverage: number;
+      count: number;
+      totalMeasurements: number;
+    };
+  }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const { coverage, count, totalMeasurements } = payload[0]?.payload || {};
+
+  return (
+    <div
+      css={css`
+        background-color: rgba(0, 0, 0, 0.8);
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+      `}
+    >
+      <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
+        {coverage.toFixed(0)}% of measurements
+      </p>
+      <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
+        n={count} of {totalMeasurements}
+      </p>
+    </div>
+  );
 }
 
 export interface HistogramChartProps {
@@ -402,6 +505,133 @@ function createCustomBarShape(
 }
 
 /**
+ * Renders a box plot chart using aggregateHistogramData and ComposedChart
+ * Handles degenerate cases and shows coverage labels
+ */
+function renderAggregateBoxPlots(
+  sessions: Session[],
+  metric: HistogramMetric
+) {
+  if (sessions.length === 0) {
+    return (
+      <div style={{ color: '#666', fontSize: '11px', height: '200px', display: 'flex', alignItems: 'center' }}>
+        No data available
+      </div>
+    );
+  }
+
+  // Get aggregated histogram data with coverage tracking
+  const binData = aggregateHistogramData(sessions, metric, 1);
+
+  if (binData.length === 0) {
+    return (
+      <div style={{ color: '#666', fontSize: '11px', height: '200px', display: 'flex', alignItems: 'center' }}>
+        No data available
+      </div>
+    );
+  }
+
+  const color = METRIC_COLORS[metric];
+
+  // Prepare chart data with box plot calculations
+  const chartData = binData.map((bin) => {
+    const quartiles = calculateQuartiles(bin.values);
+    const whiskers = quartiles ? calculateWhiskers(quartiles) : null;
+    const boxPlot = calcBoxPlotElements(bin.values, quartiles, whiskers);
+
+    return {
+      binRange: bin.binRange,
+      binStart: bin.binStart,
+      binEnd: bin.binEnd,
+      coverage: bin.coverage,
+      count: bin.count,
+      totalMeasurements: bin.totalMeasurements,
+      ...boxPlot,
+    };
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <ComposedChart
+        data={chartData}
+        margin={{ top: 5, right: 20, left: 40, bottom: 20 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+        <XAxis
+          dataKey="binRange"
+          tick={{ fontSize: 9, fill: '#666' }}
+        />
+        <YAxis
+          label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
+          tick={{ fontSize: 9, fill: '#666' }}
+        />
+
+        {/* Whiskers - for full box plots (n >= 3) */}
+        <Line
+          dataKey="whiskerLower"
+          stroke={color}
+          dot={false}
+          isAnimationActive={false}
+          strokeWidth={1}
+        />
+        <Line
+          dataKey="whiskerUpper"
+          stroke={color}
+          dot={false}
+          isAnimationActive={false}
+          strokeWidth={1}
+        />
+
+        {/* Median line */}
+        <Line
+          dataKey="median"
+          stroke={color}
+          strokeWidth={2}
+          dot={false}
+          isAnimationActive={false}
+        />
+
+        {/* Min/Max for degenerate cases */}
+        <Line
+          dataKey="min"
+          stroke={color}
+          strokeWidth={1}
+          dot={false}
+          isAnimationActive={false}
+          opacity={0.5}
+        />
+        <Line
+          dataKey="max"
+          stroke={color}
+          strokeWidth={1}
+          dot={false}
+          isAnimationActive={false}
+          opacity={0.5}
+        />
+
+        {/* Single value line for n=1 case */}
+        <Line
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          dot={false}
+          isAnimationActive={false}
+        />
+
+        {/* Outliers as scatter points */}
+        <Scatter
+          dataKey="outliers"
+          fill={color}
+          isAnimationActive={false}
+        />
+
+        <Tooltip content={<BoxPlotTooltip />} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
+/**
  * Helper component to render a single metric's histogram
  */
 const HistogramBar = memo(function HistogramBar({
@@ -472,7 +702,7 @@ const HistogramBar = memo(function HistogramBar({
         <div style={{ fontSize: '10px', color: '#888', marginBottom: '8px' }}>
           {chartTitle}
         </div>
-        {renderBoxPlot(boxPlotData, metric, chartTitle)}
+        {renderAggregateBoxPlots(sessions, metric)}
       </div>
     );
   }
@@ -540,7 +770,7 @@ const HistogramBar = memo(function HistogramBar({
           {/* Overlay box plot if both modes are enabled */}
           {shouldRenderBoxPlot && shouldRenderIndividual && (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-              {renderBoxPlot(boxPlotData, metric, chartTitle)}
+              {renderAggregateBoxPlots(sessions, metric)}
             </div>
           )}
         </div>
