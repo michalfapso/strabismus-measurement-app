@@ -22,7 +22,9 @@ const DEFAULT_STATE: ViewState = {
   },
   selectedSessions: new Set(),
   histogramMetrics: new Set(['deviation']),
-  histogramDisplayModes: new Set(['individual']),
+  // Default display modes: both components show individual session data + statistical summary (mean±stddev)
+  // This provides a complete view of both individual variation and aggregate statistics
+  histogramDisplayModes: new Set(['individual', 'meanStddev']),
   timeSeriesMetrics: new Set(['deviation']),
   timeSeriesDisplayModes: new Set(['individual', 'meanStddev']),
   timeSeriesTimeMode: 'absolute',

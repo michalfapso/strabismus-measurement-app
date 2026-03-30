@@ -16,7 +16,7 @@ describe('useViewState', () => {
     expect(result.current.state.filters.exerciseType).toBeNull();
     expect(result.current.state.selectedSessions).toEqual(new Set());
     expect(result.current.state.histogramMetrics).toEqual(new Set(['deviation']));
-    expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual']));
+    expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual', 'meanStddev']));
     expect(result.current.state.timeSeriesMetrics).toEqual(new Set(['deviation']));
     expect(result.current.state.timeSeriesDisplayModes).toEqual(new Set(['individual', 'meanStddev']));
     expect(result.current.state.timeSeriesTimeMode).toBe('absolute');
@@ -142,12 +142,6 @@ describe('useViewState', () => {
   it('toggleHistogramDisplayMode toggles display modes', () => {
     const { result } = renderHook(() => useViewState());
 
-    expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual']));
-
-    act(() => {
-      result.current.toggleHistogramDisplayMode('meanStddev');
-    });
-
     expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual', 'meanStddev']));
 
     act(() => {
@@ -155,6 +149,12 @@ describe('useViewState', () => {
     });
 
     expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual']));
+
+    act(() => {
+      result.current.toggleHistogramDisplayMode('meanStddev');
+    });
+
+    expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual', 'meanStddev']));
   });
 
   it('setTimeSeriesTimeMode updates time mode', () => {
