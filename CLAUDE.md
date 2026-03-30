@@ -1,10 +1,89 @@
 # Strabismus Measurement Application - Architecture & Development Guide
 
+## Purpose & Clinical Context
+
+This is a **clinical oculomotor assessment tool** used by eye care professionals (orthoptists, ophthalmologists) to measure and track a patient's ability to maintain **binocular fusion** — the brain's ability to merge the images from both eyes into a single, fused image.
+
+### The Medical Problem
+Patients with strabismus (eye misalignment) or convergence insufficiency may undergo **vision therapy** involving exercises to strengthen binocular fusion. A key clinical challenge is **objectively measuring** how well a patient maintains fusion during and across therapy sessions, and whether they are improving over time.
+
+### What the App Measures
+The app tracks a **moving cross/target** that the patient is instructed to hold fused:
+- **X, Y position** (centimeters): How far the eye has deviated from center — measures diplopia onset
+- **Rotation** (degrees): Cyclotorsion/rotation of the target
+- **Deviation** (√x²+y²): Combined positional deviation from center, the primary clinical measure
+
+### Exercises Supported
+- **No Exercise/Control** — Baseline measurement without exercise
+- **Pencil Push-ups** — Classic convergence training (moving target toward nose)
+- **Brock String** — Spatial awareness and vergence training
+- **Extreme Rotation** — Cyclofusion training at maximum rotation angles
+- **Convergence Jumps** — Rapid alternation between near/far targets
+- **Left/Right-Tendon-Stretch** — Surgical recovery exercises targeting specific muscles
+- Custom tags are also supported (entered freely, not constrained to this list)
+
+### Clinical Use
+A clinician records one session per exercise attempt. Over weeks/months, multiple sessions build a longitudinal dataset. The aggregate analysis lets the clinician compare sessions to answer:
+- *Is the patient improving over time?* (TrendChart)
+- *How consistent are their sessions?* (std dev band in TimeSeriesGraph)
+- *For how long can they maintain fusion before deviation occurs?* (HistogramChart — time in each deviation bin)
+- *Are the sessions consistent in pattern?* (Overlay of individual sessions)
+
+---
+
+## Example User Flow
+
+### First Visit: Calibration
+1. Clinician opens the app — **CalibrationScreen** appears (mandatory on first use)
+2. Clinician selects calibration method:
+   - **Credit card method**: lay a credit card on screen, drag to match its known width
+   - **A4 short/long side**: use paper edge to set scale
+3. App calculates **PPI (pixels per inch)** — stores in CalibrationContext + persists to localStorage
+4. Calibration translates pixel coordinates into real-world centimeters for all future measurements
+
+### Routine Session: Recording a Measurement
+1. Clinician is on **Measurement** page (default view after calibration)
+2. **AssessmentCanvas** shows a static reference cross and a draggable user cross
+3. Clinician opens **DataCaptureControl** panel (top-right toolbar → "Measurement")
+4. Selects exercise from dropdown (e.g., "Pencil Push-ups") — can also type a custom tag
+5. Clicks **Start** — recording begins, capturing x/y/rotation every ~100ms
+6. Patient performs the exercise while clinician or patient manipulates the cross
+7. Clinician clicks **Stop** — session auto-saves to IndexedDB
+8. **ResultsPanel** appears showing immediate stats for the session
+
+### Reviewing a Single Session
+1. Clinician clicks **History** in the top toolbar
+2. **HistoryPage** shows session list with date, exercise, duration, and position range
+3. Clinician clicks one session row — row highlights with green left border (selected)
+4. **UnifiedSessionPanel** opens on the right showing:
+   - **StatCards**: Mean deviation, rotation range, X range, Y range
+   - **TimeSeriesGraph**: Plot of deviation/position over time; metric selector to show/hide variables
+   - **HistogramChart**: Bar chart showing how many seconds the deviation spent in each 1cm bin (key for understanding fusion duration)
+5. Clinician exports session to CSV for records via "Export CSV" button
+
+### Comparing Multiple Sessions (Aggregate Analysis)
+1. On the History page, clinician Shift+clicks to select a range of sessions (or Ctrl+clicks for individual ones)
+2. **UnifiedSessionPanel** switches to aggregate mode showing:
+   - **StatCards**: Mean ± stddev across all selected sessions
+   - **TimeSeriesGraph**: Thin grey lines per session + thick colored mean + dashed stddev bounds; toggle Mean/Std Dev/Individual
+   - **HistogramChart**: Combined duration distribution across all sessions
+   - **TrendChart** (bottom): Metric value per session over time with regression line — shows if patient is improving
+3. Clinician can filter by date range or exercise type using filter bars at top of list
+
+### Recalibration
+1. Clinician clicks **Recalibrate** in toolbar (or if the screen/setup changes)
+2. CalibrationScreen appears **with the toolbar still visible** (non-blocking overlay)
+3. After re-calibrating, canvas state is restored — measurement continues seamlessly
+
+---
+
 ## Project Overview
 
 A React-based application for measuring and analyzing eye position/rotation (strabismus) during eye fusion exercises. Captures real-time position and rotation data, stores sessions, and provides comprehensive analysis with single-session and multi-session aggregate views.
 
-**Tech Stack:** React, TypeScript, Vite, emotion (CSS-in-JS), recharts, IndexedDB
+**Deployment:** Offline-first single-page app. No backend. Runs entirely in the browser. Designed to work on a clinical workstation or tablet without internet.
+
+**Tech Stack:** React, TypeScript, Vite, emotion (CSS-in-JS), recharts, IndexedDB, react-konva (canvas)
 
 ---
 
