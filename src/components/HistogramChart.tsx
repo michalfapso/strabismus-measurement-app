@@ -177,17 +177,17 @@ function renderBoxPlot(
   const color = METRIC_COLORS[metric];
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={120}>
       <BarChart
         data={chartData}
-        margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
+        margin={{ top: 5, right: 20, left: 40, bottom: 20 }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#333" />
         <XAxis
           dataKey="label"
           angle={-45}
           textAnchor="end"
-          height={80}
+          height={60}
           tick={{ fontSize: 9, fill: '#666' }}
         />
         <YAxis
@@ -399,17 +399,17 @@ const HistogramBar = memo(function HistogramBar({
       {/* Chart */}
       {chartData.length > 0 ? (
         <div style={{ position: 'relative' }}>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={120}>
             <BarChart
               data={chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
+              margin={{ top: 5, right: 20, left: 40, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis
                 dataKey="label"
                 angle={-45}
                 textAnchor="end"
-                height={80}
+                height={60}
                 tick={{ fontSize: 9, fill: '#666' }}
               />
               <YAxis
