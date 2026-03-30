@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Session } from '../types';
 import {
   BarChart,
@@ -13,7 +12,9 @@ import {
   calculateSessionHistogram,
   calculateAggregateHistogram,
   HistogramMetric,
+  HistogramBin,
 } from '../utils/histogram';
+import { useViewState } from '../hooks/useViewState';
 
 export interface HistogramChartProps {
   sessions: Session[];
@@ -28,116 +29,56 @@ const METRIC_COLORS: Record<HistogramMetric, string> = {
   rotation: '#FFC107',   // gold
 };
 
-export function HistogramChart({ sessions, isSingleSession }: HistogramChartProps) {
-  const [selectedMetric, setSelectedMetric] = useState<HistogramMetric>('deviation');
-  const [displayMode, setDisplayMode] = useState<'mean' | 'individual'>('individual');
-
-  // Calculate histogram based on view mode
-  const histogramData = isSingleSession
-    ? calculateSessionHistogram(sessions[0], selectedMetric)
-    : calculateAggregateHistogram(sessions, selectedMetric, displayMode);
-
-  // Prepare data for recharts
-  const chartData = histogramData.map((bin) => ({
+/**
+ * Helper component to render a single metric's histogram
+ */
+function HistogramBar({
+  metric,
+  data,
+}: {
+  metric: HistogramMetric;
+  data: HistogramBin[];
+}) {
+  const chartData = data.map((bin) => ({
     label: bin.label,
     duration: parseFloat(bin.duration.toFixed(2)),
   }));
 
-  const chartTitle = isSingleSession
-    ? `Session Duration by ${selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Range`
-    : `Combined Duration by ${selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Range`;
+  const chartTitle = `${metric.charAt(0).toUpperCase() + metric.slice(1)} Range`;
 
   return (
     <div
       style={{
-        padding: '12px',
+        marginBottom: '20px',
         backgroundColor: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(0,255,0,0.2)',
+        border: '1px solid rgba(0,255,0,0.1)',
         borderRadius: '4px',
-        width: '100%',
+        padding: '8px',
       }}
     >
-      {/* Header with title */}
-      <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px' }}>
+      {/* Metric title */}
+      <div style={{ fontSize: '10px', color: '#888', marginBottom: '8px' }}>
         {chartTitle}
       </div>
 
-      {/* Metric Selector */}
-      <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '10px', color: '#aaa' }}>Metric:</label>
-        {(['deviation', 'x', 'y', 'rotation'] as const).map((metric) => (
-          <label
-            key={metric}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '10px',
-              color: '#aaa',
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="radio"
-              name="metric"
-              value={metric}
-              checked={selectedMetric === metric}
-              onChange={() => setSelectedMetric(metric)}
-              style={{ cursor: 'pointer' }}
-            />
-            {metric.charAt(0).toUpperCase() + metric.slice(1)}
-          </label>
-        ))}
-      </div>
-
-      {/* Display Mode Selector - only for aggregate view */}
-      {!isSingleSession && (
-        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: '10px', color: '#aaa' }}>Mode:</label>
-          {(['individual', 'mean'] as const).map((mode) => (
-            <label
-              key={mode}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '10px',
-                color: '#aaa',
-                cursor: 'pointer',
-              }}
-            >
-              <input
-                type="radio"
-                name="displayMode"
-                value={mode}
-                checked={displayMode === mode}
-                onChange={() => setDisplayMode(mode)}
-                style={{ cursor: 'pointer' }}
-              />
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
-            </label>
-          ))}
-        </div>
-      )}
-
       {/* Chart */}
       {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={200}>
           <BarChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 0, bottom: 50 }}
+            margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis
               dataKey="label"
               angle={-45}
               textAnchor="end"
-              height={100}
-              tick={{ fontSize: 10, fill: '#888' }}
+              height={80}
+              tick={{ fontSize: 9, fill: '#666' }}
             />
             <YAxis
-              label={{ value: 'Duration (seconds)', angle: -90, position: 'insideLeft' }}
-              tick={{ fontSize: 10, fill: '#888' }}
+              tick={{ fontSize: 9, fill: '#666' }}
+              label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
             />
             <Tooltip
               contentStyle={{
@@ -156,16 +97,129 @@ export function HistogramChart({ sessions, isSingleSession }: HistogramChartProp
             />
             <Bar
               dataKey="duration"
-              fill={METRIC_COLORS[selectedMetric]}
-              radius={[4, 4, 0, 0]}
+              fill={METRIC_COLORS[metric]}
+              radius={[3, 3, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
       ) : (
-        <div style={{ color: '#666', fontSize: '12px', height: '250px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ color: '#666', fontSize: '11px', height: '200px', display: 'flex', alignItems: 'center' }}>
           No data available
         </div>
       )}
+    </div>
+  );
+}
+
+export function HistogramChart({ sessions, isSingleSession }: HistogramChartProps) {
+  const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = useViewState();
+
+  // Determine display mode: 'individual' (default) or 'mean' if 'meanStddev' is selected
+  const displayMode: 'individual' | 'mean' = state.histogramDisplayModes.has('meanStddev')
+    ? 'mean'
+    : 'individual';
+
+  // For single session, always show deviation; for aggregate, use selected metrics from state
+  const metricsToShow: HistogramMetric[] = isSingleSession
+    ? ['deviation']
+    : Array.from(state.histogramMetrics) as HistogramMetric[];
+
+  // Calculate histogram data for each metric
+  const histogramDataMap = new Map<HistogramMetric, HistogramBin[]>();
+  for (const metric of metricsToShow) {
+    const data = isSingleSession
+      ? calculateSessionHistogram(sessions[0], metric)
+      : calculateAggregateHistogram(sessions, metric, displayMode);
+    histogramDataMap.set(metric, data);
+  }
+
+  return (
+    <div
+      style={{
+        padding: '12px',
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(0,255,0,0.2)',
+        borderRadius: '4px',
+        width: '100%',
+      }}
+    >
+      {/* Header with title */}
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px' }}>
+        Duration Distribution by Metric
+      </div>
+
+      {/* Metric Checkboxes - only for aggregate view */}
+      {!isSingleSession && (
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '10px', color: '#aaa' }}>Metrics:</label>
+          {(['deviation', 'x', 'y', 'rotation'] as const).map((metric) => (
+            <label
+              key={metric}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '10px',
+                color: '#aaa',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={state.histogramMetrics.has(metric)}
+                onChange={() => toggleHistogramMetric(metric)}
+                style={{ cursor: 'pointer' }}
+              />
+              {metric.charAt(0).toUpperCase() + metric.slice(1)}
+            </label>
+          ))}
+        </div>
+      )}
+
+      {/* Display Mode Selector - only for aggregate view */}
+      {!isSingleSession && (
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '10px', color: '#aaa' }}>Mode:</label>
+          {(['individual', 'meanStddev'] as const).map((mode) => (
+            <label
+              key={mode}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '10px',
+                color: '#aaa',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={state.histogramDisplayModes.has(mode)}
+                onChange={() => toggleHistogramDisplayMode(mode)}
+                style={{ cursor: 'pointer' }}
+              />
+              {mode === 'meanStddev' ? 'Mean & Stddev' : 'Individual'}
+            </label>
+          ))}
+        </div>
+      )}
+
+      {/* Render histograms for each selected metric */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {metricsToShow.length > 0 ? (
+          metricsToShow.map((metric) => (
+            <HistogramBar
+              key={metric}
+              metric={metric}
+              data={histogramDataMap.get(metric) || []}
+            />
+          ))
+        ) : (
+          <div style={{ color: '#666', fontSize: '12px', padding: '20px' }}>
+            No metrics selected
+          </div>
+        )}
+      </div>
     </div>
   );
 }
