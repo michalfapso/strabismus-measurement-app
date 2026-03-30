@@ -10,10 +10,12 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatTimeSeconds, formatTimeSecondsVerbose } from '../utils/timeFormatting';
+import { useViewState } from '../hooks/useViewState';
 
 export interface TimeSeriesGraphProps {
   sessions: Session[];
   isSingleSession: boolean;
+  viewState?: ReturnType<typeof useViewState>;
 }
 
 type MetricType = 'deviation' | 'x' | 'y' | 'rotation';
@@ -90,14 +92,15 @@ function calculateStats(values: number[]) {
 }
 
 
-export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphProps) {
-  const [selectedMetrics, setSelectedMetrics] = useState<Set<MetricType>>(
-    new Set(['deviation'])
-  );
-  const [displayMode, setDisplayMode] = useState<Set<DisplayMode>>(
-    new Set(['meanStddev', 'individual'])
-  );
-  const [timeMode, setTimeMode] = useState<'absolute' | 'relative'>('absolute');
+export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedViewState }: TimeSeriesGraphProps) {
+  // Use passed viewState if provided (from UnifiedSessionPanel), otherwise create our own
+  const defaultViewState = useViewState();
+  const { state, toggleTimeSeriesMetric, toggleTimeSeriesDisplayMode, setTimeSeriesTimeMode } = passedViewState || defaultViewState;
+
+  // Read from viewState
+  const selectedMetrics = state.timeSeriesMetrics;
+  const displayMode = state.timeSeriesDisplayModes;
+  const timeMode = state.timeSeriesTimeMode;
 
   if (sessions.length === 0) {
     return (
@@ -119,24 +122,17 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
 
   // Toggle metric selection
   const toggleMetric = (metric: MetricType) => {
-    const newMetrics = new Set(selectedMetrics);
-    if (newMetrics.has(metric)) {
-      newMetrics.delete(metric);
-    } else {
-      newMetrics.add(metric);
-    }
-    setSelectedMetrics(newMetrics);
+    toggleTimeSeriesMetric(metric);
   };
 
   // Toggle display mode (aggregate only)
   const toggleDisplayMode = (mode: DisplayMode) => {
-    const newModes = new Set(displayMode);
-    if (newModes.has(mode)) {
-      newModes.delete(mode);
-    } else {
-      newModes.add(mode);
-    }
-    setDisplayMode(newModes);
+    toggleTimeSeriesDisplayMode(mode);
+  };
+
+  // Handle time mode change
+  const handleTimeModeChange = (mode: 'absolute' | 'relative') => {
+    setTimeSeriesTimeMode(mode);
   };
 
   // Prepare chart data
@@ -338,7 +334,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession }: TimeSeriesGraphPr
             {(['absolute', 'relative'] as const).map((mode) => (
               <button
                 key={mode}
-                onClick={() => setTimeMode(mode)}
+                onClick={() => handleTimeModeChange(mode)}
                 style={{
                   padding: '4px 8px',
                   backgroundColor:

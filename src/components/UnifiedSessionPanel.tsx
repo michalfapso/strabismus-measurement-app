@@ -92,7 +92,7 @@ export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         marginBottom: '16px',
       }}>
-        <TimeSeriesGraph sessions={sessions} isSingleSession={isSingleSession} />
+        <TimeSeriesGraph sessions={sessions} isSingleSession={isSingleSession} viewState={viewState} />
       </div>
 
       {/* HistogramChart section */}
