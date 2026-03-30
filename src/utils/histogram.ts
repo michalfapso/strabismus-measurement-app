@@ -24,6 +24,70 @@ export interface HistogramBinWithSessions extends HistogramBin {
   sessionDurations: Array<{ sessionId: string; duration: number }>;
 }
 
+export interface BoxPlotData {
+  label: string;
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  outliers: number[];
+}
+
+/**
+ * Calculate quartiles and whiskers for box plot
+ */
+function calculateQuartiles(values: number[]): {
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  outliers: number[];
+} {
+  if (values.length === 0) {
+    return { min: 0, q1: 0, median: 0, q3: 0, max: 0, outliers: [] };
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const len = sorted.length;
+
+  // Calculate percentiles
+  const q1Index = Math.floor(len * 0.25);
+  const medianIndex = Math.floor(len * 0.5);
+  const q3Index = Math.floor(len * 0.75);
+
+  const q1 = sorted[q1Index];
+  const median = sorted[medianIndex];
+  const q3 = sorted[q3Index];
+
+  const iqr = q3 - q1;
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+
+  // Find min/max within whisker bounds
+  let min = sorted[0];
+  let max = sorted[len - 1];
+  const outliers: number[] = [];
+
+  for (const value of sorted) {
+    if (value < lowerBound) {
+      outliers.push(value);
+    } else if (value <= upperBound) {
+      if (min === sorted[0] || value < min) {
+        min = value;
+      }
+      if (max === sorted[len - 1] || value > max) {
+        max = value;
+      }
+    } else {
+      outliers.push(value);
+    }
+  }
+
+  return { min, q1, median, q3, max, outliers };
+}
+
 /**
  * Get metric value from a TimeSeries data point
  */
@@ -246,4 +310,53 @@ export function calculateAggregateHistogram(
     result.sort((a, b) => a.rangeStart - b.rangeStart);
     return result;
   }
+}
+
+/**
+ * Calculate box plot data from sessions for Mean & Std Dev mode
+ * @param sessions Array of sessions to aggregate
+ * @param metric Which metric to analyze
+ * @returns Array of box plot data per bin
+ */
+export function calculateBoxPlotData(
+  sessions: Session[],
+  metric: HistogramMetric
+): BoxPlotData[] {
+  if (sessions.length === 0) {
+    return [];
+  }
+
+  // First, calculate the histogram to get bin ranges
+  const histogramData = calculateAggregateHistogram(sessions, metric, 'individual');
+
+  // For each bin, collect all duration values from all sessions
+  const boxPlotDataMap = new Map<string, number[]>();
+
+  for (const bin of histogramData) {
+    const key = `${bin.rangeStart}-${bin.rangeEnd}`;
+    const durations = bin.sessionDurations.map((sd) => sd.duration);
+    boxPlotDataMap.set(key, durations);
+  }
+
+  // Convert to box plot format
+  const result: BoxPlotData[] = [];
+
+  for (const bin of histogramData) {
+    const key = `${bin.rangeStart}-${bin.rangeEnd}`;
+    const durations = boxPlotDataMap.get(key) || [];
+
+    const quartiles = calculateQuartiles(durations);
+
+    result.push({
+      label: bin.label,
+      min: quartiles.min,
+      q1: quartiles.q1,
+      median: quartiles.median,
+      q3: quartiles.q3,
+      max: quartiles.max,
+      outliers: quartiles.outliers,
+    });
+  }
+
+  return result;
 }

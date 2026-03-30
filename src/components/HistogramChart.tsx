@@ -12,9 +12,11 @@ import {
 import {
   calculateSessionHistogram,
   calculateAggregateHistogram,
+  calculateBoxPlotData,
   HistogramMetric,
   HistogramBin,
   HistogramBinWithSessions,
+  BoxPlotData,
 } from '../utils/histogram';
 import { useViewState } from '../hooks/useViewState';
 
@@ -30,6 +32,218 @@ const METRIC_COLORS: Record<HistogramMetric, string> = {
   y: '#FF9500',          // orange
   rotation: '#FFC107',   // gold
 };
+
+/**
+ * Custom box plot shape component that renders boxes with whiskers
+ */
+function BoxPlotShape(props: any) {
+  const { x, y, width, height, payload } = props;
+
+  if (!payload) return null;
+
+  const data = payload;
+  const color = METRIC_COLORS[data.metric as HistogramMetric];
+
+  // Calculate y positions based on data values
+  // We need to map data values to pixel positions
+  // Assuming y-axis goes from 0 to some max value
+  const chartHeight = 160; // approximate chart content height
+  const yAxisMax = 50; // approximate max y value (will be dynamic)
+
+  const getYPos = (value: number): number => {
+    return y + height - (value / yAxisMax) * chartHeight;
+  };
+
+  const minY = getYPos(data.min);
+  const q1Y = getYPos(data.q1);
+  const medianY = getYPos(data.median);
+  const q3Y = getYPos(data.q3);
+  const maxY = getYPos(data.max);
+
+  const boxWidth = width * 0.6;
+  const boxX = x + width / 2 - boxWidth / 2;
+
+  const elements = [];
+
+  // Whisker lines (min to max)
+  elements.push(
+    <line
+      key="whisker-line"
+      x1={x + width / 2}
+      y1={minY}
+      x2={x + width / 2}
+      y2={maxY}
+      stroke={color}
+      strokeWidth={1}
+      opacity={0.5}
+    />
+  );
+
+  // Whisker caps
+  elements.push(
+    <line
+      key="whisker-min-cap"
+      x1={boxX + boxWidth * 0.2}
+      y1={minY}
+      x2={boxX + boxWidth * 0.8}
+      y2={minY}
+      stroke={color}
+      strokeWidth={1}
+      opacity={0.5}
+    />,
+    <line
+      key="whisker-max-cap"
+      x1={boxX + boxWidth * 0.2}
+      y1={maxY}
+      x2={boxX + boxWidth * 0.8}
+      y2={maxY}
+      stroke={color}
+      strokeWidth={1}
+      opacity={0.5}
+    />
+  );
+
+  // Q1-Q3 box
+  elements.push(
+    <rect
+      key="box"
+      x={boxX}
+      y={Math.min(q1Y, q3Y)}
+      width={boxWidth}
+      height={Math.abs(q3Y - q1Y)}
+      fill={color}
+      fillOpacity={0.3}
+      stroke={color}
+      strokeWidth={1.5}
+    />
+  );
+
+  // Median line (bold)
+  elements.push(
+    <line
+      key="median"
+      x1={boxX}
+      y1={medianY}
+      x2={boxX + boxWidth}
+      y2={medianY}
+      stroke={color}
+      strokeWidth={2}
+    />
+  );
+
+  // Outliers as dots
+  if (data.outliers && data.outliers.length > 0) {
+    data.outliers.forEach((outlier: number, idx: number) => {
+      const outlierY = getYPos(outlier);
+      elements.push(
+        <circle
+          key={`outlier-${idx}`}
+          cx={x + width / 2}
+          cy={outlierY}
+          r={3}
+          fill={color}
+          fillOpacity={0.7}
+        />
+      );
+    });
+  }
+
+  return <g>{elements}</g>;
+}
+
+/**
+ * Renders a box plot visualization for Mean & Std Dev mode
+ */
+function renderBoxPlot(
+  boxData: BoxPlotData[],
+  metric: HistogramMetric,
+  chartTitle: string
+) {
+  if (boxData.length === 0) {
+    return (
+      <div style={{ color: '#666', fontSize: '11px', height: '200px', display: 'flex', alignItems: 'center' }}>
+        No data available
+      </div>
+    );
+  }
+
+  // Add metric info to box data for shape rendering
+  const chartData = boxData.map((item) => ({
+    ...item,
+    metric,
+    duration: item.median, // For chart baseline
+  }));
+
+  const color = METRIC_COLORS[metric];
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart
+        data={chartData}
+        margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+        <XAxis
+          dataKey="label"
+          angle={-45}
+          textAnchor="end"
+          height={80}
+          tick={{ fontSize: 9, fill: '#666' }}
+        />
+        <YAxis
+          tick={{ fontSize: 9, fill: '#666' }}
+          label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
+        />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #333',
+            borderRadius: '4px',
+            color: '#fff',
+          }}
+          labelStyle={{ color: '#888' }}
+          formatter={(value) => {
+            if (typeof value === 'number') {
+              return `${value.toFixed(2)}s`;
+            }
+            return '';
+          }}
+          content={({ payload }) => {
+            if (!payload || payload.length === 0) return null;
+            const data = payload[0].payload;
+            return (
+              <div
+                style={{
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  padding: '8px',
+                  fontSize: '11px',
+                }}
+              >
+                <div>{data.label}</div>
+                <div>Min: {data.min.toFixed(2)}s</div>
+                <div>Q1: {data.q1.toFixed(2)}s</div>
+                <div>Median: {data.median.toFixed(2)}s</div>
+                <div>Q3: {data.q3.toFixed(2)}s</div>
+                <div>Max: {data.max.toFixed(2)}s</div>
+                {data.outliers && data.outliers.length > 0 && (
+                  <div>Outliers: {data.outliers.map((o: number) => o.toFixed(2)).join(', ')}</div>
+                )}
+              </div>
+            );
+          }}
+        />
+        <Bar
+          dataKey="duration"
+          fill="transparent"
+          shape={(props: any) => <BoxPlotShape {...props} />}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
 
 /**
  * Custom bar shape that renders individual session lines
@@ -97,15 +311,18 @@ const HistogramBar = memo(function HistogramBar({
   data,
   displayModes,
   isSingleSession,
+  sessions,
 }: {
   metric: HistogramMetric;
   data: HistogramBin[] | HistogramBinWithSessions[];
   displayModes: Set<'individual' | 'meanStddev'>;
   isSingleSession: boolean;
+  sessions: Session[];
 }) {
   // Check if data contains session info (only in aggregate mode)
   const hasSessionInfo = !isSingleSession && data.length > 0 && 'sessionDurations' in data[0];
   const showIndividualLines = !isSingleSession && displayModes.has('individual');
+  const showMeanStddev = !isSingleSession && displayModes.has('meanStddev');
 
   const chartData = useMemo(() => {
     return data.map((bin) => ({
@@ -117,6 +334,14 @@ const HistogramBar = memo(function HistogramBar({
     }));
   }, [data, hasSessionInfo]);
 
+  // Calculate box plot data for Mean & Std Dev mode
+  const boxPlotData = useMemo(() => {
+    if (!isSingleSession && showMeanStddev && !showIndividualLines && sessions.length > 0) {
+      return calculateBoxPlotData(sessions, metric);
+    }
+    return [];
+  }, [isSingleSession, showMeanStddev, showIndividualLines, sessions, metric]);
+
   const chartTitle = `${metric.charAt(0).toUpperCase() + metric.slice(1)} Range`;
 
   // Create custom bar shape only if needed
@@ -124,6 +349,27 @@ const HistogramBar = memo(function HistogramBar({
     () => showIndividualLines && hasSessionInfo ? createCustomBarShape(metric, showIndividualLines) : undefined,
     [showIndividualLines, hasSessionInfo, metric]
   );
+
+  // Render box plot if Mean & Std Dev is enabled (and Individual is not)
+  if (!isSingleSession && showMeanStddev && !showIndividualLines && boxPlotData.length > 0) {
+    return (
+      <div
+        style={{
+          marginBottom: '20px',
+          backgroundColor: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(0,255,0,0.1)',
+          borderRadius: '4px',
+          padding: '8px',
+        }}
+      >
+        {/* Metric title */}
+        <div style={{ fontSize: '10px', color: '#888', marginBottom: '8px' }}>
+          {chartTitle}
+        </div>
+        {renderBoxPlot(boxPlotData, metric, chartTitle)}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -295,6 +541,7 @@ export function HistogramChart({ sessions, isSingleSession }: HistogramChartProp
               data={histogramDataMap.get(metric) || []}
               displayModes={state.histogramDisplayModes}
               isSingleSession={isSingleSession}
+              sessions={sessions}
             />
           ))
         ) : (
