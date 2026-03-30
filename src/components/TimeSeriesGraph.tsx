@@ -452,161 +452,153 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         </>
       )}
 
-      {/* Chart */}
+      {/* Charts - stacked vertically, one per metric */}
       <div
         style={{
           padding: '12px',
           backgroundColor: 'rgba(255,255,255,0.02)',
           border: '1px solid rgba(0,255,0,0.2)',
           borderRadius: '4px',
-          minHeight: '250px',
           width: '100%',
         }}
       >
         {chartData && chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart
-              data={chartData}
-              margin={{ top: 5, right: 60, left: 0, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-              <XAxis
-                dataKey={timeMode === 'relative' ? 'normalizedTime' : 't'}
-                domain={timeMode === 'relative' ? [0, 100] : undefined}
-                stroke="#888"
-                style={{ fontSize: '10px' }}
-                tickFormatter={timeMode === 'absolute' ? formatTimeSeconds : (v) => v.toFixed(1) + '%'}
-                label={{
-                  value: timeMode === 'absolute' ? 'Time (seconds)' : 'Session Duration (%)',
-                  position: 'insideBottomRight',
-                  offset: -5,
-                  fill: '#888',
-                  fontSize: 10,
-                }}
-              />
+          selectedMetrics.size === 0 ? (
+            <div style={{ color: '#888', fontSize: '10px' }}>Select a metric to view</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {Array.from(selectedMetrics).map((metric, metricIndex) => {
+                const isBottomChart = metricIndex === selectedMetrics.size - 1;
 
-              {/* Y-Axis for cm (Deviation, X, Y) */}
-              <YAxis
-                yAxisId="left"
-                stroke="#888"
-                style={{ fontSize: '10px' }}
-                label={{
-                  value: 'Distance (cm)',
-                  angle: -90,
-                  position: 'insideLeft',
-                  fill: '#888',
-                  fontSize: 10,
-                }}
-              />
+                return (
+                  <ResponsiveContainer key={metric} width="100%" height={250}>
+                    <ComposedChart
+                      data={chartData}
+                      margin={{ top: 5, right: 60, left: 0, bottom: isBottomChart ? 30 : 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
 
-              {/* Y-Axis for rotation (degrees) */}
-              {selectedMetrics.has('rotation') && (
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="#888"
-                  style={{ fontSize: '10px' }}
-                  label={{
-                    value: 'Rotation (°)',
-                    angle: 90,
-                    position: 'insideRight',
-                    fill: '#888',
-                    fontSize: 10,
-                  }}
-                />
-              )}
+                      {/* X-Axis: only show on bottom chart */}
+                      {isBottomChart && (
+                        <XAxis
+                          dataKey={timeMode === 'relative' ? 'normalizedTime' : 't'}
+                          domain={timeMode === 'relative' ? [0, 100] : undefined}
+                          stroke="#888"
+                          style={{ fontSize: '10px' }}
+                          tickFormatter={timeMode === 'absolute' ? formatTimeSeconds : (v) => v.toFixed(1) + '%'}
+                          label={{
+                            value: timeMode === 'absolute' ? 'Time (seconds)' : 'Session Duration (%)',
+                            position: 'insideBottomRight',
+                            offset: -5,
+                            fill: '#888',
+                            fontSize: 10,
+                          }}
+                        />
+                      )}
 
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(10, 10, 10, 0.95)',
-                  border: '1px solid #0f0',
-                  borderRadius: '4px',
-                }}
-                labelStyle={{ color: '#0f0' }}
-                labelFormatter={(value) =>
-                  timeMode === 'relative'
-                    ? (value as number).toFixed(1) + '%'
-                    : formatTimeSeconds(value as number)
-                }
-              />
+                      {/* Y-Axis: show for each metric */}
+                      <YAxis
+                        yAxisId="left"
+                        stroke="#888"
+                        style={{ fontSize: '10px' }}
+                        label={{
+                          value: metric === 'rotation' ? 'Rotation (°)' : 'Distance (cm)',
+                          angle: -90,
+                          position: 'insideLeft',
+                          fill: '#888',
+                          fontSize: 10,
+                        }}
+                      />
 
-              {/* Render lines for each metric */}
-              {isSingleSession ? (
-                // Single session: just show metric lines
-                Array.from(selectedMetrics).map((metric) => (
-                  <Line
-                    key={metric}
-                    yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                    dataKey={metric}
-                    stroke={METRIC_COLORS[metric]}
-                    dot={false}
-                    strokeWidth={2}
-                    isAnimationActive={false}
-                    name={metric.charAt(0).toUpperCase() + metric.slice(1)}
-                  />
-                ))
-              ) : (
-                // Aggregate: show individual, and mean & stddev lines
-                <>
-                  {Array.from(selectedMetrics).map((metric) => (
-                    <div key={metric}>
-                      {/* Individual session lines */}
-                      {displayMode.has('individual') &&
-                        sessions.map((_, sessionIdx) => (
-                          <Line
-                            key={`${metric}_session${sessionIdx}`}
-                            yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                            dataKey={`${metric}_session${sessionIdx}`}
-                            stroke="rgba(180,180,180,0.2)"
-                            dot={false}
-                            strokeWidth={0.5}
-                            isAnimationActive={false}
-                          />
-                        ))}
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(10, 10, 10, 0.95)',
+                          border: '1px solid #0f0',
+                          borderRadius: '4px',
+                        }}
+                        labelStyle={{ color: '#0f0' }}
+                        labelFormatter={(value) =>
+                          timeMode === 'relative'
+                            ? (value as number).toFixed(1) + '%'
+                            : formatTimeSeconds(value as number)
+                        }
+                      />
 
-                      {/* Mean & Std Dev: render both bounds and mean line together */}
-                      {displayMode.has('meanStddev') && (
+                      {/* Render lines for this metric */}
+                      {isSingleSession ? (
+                        // Single session: just show metric line
+                        <Line
+                          yAxisId="left"
+                          dataKey={metric}
+                          stroke={METRIC_COLORS[metric]}
+                          dot={false}
+                          strokeWidth={2}
+                          isAnimationActive={false}
+                          name={metric.charAt(0).toUpperCase() + metric.slice(1)}
+                        />
+                      ) : (
+                        // Aggregate: show individual (colored) and mean & stddev lines
                         <>
-                          <Line
-                            key={`${metric}_upper`}
-                            yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                            dataKey={`${metric}_upper`}
-                            stroke={METRIC_COLORS[metric]}
-                            dot={false}
-                            strokeWidth={1}
-                            strokeDasharray="5 5"
-                            isAnimationActive={false}
-                            opacity={0.5}
-                          />
-                          <Line
-                            key={`${metric}_lower`}
-                            yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                            dataKey={`${metric}_lower`}
-                            stroke={METRIC_COLORS[metric]}
-                            dot={false}
-                            strokeWidth={1}
-                            strokeDasharray="5 5"
-                            isAnimationActive={false}
-                            opacity={0.5}
-                          />
-                          <Line
-                            key={`${metric}_mean`}
-                            yAxisId={metric === 'rotation' ? 'right' : 'left'}
-                            dataKey={`${metric}_mean`}
-                            stroke={METRIC_COLORS[metric]}
-                            dot={false}
-                            strokeWidth={2.5}
-                            isAnimationActive={false}
-                            name={metric.charAt(0).toUpperCase() + metric.slice(1) + ' (mean)'}
-                          />
+                          {/* Individual session lines - colored by metric with 0.7 opacity */}
+                          {displayMode.has('individual') &&
+                            sessions.map((_, sessionIdx) => (
+                              <Line
+                                key={`${metric}_session${sessionIdx}`}
+                                yAxisId="left"
+                                dataKey={`${metric}_session${sessionIdx}`}
+                                stroke={METRIC_COLORS[metric]}
+                                dot={false}
+                                strokeWidth={1}
+                                opacity={0.7}
+                                isAnimationActive={false}
+                              />
+                            ))}
+
+                          {/* Mean & Std Dev: render both bounds and mean line together */}
+                          {displayMode.has('meanStddev') && (
+                            <>
+                              <Line
+                                key={`${metric}_upper`}
+                                yAxisId="left"
+                                dataKey={`${metric}_upper`}
+                                stroke={METRIC_COLORS[metric]}
+                                dot={false}
+                                strokeWidth={1}
+                                strokeDasharray="5 5"
+                                isAnimationActive={false}
+                                opacity={0.5}
+                              />
+                              <Line
+                                key={`${metric}_lower`}
+                                yAxisId="left"
+                                dataKey={`${metric}_lower`}
+                                stroke={METRIC_COLORS[metric]}
+                                dot={false}
+                                strokeWidth={1}
+                                strokeDasharray="5 5"
+                                isAnimationActive={false}
+                                opacity={0.5}
+                              />
+                              <Line
+                                key={`${metric}_mean`}
+                                yAxisId="left"
+                                dataKey={`${metric}_mean`}
+                                stroke={METRIC_COLORS[metric]}
+                                dot={false}
+                                strokeWidth={2.5}
+                                isAnimationActive={false}
+                                name={metric.charAt(0).toUpperCase() + metric.slice(1) + ' (mean)'}
+                              />
+                            </>
+                          )}
                         </>
                       )}
-                    </div>
-                  ))}
-                </>
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                );
+              })}
+            </div>
+          )
         ) : (
           <div style={{ color: '#888', fontSize: '10px' }}>No data available</div>
         )}
