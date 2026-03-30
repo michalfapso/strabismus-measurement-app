@@ -88,9 +88,12 @@ const HistogramBar = memo(function HistogramBar({
                 borderRadius: '4px',
                 color: '#fff',
               }}
-              formatter={(value: number) =>
-                typeof value === 'number' ? `${value.toFixed(2)}s` : `${value}s`
-              }
+              formatter={(value) => {
+                if (typeof value === 'number') {
+                  return `${value.toFixed(2)}s`;
+                }
+                return '';
+              }}
               labelStyle={{ color: '#888' }}
             />
             <Bar
