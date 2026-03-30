@@ -25,6 +25,7 @@ import {
 import { calculateQuartiles, calculateWhiskers, identifyOutliers } from '../utils/chartUtils';
 import { TimeSeries } from '../types';
 import { useViewState, type ViewState } from '../hooks/useViewState';
+import { metricButtonStyle } from '../styles/chartControlsStyles';
 
 /**
  * Represents aggregated histogram data for a single bin with coverage tracking
@@ -625,7 +626,10 @@ function renderAggregateBoxPlots(
           isAnimationActive={false}
         />
 
-        <Tooltip content={<BoxPlotTooltip />} />
+        <Tooltip
+          content={<BoxPlotTooltip />}
+          cursor={{ fill: 'rgba(255, 255, 255, 0.3)' }}
+        />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -823,58 +827,44 @@ export function HistogramChart({ sessions, isSingleSession, viewState: passedVie
         Duration Distribution by Metric
       </div>
 
-      {/* Metric Checkboxes - only for aggregate view */}
+      {/* Metric Buttons - only for aggregate view */}
       {!isSingleSession && (
-        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ fontSize: '10px', color: '#aaa' }}>Metrics:</label>
           {(['deviation', 'x', 'y', 'rotation'] as const).map((metric) => (
-            <label
+            <button
               key={metric}
+              css={metricButtonStyle}
+              data-active={state.histogramMetrics.has(metric)}
+              onClick={() => toggleHistogramMetric(metric)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
                 fontSize: '10px',
                 color: '#aaa',
-                cursor: 'pointer',
               }}
             >
-              <input
-                type="checkbox"
-                checked={state.histogramMetrics.has(metric)}
-                onChange={() => toggleHistogramMetric(metric)}
-                style={{ cursor: 'pointer' }}
-              />
               {metric.charAt(0).toUpperCase() + metric.slice(1)}
-            </label>
+            </button>
           ))}
         </div>
       )}
 
       {/* Display Mode Selector - only for aggregate view */}
       {!isSingleSession && (
-        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ fontSize: '10px', color: '#aaa' }}>Mode:</label>
           {(['individual', 'meanStddev'] as const).map((mode) => (
-            <label
+            <button
               key={mode}
+              css={metricButtonStyle}
+              data-active={state.histogramDisplayModes.has(mode)}
+              onClick={() => toggleHistogramDisplayMode(mode)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
                 fontSize: '10px',
                 color: '#aaa',
-                cursor: 'pointer',
               }}
             >
-              <input
-                type="checkbox"
-                checked={state.histogramDisplayModes.has(mode)}
-                onChange={() => toggleHistogramDisplayMode(mode)}
-                style={{ cursor: 'pointer' }}
-              />
               {mode === 'meanStddev' ? 'Mean & Stddev' : 'Individual'}
-            </label>
+            </button>
           ))}
         </div>
       )}
