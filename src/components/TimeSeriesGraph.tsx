@@ -185,7 +185,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         style={{
           padding: '12px',
           backgroundColor: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(0,255,0,0.2)',
+          border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '4px',
           minHeight: '250px',
           width: '100%',
@@ -454,11 +454,9 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
                   cursor: 'pointer',
                   padding: '4px 8px',
                   backgroundColor: displayMode.has(mode)
-                    ? 'rgba(0,255,0,0.1)'
+                    ? 'rgba(255,255,255,0.12)'
                     : 'rgba(255,255,255,0.05)',
-                  border: displayMode.has(mode)
-                    ? '1px solid #0f0'
-                    : '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '3px',
                 }}
               >
@@ -505,7 +503,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         style={{
           padding: '12px',
           backgroundColor: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(0,255,0,0.2)',
+          border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '4px',
           width: '100%',
         }}

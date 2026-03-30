@@ -69,7 +69,7 @@ export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
                   style={{
                     padding: '12px',
                     backgroundColor: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(0,255,0,0.2)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '4px',
                   }}
                 >
