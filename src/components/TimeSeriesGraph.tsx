@@ -61,6 +61,22 @@ function getMetricValue(point: any, metric: MetricType): number {
   return 0;
 }
 
+// Normalize session time to 0-100% per session
+function normalizeSessionTimeToRelative(
+  session: Session,
+  metric: MetricType
+): Array<{ normalizedTime: number; value: number }> {
+  if (session.timeSeries.length === 0) return [];
+
+  const maxTime = session.timeSeries[session.timeSeries.length - 1].t;
+  if (maxTime === 0) return [];
+
+  return session.timeSeries.map((ts) => ({
+    normalizedTime: (ts.t / maxTime) * 100,
+    value: getMetricValue(ts, metric),
+  }));
+}
+
 // Resample single metric across a session
 function resampleSessionForMetric(
   session: Session,
@@ -139,6 +155,88 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
   const prepareChartData = () => {
     if (sessions.length === 0 || selectedMetrics.size === 0) return null;
 
+    // For relative mode: normalize each session to 0-100% and create common grid
+    if (timeMode === 'relative') {
+      const relativeTimeGrid: number[] = [];
+      for (let t = 0; t <= 100; t += 2) {
+        relativeTimeGrid.push(t);
+      }
+      relativeTimeGrid.push(100);
+
+      // For single session: normalize data
+      if (isSingleSession) {
+        const session = sessions[0];
+        const chartData: any[] = [];
+
+        for (const metric of selectedMetrics) {
+          const normalizedData = normalizeSessionTimeToRelative(session, metric);
+
+          // Create time grid entries with interpolation
+          relativeTimeGrid.forEach((timePercent) => {
+            let entry = chartData.find((e) => Math.abs(e.normalizedTime - timePercent) < 0.5);
+            if (!entry) {
+              entry = { normalizedTime: timePercent };
+              chartData.push(entry);
+            }
+
+            // Find closest point or interpolate
+            const points: Array<[number, number]> = normalizedData.map((d) => [
+              d.normalizedTime,
+              d.value,
+            ]);
+            const interpolated = interpolate(timePercent, points);
+            if (interpolated !== null) {
+              entry[metric] = interpolated;
+            }
+          });
+        }
+
+        return chartData;
+      }
+
+      // For aggregate in relative mode: normalize each session independently
+      const chartData: any[] = [];
+
+      relativeTimeGrid.forEach((timePercent) => {
+        const entry: any = { normalizedTime: timePercent };
+
+        for (const metric of selectedMetrics) {
+          const metricValues: number[] = [];
+          const sessionValues: Record<string, number> = {};
+
+          // Normalize each session for this metric
+          sessions.forEach((session, sessionIdx) => {
+            const normalizedData = normalizeSessionTimeToRelative(session, metric);
+            const points: Array<[number, number]> = normalizedData.map((d) => [
+              d.normalizedTime,
+              d.value,
+            ]);
+            const interpolated = interpolate(timePercent, points);
+
+            if (interpolated !== null) {
+              metricValues.push(interpolated);
+              sessionValues[`${metric}_session${sessionIdx}`] = interpolated;
+            }
+          });
+
+          if (metricValues.length > 0) {
+            const stats = calculateStats(metricValues);
+            entry[`${metric}_mean`] = stats.mean;
+            entry[`${metric}_upper`] = stats.mean + stats.stddev;
+            entry[`${metric}_lower`] = stats.mean - stats.stddev;
+          }
+
+          // Add individual session data for this metric
+          Object.assign(entry, sessionValues);
+        }
+
+        chartData.push(entry);
+      });
+
+      return chartData;
+    }
+
+    // ABSOLUTE MODE: Use original logic
     // Determine time range
     let minTime = Infinity;
     let maxTime = -Infinity;
@@ -177,12 +275,11 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
 
         resampledData.forEach((point) => {
           const [t, value] = point;
-          const timeValue = timeMode === 'absolute' ? t : ((t - minTime) / (maxTime - minTime)) * 100;
 
           // Find or create entry for this time
-          let entry = chartData.find((e) => Math.abs(e.t - timeValue) < 0.1);
+          let entry = chartData.find((e) => Math.abs(e.t - t) < 0.1);
           if (!entry) {
-            entry = { t: timeValue };
+            entry = { t };
             chartData.push(entry);
           }
 
@@ -197,8 +294,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
     const chartData: any[] = [];
 
     absoluteTimeGrid.forEach((timePoint) => {
-      const timeValue = timeMode === 'absolute' ? timePoint : ((timePoint - minTime) / (maxTime - minTime)) * 100;
-      const entry: any = { t: timeValue };
+      const entry: any = { t: timePoint };
 
       for (const metric of selectedMetrics) {
         const metricValues: number[] = [];
@@ -375,12 +471,13 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
             >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis
-                dataKey="t"
+                dataKey={timeMode === 'relative' ? 'normalizedTime' : 't'}
+                domain={timeMode === 'relative' ? [0, 100] : undefined}
                 stroke="#888"
                 style={{ fontSize: '10px' }}
                 tickFormatter={timeMode === 'absolute' ? formatTimeSeconds : (v) => v.toFixed(1) + '%'}
                 label={{
-                  value: timeMode === 'absolute' ? 'Time' : 'Duration (%)',
+                  value: timeMode === 'absolute' ? 'Time (seconds)' : 'Session Duration (%)',
                   position: 'insideBottomRight',
                   offset: -5,
                   fill: '#888',
@@ -427,7 +524,9 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
                 }}
                 labelStyle={{ color: '#0f0' }}
                 labelFormatter={(value) =>
-                  timeMode === 'absolute' ? formatTimeSeconds(value as number) : value.toFixed(1) + '%'
+                  timeMode === 'relative'
+                    ? (value as number).toFixed(1) + '%'
+                    : formatTimeSeconds(value as number)
                 }
               />
 
