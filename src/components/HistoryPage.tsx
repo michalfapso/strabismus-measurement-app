@@ -44,10 +44,12 @@ export function HistoryPage({}: HistoryPageProps) {
   }, [allSessions]);
 
   // Convert dateRange timestamps to Date objects for DateFilterBar
+  // Handle infinity edge case: convert to current time
   const dateRange = useMemo(() => {
+    const now = Date.now();
     return {
-      from: new Date(state.filters.dateRange[0]),
-      to: new Date(state.filters.dateRange[1]),
+      from: new Date(state.filters.dateRange[0] === -Infinity ? 0 : state.filters.dateRange[0]),
+      to: new Date(state.filters.dateRange[1] === Infinity ? now : state.filters.dateRange[1]),
     };
   }, [state.filters.dateRange]);
 
@@ -90,15 +92,17 @@ export function HistoryPage({}: HistoryPageProps) {
   };
 
   const handleExerciseTypeChange = (types: Set<string>) => {
-    // If all types are selected, set exerciseType to null (show all)
+    // LIMITATION: useViewState only supports filtering by a single exerciseType at a time
+    // If the user selects multiple types, we select only the first one
+    // If all types are selected, we set exerciseType to null (show all)
+    // TODO: Consider extending useViewState.filters.exerciseType to support Set<string> for true multi-select
+
     if (types.size === distinctExerciseTypes.length) {
+      // All types selected: show all exercises
       updateFilters({ exerciseType: null });
-    } else if (types.size === 1) {
-      // Single type selected
-      updateFilters({ exerciseType: Array.from(types)[0] });
-    } else {
-      // Multiple types selected - for now, select the first one
-      // (useViewState only supports single exerciseType)
+    } else if (types.size > 0) {
+      // Single or multiple types: apply the first selected type
+      // Note: This silently ignores additional selections when count > 1
       updateFilters({ exerciseType: Array.from(types)[0] });
     }
   };
@@ -163,10 +167,13 @@ export function HistoryPage({}: HistoryPageProps) {
   };
 
   const selectedCount = state.selectedSessions.size;
-  const selectedSessionIds = Array.from(state.selectedSessions);
-  const selectedSessions = selectedSessionIds
-    .map(id => allSessions.find(s => s.sessionId === id))
-    .filter(s => s !== undefined) as Session[];
+
+  // Memoize selectedSessions to avoid O(n²) computation on every render
+  const selectedSessions = useMemo(() => {
+    return Array.from(state.selectedSessions)
+      .map(id => allSessions.find(s => s.sessionId === id))
+      .filter(s => s !== undefined) as Session[];
+  }, [state.selectedSessions, allSessions]);
 
   return (
     <div style={{
