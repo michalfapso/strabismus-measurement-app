@@ -18,7 +18,104 @@ import {
   HistogramBinWithSessions,
   BoxPlotData,
 } from '../utils/histogram';
+import { TimeSeries } from '../types';
 import { useViewState, type ViewState } from '../hooks/useViewState';
+
+/**
+ * Represents aggregated histogram data for a single bin with coverage tracking
+ */
+export interface BinData {
+  binRange: string; // e.g., "0-1"
+  binStart: number;
+  binEnd: number;
+  values: number[]; // All values in this bin across all measurements
+  coverage: number; // Percentage of measurements with data in this bin
+  count: number; // n value in this bin (number of measurements with data)
+  totalMeasurements: number;
+}
+
+/**
+ * Get metric value from a TimeSeries data point
+ */
+function getMetricValue(point: TimeSeries, metric: HistogramMetric): number {
+  if (metric === 'deviation') {
+    return Math.sqrt(point.x * point.x + point.y * point.y);
+  } else if (metric === 'x') {
+    return point.x;
+  } else if (metric === 'y') {
+    return point.y;
+  } else if (metric === 'rotation') {
+    return point.r;
+  }
+  return 0;
+}
+
+/**
+ * Aggregate histogram data from sessions with coverage tracking
+ * Transforms session time series data into bins, tracking which measurements
+ * have data in each bin for coverage calculation
+ * @param sessions Array of sessions to aggregate
+ * @param metric Which metric to analyze (deviation, x, y, rotation)
+ * @param binSize Size of each bin (default 1)
+ * @returns Array of BinData with coverage tracking
+ */
+export function aggregateHistogramData(
+  sessions: Session[],
+  metric: HistogramMetric,
+  binSize: number = 1
+): BinData[] {
+  const bins: Map<string, number[]> = new Map();
+  const measurementsWithDataInBin: Map<string, Set<string>> = new Map();
+  const totalMeasurements = sessions.length;
+
+  // Iterate through sessions and place values in bins
+  sessions.forEach((session) => {
+    const sessionMeasuredBins = new Set<string>();
+
+    session.timeSeries.forEach((ts) => {
+      const value = getMetricValue(ts, metric);
+      const binIndex = Math.floor(value / binSize);
+      const binStart = binIndex * binSize;
+      const binEnd = binStart + binSize;
+      const binKey = `${binStart}-${binEnd}`;
+
+      if (!bins.has(binKey)) {
+        bins.set(binKey, []);
+      }
+      bins.get(binKey)!.push(value);
+      sessionMeasuredBins.add(binKey);
+    });
+
+    // Track which measurements contributed to each bin
+    sessionMeasuredBins.forEach((binKey) => {
+      if (!measurementsWithDataInBin.has(binKey)) {
+        measurementsWithDataInBin.set(binKey, new Set());
+      }
+      measurementsWithDataInBin.get(binKey)!.add(session.sessionId);
+    });
+  });
+
+  // Convert to sorted array of BinData
+  const result: BinData[] = Array.from(bins.entries())
+    .map(([binKey, values]) => {
+      const [binStart, binEnd] = binKey.split('-').map(Number);
+      const count = measurementsWithDataInBin.get(binKey)?.size || 0;
+      const coverage = (count / totalMeasurements) * 100;
+
+      return {
+        binRange: binKey,
+        binStart,
+        binEnd,
+        values,
+        coverage,
+        count,
+        totalMeasurements,
+      };
+    })
+    .sort((a, b) => a.binStart - b.binStart);
+
+  return result;
+}
 
 export interface HistogramChartProps {
   sessions: Session[];
