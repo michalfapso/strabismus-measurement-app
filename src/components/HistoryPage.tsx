@@ -1,8 +1,7 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect, useMemo } from 'react';
 import { Session } from '../types';
 import { SessionContext } from '../context/SessionContext';
-import { useHistoryFilters } from '../hooks/useHistoryFilters';
-import { useMultiSelect } from '../hooks/useMultiSelect';
+import { useViewState } from '../hooks/useViewState';
 import { DateFilterBar } from './DateFilterBar';
 import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
@@ -18,20 +17,10 @@ export function HistoryPage({}: HistoryPageProps) {
   const [loading, setLoading] = useState(true);
 
   const {
-    dateRange,
-    filteredSessions,
-    setDateRange,
-    distinctExerciseTypes,
-    selectedExerciseTypes,
-    setSelectedExerciseTypes,
-  } = useHistoryFilters(allSessions);
-  const {
-    selectedIds,
-    handleRowClick,
-    clearSelection,
-    updateSelectionAfterFilter,
-    getSelectedArray,
-  } = useMultiSelect();
+    state,
+    updateFilters,
+    updateSelectedSessions,
+  } = useViewState();
 
   // Load sessions on mount
   useEffect(() => {
@@ -48,14 +37,75 @@ export function HistoryPage({}: HistoryPageProps) {
     loadSessions();
   }, [loadHistoricalSessions]);
 
+  // Compute distinct exercise types from sessions
+  const distinctExerciseTypes = useMemo(() => {
+    const types = new Set(allSessions.map((s) => s.exerciseTag).filter(Boolean));
+    return Array.from(types).sort();
+  }, [allSessions]);
+
+  // Convert dateRange timestamps to Date objects for DateFilterBar
+  const dateRange = useMemo(() => {
+    return {
+      from: new Date(state.filters.dateRange[0]),
+      to: new Date(state.filters.dateRange[1]),
+    };
+  }, [state.filters.dateRange]);
+
+  // Build selectedExerciseTypes set for ExerciseTypeFilterBar
+  // If exerciseType is null, show all types selected
+  const selectedExerciseTypes = useMemo(() => {
+    if (state.filters.exerciseType === null) {
+      return new Set(distinctExerciseTypes);
+    }
+    return new Set([state.filters.exerciseType]);
+  }, [state.filters.exerciseType, distinctExerciseTypes]);
+
+  // Filter sessions based on date range AND exercise type
+  const filteredSessions = useMemo(() => {
+    return allSessions.filter((session) => {
+      const sessionDate = new Date(session.timestamp);
+      const inDateRange = sessionDate >= dateRange.from && sessionDate <= dateRange.to;
+      const inSelectedTypes = selectedExerciseTypes.has(session.exerciseTag);
+      return inDateRange && inSelectedTypes;
+    });
+  }, [allSessions, dateRange, selectedExerciseTypes]);
+
   // Update selection when filters change
   useEffect(() => {
     const visibleIds = filteredSessions.map((s) => s.sessionId);
-    updateSelectionAfterFilter(visibleIds);
-  }, [filteredSessions, updateSelectionAfterFilter]);
+    const filtered = new Set(
+      Array.from(state.selectedSessions).filter((id) => visibleIds.includes(id))
+    );
+    if (filtered.size !== state.selectedSessions.size ||
+        Array.from(filtered).some((id) => !state.selectedSessions.has(id))) {
+      updateSelectedSessions(filtered);
+    }
+  }, [filteredSessions, state.selectedSessions, updateSelectedSessions]);
+
+  const handleDateChange = (from: Date, to: Date) => {
+    const [actualFrom, actualTo] = from <= to ? [from, to] : [to, from];
+    updateFilters({
+      dateRange: [actualFrom.getTime(), actualTo.getTime()],
+    });
+  };
+
+  const handleExerciseTypeChange = (types: Set<string>) => {
+    // If all types are selected, set exerciseType to null (show all)
+    if (types.size === distinctExerciseTypes.length) {
+      updateFilters({ exerciseType: null });
+    } else if (types.size === 1) {
+      // Single type selected
+      updateFilters({ exerciseType: Array.from(types)[0] });
+    } else {
+      // Multiple types selected - for now, select the first one
+      // (useViewState only supports single exerciseType)
+      updateFilters({ exerciseType: Array.from(types)[0] });
+    }
+  };
 
   const handleExport = () => {
-    const selectedSessions = getSelectedArray()
+    const selectedSessionIds = Array.from(state.selectedSessions);
+    const selectedSessions = selectedSessionIds
       .map(id => allSessions.find(s => s.sessionId === id))
       .filter(s => s !== undefined) as Session[];
 
@@ -65,17 +115,56 @@ export function HistoryPage({}: HistoryPageProps) {
   };
 
   const handleDelete = async () => {
-    const selectedSessionIds = getSelectedArray();
+    const selectedSessionIds = Array.from(state.selectedSessions);
     if (selectedSessionIds.length === 0) return;
 
     if (window.confirm(`Delete ${selectedSessionIds.length} session${selectedSessionIds.length > 1 ? 's' : ''}?`)) {
       await deleteSelectedSessions(selectedSessionIds);
       setAllSessions(allSessions.filter(s => !selectedSessionIds.includes(s.sessionId)));
+      updateSelectedSessions(new Set());
     }
   };
 
-  const selectedCount = selectedIds.size;
-  const selectedSessions = getSelectedArray()
+  const handleRowClick = (id: string, ctrlKey: boolean, shiftKey: boolean, visibleIds: string[]) => {
+    let nextSelection: Set<string>;
+
+    if (shiftKey) {
+      // Shift+click: select range from last selected to clicked item
+      const selectedArray = Array.from(state.selectedSessions);
+      const anchorId = selectedArray[selectedArray.length - 1];
+
+      if (anchorId) {
+        const anchorIndex = visibleIds.indexOf(anchorId);
+        const currentIndex = visibleIds.indexOf(id);
+        if (anchorIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(anchorIndex, currentIndex);
+          const end = Math.max(anchorIndex, currentIndex);
+          nextSelection = new Set(visibleIds.slice(start, end + 1));
+        } else {
+          nextSelection = new Set([id]);
+        }
+      } else {
+        nextSelection = new Set([id]);
+      }
+    } else if (ctrlKey) {
+      // Ctrl+click: toggle
+      nextSelection = new Set(state.selectedSessions);
+      if (nextSelection.has(id)) {
+        nextSelection.delete(id);
+      } else {
+        nextSelection.add(id);
+      }
+    } else {
+      // Plain click: select only this item
+      nextSelection = new Set([id]);
+    }
+
+    updateSelectedSessions(nextSelection);
+  };
+
+  const selectedCount = state.selectedSessions.size;
+  const selectedSessionIds = Array.from(state.selectedSessions);
+  const selectedSessions = selectedSessionIds
     .map(id => allSessions.find(s => s.sessionId === id))
     .filter(s => s !== undefined) as Session[];
 
@@ -97,11 +186,11 @@ export function HistoryPage({}: HistoryPageProps) {
         flexShrink: 0,
       }}>
         <h1 style={{ margin: '0 0 12px 0', fontSize: '20px', color: '#fff' }}>Session History</h1>
-        <DateFilterBar currentRange={dateRange} onDateChange={setDateRange} />
+        <DateFilterBar currentRange={dateRange} onDateChange={handleDateChange} />
         <ExerciseTypeFilterBar
           distinctTypes={distinctExerciseTypes}
           selectedTypes={selectedExerciseTypes}
-          onSelectedTypesChange={setSelectedExerciseTypes}
+          onSelectedTypesChange={handleExerciseTypeChange}
         />
       </div>
 
@@ -134,7 +223,7 @@ export function HistoryPage({}: HistoryPageProps) {
             <>
               <HistoryListView
                 sessions={filteredSessions}
-                selectedIds={selectedIds}
+                selectedIds={state.selectedSessions}
                 onRowClick={handleRowClick}
               />
               {selectedCount > 0 && (
