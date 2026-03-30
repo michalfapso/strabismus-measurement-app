@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { formatTimeSeconds, formatTimeSecondsVerbose } from '../utils/timeFormatting';
 import { useViewState } from '../hooks/useViewState';
+import { metricCheckboxStyle, timeModButtonStyle } from '../styles/chartControlsStyles';
 
 export interface TimeSeriesGraphProps {
   sessions: Session[];
@@ -407,20 +408,15 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         {(['deviation', 'x', 'y', 'rotation'] as MetricType[]).map((metric) => (
           <label
             key={metric}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              padding: '4px 8px',
-              backgroundColor: selectedMetrics.has(metric)
-                ? 'rgba(0,255,0,0.1)'
-                : 'rgba(255,255,255,0.05)',
-              border: selectedMetrics.has(metric)
-                ? '1px solid ' + METRIC_COLORS[metric]
-                : '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '3px',
-            }}
+            css={[
+              metricCheckboxStyle,
+              css`
+                color: ${METRIC_COLORS[metric]};
+                display: flex;
+                align-items: center;
+                gap: 4px;
+              `,
+            ]}
           >
             <input
               type="checkbox"
@@ -490,19 +486,11 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
             {(['absolute', 'relative'] as const).map((mode) => (
               <button
                 key={mode}
+                css={timeModButtonStyle}
+                aria-pressed={timeMode === mode}
                 onClick={() => handleTimeModeChange(mode)}
                 style={{
-                  padding: '4px 8px',
-                  backgroundColor:
-                    timeMode === mode ? 'rgba(0,255,0,0.1)' : 'rgba(255,255,255,0.05)',
-                  border:
-                    timeMode === mode
-                      ? '1px solid #0f0'
-                      : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '3px',
                   color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '12px',
                 }}
               >
                 {mode === 'absolute' ? 'Absolute' : 'Relative'}
