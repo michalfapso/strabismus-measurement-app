@@ -18,11 +18,12 @@ import {
   HistogramBinWithSessions,
   BoxPlotData,
 } from '../utils/histogram';
-import { useViewState } from '../hooks/useViewState';
+import { useViewState, type ViewState } from '../hooks/useViewState';
 
 export interface HistogramChartProps {
   sessions: Session[];
   isSingleSession: boolean;
+  viewState?: ReturnType<typeof useViewState>;
 }
 
 // Metric colors matching TimeSeriesGraph
@@ -455,8 +456,10 @@ const HistogramBar = memo(function HistogramBar({
   );
 });
 
-export function HistogramChart({ sessions, isSingleSession }: HistogramChartProps) {
-  const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = useViewState();
+export function HistogramChart({ sessions, isSingleSession, viewState: passedViewState }: HistogramChartProps) {
+  // Use passed viewState if provided (from UnifiedSessionPanel), otherwise create our own
+  const defaultViewState = useViewState();
+  const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = passedViewState || defaultViewState;
 
   // For single session, always show deviation; for aggregate, use selected metrics from state
   const metricsToShow: HistogramMetric[] = isSingleSession
