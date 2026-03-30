@@ -24,13 +24,17 @@ npm run preview   # Preview production build
 
 ## Tips for Future Development
 
-**Adding new metrics:** update metric color palette, add to TimeSeriesGraph selector, handle in histogram binning, update StatCard calculations.
+**Adding new metrics:** Update metric color palette in `docs/styling.md`, add to `ViewState` in useViewState.ts, add to TimeSeriesGraph/HistogramChart selectors, handle in histogram binning calculations, update StatCard calculations.
 
-**Modifying filtering:** `updateSelectionAfterFilter` in useMultiSelect keeps compatible selections; check if sessionStorage persistence is needed.
+**Modifying state persistence:** Use useViewState setters (toggleHistogramMetric, updateFilters, etc.) which automatically persist to localStorage with 500ms debounce. No manual persistence code needed.
 
-**New visualizations:** use recharts `ComposedChart` for multi-axis; maintain metric colors; follow dark theme pattern from existing components.
+**New display modes:** Add to `histogramDisplayModes` or `timeSeriesDisplayModes` in ViewState interface, implement toggle setter, add UI controls in chart components. Display mode state is preserved across page reloads.
 
-**Before large changes:** create plan doc in `docs/superpowers/plans/`, use subagent-driven-development for multi-task work.
+**Modifying filtering:** Call `updateFilters()` from useViewState to persist filter changes. Selection auto-prunes to visible sessions via useEffect in HistoryPage.
+
+**New visualizations:** Use recharts `ComposedChart` for multi-axis; maintain metric colors; follow dark theme pattern from existing components. Integrate with useViewState for state persistence if user-configurable.
+
+**Before large changes:** Create plan doc in `docs/superpowers/plans/`, update relevant docs (architecture.md, styling.md, data-types.md) as you implement changes.
 
 ## Known Issues & Technical Debt
 - **RotationGraph.tsx:34** — `value` possibly undefined, `toFixed` not on ValueType. Non-blocking, pre-existing.

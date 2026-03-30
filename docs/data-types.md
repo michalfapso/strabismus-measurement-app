@@ -24,11 +24,41 @@ interface CalibrationData {
 }
 ```
 
+## View State (src/hooks/useViewState.ts)
+
+Centralized persistent state for HistoryPage analysis view, saved to localStorage.
+
+```typescript
+interface ViewState {
+  filters: {
+    dateRange: [number, number];  // [fromTime, toTime] in milliseconds
+    exerciseType: string | null;   // Single exercise filter, or null to show all
+  };
+  selectedSessions: Set<string>;           // Session IDs selected by user
+  histogramMetrics: Set<'deviation' | 'x' | 'y' | 'rotation'>;  // Multi-select
+  histogramDisplayModes: Set<'individual' | 'meanStddev'>;      // Independent toggles
+  timeSeriesMetrics: Set<'deviation' | 'x' | 'y' | 'rotation'>; // Multi-select
+  timeSeriesDisplayModes: Set<'individual' | 'meanStddev'>;     // Independent toggles
+  timeSeriesTimeMode: 'absolute' | 'relative';
+}
+```
+
+**Storage:**
+- Key: `"strabismus_view_state"`
+- Debounced saves: 500ms after state mutations
+- Deserialization validates metrics/modes and filters invalid values
+
+**Constraints:**
+- At least one metric in `histogramMetrics` and `timeSeriesMetrics` (enforcement in setters)
+- Display modes can be empty (optional overlays)
+- `exerciseType` single-select limitation (TODO: extend to Set<string> for multi-select filters)
+
 ## Storage
 
 ### IndexedDB (src/services/storage.ts)
 - Database: `StrabismusDB`, Store: `sessions`, Key: `sessionId`
 - Operations: `saveSession`, `getAllSessions`, `deleteSession`, `getSession`
+- Stores raw session data (TimeSeries arrays)
 
 ### SessionContext (src/context/SessionContext.tsx)
 - `currentSession` — in-progress recording
@@ -36,8 +66,15 @@ interface CalibrationData {
 - `startSession(exerciseTag, ppi)` / `addTimeSeriesPoint(point)` / `endSession()`
 - `loadHistoricalSessions()` / `deleteSelectedSessions(ids)`
 
-### sessionStorage (useHistoryFilters)
-- Persists: date range filter, exercise type filter selections across page reloads
+### localStorage (useViewState)
+- **PRIMARY** view state for HistoryPage
+- Key: `"strabismus_view_state"`
+- Persists: filters, selected sessions, metric selections, display mode toggles, time mode
+- Survives browser reload and page navigation
+
+### sessionStorage (legacy)
+- Previously used by useHistoryFilters (now integrated into useViewState)
+- Can be removed when useHistoryFilters is fully deprecated
 
 ## Time Handling
 

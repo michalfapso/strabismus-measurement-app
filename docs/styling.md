@@ -21,12 +21,32 @@
 
 ## Data Visualization
 
+### TimeSeriesGraph
+
 | Element | Style |
 |---------|-------|
-| Individual session lines | `rgba(180,180,180,0.3)` thin grey |
-| Mean line | metric color, 3px width |
-| Stddev bounds | metric color, 1.5px dashed |
-| Histogram bars | metric color, full opacity |
+| Individual session lines | `rgba(180,180,180,0.3)` thin grey, 1px |
+| Mean line | metric color, 2.5px solid |
+| Stddev bounds | metric color, 1.5px dashed, opacity 0.5 |
+
+### HistogramChart
+
+#### Individual Mode (thin lines per session)
+| Element | Style |
+|---------|-------|
+| Session horizontal lines | `rgba(180,180,180,0.3)` thin grey, 1px |
+
+#### Mean & Std Dev Mode (box plot)
+Box plot elements are stacked with all median/quartile/whisker/outlier markers at full opacity (1) in metric color:
+
+| Element | Style |
+|---------|-------|
+| Median line | metric color, bold (2px), opacity 1 |
+| Quartile box (Q1–Q3) | metric color, filled background, opacity 1 |
+| Whiskers (min/max non-outlier) | metric color, lines extending from box, opacity 1 |
+| Outliers | metric color, small dots, opacity 1 |
+
+**Note:** Both modes can be enabled simultaneously to overlay individual lines and box plot on the same chart.
 
 ## CSS
 

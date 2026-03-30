@@ -29,22 +29,80 @@ TimeSeriesGraph + HistogramChart + TrendChart
 - 3-column layout: left (300px) session list + filters, right (flex) UnifiedSessionPanel
 - Multi-select: Shift+Click range, Ctrl+Click toggle (no checkboxes — green left border indicator)
 - Selection persists across filter changes via `updateSelectionAfterFilter`
+- **Centralized state via `useViewState` hook** — persists to localStorage key `"strabismus_view_state"`
 
 ### UnifiedSessionPanel
 Single entry point for all analysis. Mode determined by `sessions.length === 1`.
 Sections (in order): Header + StatCards → TimeSeriesGraph → HistogramChart → TrendChart (aggregate only)
 
+### useViewState Hook (hooks/useViewState.ts)
+Centralized persistent state for HistoryPage analysis view. Replaces scattered state hooks (previously useHistoryFilters, useMultiSelect as primary state).
+
+**State shape:**
+```typescript
+interface ViewState {
+  filters: {
+    dateRange: [number, number];      // [fromTime, toTime] in ms
+    exerciseType: string | null;       // Single exercise type or null for all
+  };
+  selectedSessions: Set<string>;       // Session IDs
+  histogramMetrics: Set<'deviation' | 'x' | 'y' | 'rotation'>;
+  histogramDisplayModes: Set<'individual' | 'meanStddev'>;
+  timeSeriesMetrics: Set<'deviation' | 'x' | 'y' | 'rotation'>;
+  timeSeriesDisplayModes: Set<'individual' | 'meanStddev'>;
+  timeSeriesTimeMode: 'absolute' | 'relative';
+}
+```
+
+**Behavior:**
+- Initializes from localStorage; falls back to defaults if missing or corrupted
+- Debounced saves (500ms) to localStorage after state mutations
+- Defaults: histogram shows `deviation` (individual mode), time series shows `deviation` (individual + meanStddev modes)
+- At least one metric must be selected (enforcement in toggleHistogramMetric/toggleTimeSeriesMetric)
+- Display modes can be empty (optional visualizations)
+
+**Data flow:**
+```
+UnifiedSessionPanel
+  ├─ reads state.filters, state.selectedSessions
+  ├─ passes state to TimeSeriesGraph
+  │  └─ reads timeSeriesMetrics, timeSeriesDisplayModes, timeSeriesTimeMode
+  │  └─ writes via toggleTimeSeriesMetric, toggleTimeSeriesDisplayMode, setTimeSeriesTimeMode
+  ├─ passes state to HistogramChart
+  │  └─ reads histogramMetrics, histogramDisplayModes
+  │  └─ writes via toggleHistogramMetric, toggleHistogramDisplayMode
+  └─ passes state to SessionExplorer (left panel)
+     └─ reads filters, selectedSessions
+     └─ writes via updateFilters, updateSelectedSessions
+```
+
+State persists across:
+- Page navigation (AssessmentCanvas ↔ HistoryPage)
+- Browser reload
+- Filter changes (selection auto-prunes to visible sessions)
+
 ### TimeSeriesGraph
-- Metrics: Deviation (√x²+y²), X, Y, Rotation
+- Metrics: Deviation (√x²+y²), X, Y, Rotation (configurable via useViewState)
 - Dual y-axes: cm (left), degrees (right)
 - Single session: raw data resampled to fixed time grid
 - Aggregate: thin grey lines per session + thick colored mean + dashed stddev bounds
-- Aggregate-only controls: display mode (Mean/Std Dev/Individual), time mode (Absolute/Relative)
+- **Display modes (independent toggles, can be combined):**
+  - **Individual:** thin grey lines per session (opacity 0.3)
+  - **Mean & Std Dev:** thick colored mean line (2.5px) + dashed stddev bounds (opacity 0.5)
+- Time mode: Absolute (elapsed seconds) or Relative (% of session duration)
+- All controls integrated with useViewState for persistence
 
 ### HistogramChart
 - Bin size: 1cm for position/deviation, 1° for rotation
 - Y-axis: duration in seconds (summed from ms timestamps)
-- Aggregate display modes: Mean distribution vs Individual summed durations
+- Metrics: configurable multi-select via checkboxes (previously radio buttons)
+- **Display modes (independent toggles, can be combined):**
+  - **Individual:** thin grey horizontal lines per session per bin (opacity 1)
+  - **Mean & Std Dev:** box plot visualization with median, quartiles, whiskers, and outliers (opacity 1)
+- Data calculations:
+  - Individual mode: sum duration per bin across all sessions
+  - Mean & Std Dev mode: calculate statistics (median, Q1, Q3, IQR, whiskers, outliers) per bin
+- All controls integrated with useViewState for persistence
 
 ### TrendChart
 - Aggregate-only (hidden in single session view)
@@ -59,8 +117,9 @@ Sections (in order): Header + StatCards → TimeSeriesGraph → HistogramChart �
 
 | Hook | Location | Purpose |
 |------|----------|---------|
-| `useMultiSelect` | hooks/useMultiSelect.ts | Anchor-based range selection with Set<string> |
-| `useHistoryFilters` | hooks/useHistoryFilters.ts | Date + exercise type filtering, persisted to sessionStorage |
+| `useViewState` | hooks/useViewState.ts | **PRIMARY** — Centralized persistent state for HistoryPage: filters, selections, metrics, display modes. Persists to localStorage. |
+| `useMultiSelect` | hooks/useMultiSelect.ts | Anchor-based range selection with Set<string> (legacy; now integrated into useViewState) |
+| `useHistoryFilters` | hooks/useHistoryFilters.ts | Date + exercise type filtering, persisted to sessionStorage (legacy; now integrated into useViewState) |
 | `useSessionStats` | hooks/useSessionStats.ts | Mean/stddev for single session |
 | `useCalibration` | hooks/useCalibration.ts | Wraps CalibrationContext |
 | `useSession` | hooks/useSession.ts | Wraps SessionContext |
