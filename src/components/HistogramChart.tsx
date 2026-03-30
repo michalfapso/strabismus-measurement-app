@@ -75,7 +75,7 @@ function BoxPlotShape(props: any) {
       y2={maxY}
       stroke={color}
       strokeWidth={1}
-      opacity={0.5}
+      opacity={1}
     />
   );
 
@@ -89,7 +89,7 @@ function BoxPlotShape(props: any) {
       y2={minY}
       stroke={color}
       strokeWidth={1}
-      opacity={0.5}
+      opacity={1}
     />,
     <line
       key="whisker-max-cap"
@@ -99,7 +99,7 @@ function BoxPlotShape(props: any) {
       y2={maxY}
       stroke={color}
       strokeWidth={1}
-      opacity={0.5}
+      opacity={1}
     />
   );
 
@@ -112,7 +112,7 @@ function BoxPlotShape(props: any) {
       width={boxWidth}
       height={Math.abs(q3Y - q1Y)}
       fill={color}
-      fillOpacity={0.3}
+      fillOpacity={1}
       stroke={color}
       strokeWidth={1.5}
     />
@@ -142,7 +142,7 @@ function BoxPlotShape(props: any) {
           cy={outlierY}
           r={3}
           fill={color}
-          fillOpacity={0.7}
+          fillOpacity={1}
         />
       );
     });
@@ -336,11 +336,11 @@ const HistogramBar = memo(function HistogramBar({
 
   // Calculate box plot data for Mean & Std Dev mode
   const boxPlotData = useMemo(() => {
-    if (!isSingleSession && showMeanStddev && !showIndividualLines && sessions.length > 0) {
+    if (!isSingleSession && showMeanStddev && sessions.length > 0) {
       return calculateBoxPlotData(sessions, metric);
     }
     return [];
-  }, [isSingleSession, showMeanStddev, showIndividualLines, sessions, metric]);
+  }, [isSingleSession, showMeanStddev, sessions, metric]);
 
   const chartTitle = `${metric.charAt(0).toUpperCase() + metric.slice(1)} Range`;
 
@@ -350,8 +350,16 @@ const HistogramBar = memo(function HistogramBar({
     [showIndividualLines, hasSessionInfo, metric]
   );
 
-  // Render box plot if Mean & Std Dev is enabled (and Individual is not)
-  if (!isSingleSession && showMeanStddev && !showIndividualLines && boxPlotData.length > 0) {
+  // Determine what to render based on display modes
+  // Both modes enabled: render individual + box plot overlay
+  // Only Individual: render individual mode
+  // Only Mean & Std Dev: render box plot
+  // Neither: render default bar chart
+  const shouldRenderIndividual = showIndividualLines;
+  const shouldRenderBoxPlot = showMeanStddev && boxPlotData.length > 0;
+
+  // If only rendering box plot (Mean & Std Dev mode alone)
+  if (!isSingleSession && shouldRenderBoxPlot && !shouldRenderIndividual) {
     return (
       <div
         style={{
@@ -371,6 +379,8 @@ const HistogramBar = memo(function HistogramBar({
     );
   }
 
+  // Render normal bar chart (with optional individual lines overlay when enabled)
+  // This covers: individual only, both modes together, or neither mode
   return (
     <div
       style={{
@@ -388,46 +398,54 @@ const HistogramBar = memo(function HistogramBar({
 
       {/* Chart */}
       {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart
-            data={chartData}
-            margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-            <XAxis
-              dataKey="label"
-              angle={-45}
-              textAnchor="end"
-              height={80}
-              tick={{ fontSize: 9, fill: '#666' }}
-            />
-            <YAxis
-              tick={{ fontSize: 9, fill: '#666' }}
-              label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #333',
-                borderRadius: '4px',
-                color: '#fff',
-              }}
-              formatter={(value) => {
-                if (typeof value === 'number') {
-                  return `${value.toFixed(2)}s`;
-                }
-                return '';
-              }}
-              labelStyle={{ color: '#888' }}
-            />
-            <Bar
-              dataKey="duration"
-              fill={METRIC_COLORS[metric]}
-              radius={[3, 3, 0, 0]}
-              shape={barShape}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        <div style={{ position: 'relative' }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 40 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis
+                dataKey="label"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                tick={{ fontSize: 9, fill: '#666' }}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: '#666' }}
+                label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '4px',
+                  color: '#fff',
+                }}
+                formatter={(value) => {
+                  if (typeof value === 'number') {
+                    return `${value.toFixed(2)}s`;
+                  }
+                  return '';
+                }}
+                labelStyle={{ color: '#888' }}
+              />
+              <Bar
+                dataKey="duration"
+                fill={METRIC_COLORS[metric]}
+                radius={[3, 3, 0, 0]}
+                shape={barShape}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+          {/* Overlay box plot if both modes are enabled */}
+          {shouldRenderBoxPlot && shouldRenderIndividual && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+              {renderBoxPlot(boxPlotData, metric, chartTitle)}
+            </div>
+          )}
+        </div>
       ) : (
         <div style={{ color: '#666', fontSize: '11px', height: '200px', display: 'flex', alignItems: 'center' }}>
           No data available
