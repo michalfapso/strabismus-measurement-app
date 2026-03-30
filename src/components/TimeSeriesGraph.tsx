@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { css } from '@emotion/react';
 import { Session } from '../types';
 import {
   ComposedChart,
@@ -107,6 +108,65 @@ function calculateStats(values: number[]) {
   return { mean, stddev };
 }
 
+// Custom Tooltip Component
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number }>;
+  isSingleSession?: boolean;
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  isSingleSession,
+}: CustomTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  if (isSingleSession) {
+    // Single session: show the session's value
+    const value = payload[0]?.value;
+    return (
+      <div
+        css={css`
+          background-color: rgba(0, 0, 0, 0.8);
+          padding: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        `}
+      >
+        <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
+          {(value as number).toFixed(2)}
+        </p>
+      </div>
+    );
+  } else {
+    // Aggregate view: show mean ± stddev (filter out individual session data)
+    const mean = payload.find((p) => p.name.includes('mean'))?.value;
+    const stddev = payload.find((p) => p.name.includes('stddev'))?.value;
+
+    if (mean === undefined) return null;
+
+    return (
+      <div
+        css={css`
+          background-color: rgba(0, 0, 0, 0.8);
+          padding: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        `}
+      >
+        <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
+          Mean: {(mean as number).toFixed(2)}
+        </p>
+        {stddev !== undefined && (
+          <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
+            ±{(stddev as number).toFixed(2)}
+          </p>
+        )}
+      </div>
+    );
+  }
+}
 
 export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedViewState }: TimeSeriesGraphProps) {
   // Use passed viewState if provided (from UnifiedSessionPanel), otherwise create our own
@@ -511,17 +571,8 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
                       />
 
                       <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(10, 10, 10, 0.95)',
-                          border: '1px solid #0f0',
-                          borderRadius: '4px',
-                        }}
-                        labelStyle={{ color: '#0f0' }}
-                        labelFormatter={(value) =>
-                          timeMode === 'relative'
-                            ? (value as number).toFixed(1) + '%'
-                            : formatTimeSeconds(value as number)
-                        }
+                        content={<CustomTooltip isSingleSession={isSingleSession} />}
+                        cursor={{ stroke: 'rgba(255,255,255,0.2)' }}
                       />
 
                       {/* Render lines for this metric */}
