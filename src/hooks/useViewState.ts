@@ -28,6 +28,30 @@ const DEFAULT_STATE: ViewState = {
   timeSeriesTimeMode: 'absolute',
 };
 
+// Serialized representation of defaults for deserialization
+const SERIALIZED_DEFAULTS = {
+  filters: DEFAULT_STATE.filters,
+  selectedSessions: Array.from(DEFAULT_STATE.selectedSessions),
+  histogramMetrics: Array.from(DEFAULT_STATE.histogramMetrics),
+  histogramDisplayModes: Array.from(DEFAULT_STATE.histogramDisplayModes),
+  timeSeriesMetrics: Array.from(DEFAULT_STATE.timeSeriesMetrics),
+  timeSeriesDisplayModes: Array.from(DEFAULT_STATE.timeSeriesDisplayModes),
+  timeSeriesTimeMode: DEFAULT_STATE.timeSeriesTimeMode,
+};
+
+// Type guards for validation
+function isValidMetric(val: unknown): val is 'deviation' | 'x' | 'y' | 'rotation' {
+  return ['deviation', 'x', 'y', 'rotation'].includes(val as string);
+}
+
+function isValidDisplayMode(val: unknown): val is 'individual' | 'meanStddev' {
+  return ['individual', 'meanStddev'].includes(val as string);
+}
+
+function isValidTimeMode(val: unknown): val is 'absolute' | 'relative' {
+  return ['absolute', 'relative'].includes(val as string);
+}
+
 // Convert ViewState to JSON-serializable format
 function serialize(state: ViewState): string {
   return JSON.stringify({
@@ -41,18 +65,28 @@ function serialize(state: ViewState): string {
   });
 }
 
-// Convert JSON back to ViewState
+// Convert JSON back to ViewState with validation
 function deserialize(json: string): ViewState {
   try {
     const parsed = JSON.parse(json);
     return {
-      filters: parsed.filters || DEFAULT_STATE.filters,
-      selectedSessions: new Set(parsed.selectedSessions || []),
-      histogramMetrics: new Set(parsed.histogramMetrics || ['deviation']),
-      histogramDisplayModes: new Set(parsed.histogramDisplayModes || ['individual']),
-      timeSeriesMetrics: new Set(parsed.timeSeriesMetrics || ['deviation']),
-      timeSeriesDisplayModes: new Set(parsed.timeSeriesDisplayModes || ['individual', 'meanStddev']),
-      timeSeriesTimeMode: parsed.timeSeriesTimeMode || 'absolute',
+      filters: parsed.filters || SERIALIZED_DEFAULTS.filters,
+      selectedSessions: new Set(parsed.selectedSessions || SERIALIZED_DEFAULTS.selectedSessions),
+      histogramMetrics: new Set(
+        (parsed.histogramMetrics || SERIALIZED_DEFAULTS.histogramMetrics).filter(isValidMetric)
+      ),
+      histogramDisplayModes: new Set(
+        (parsed.histogramDisplayModes || SERIALIZED_DEFAULTS.histogramDisplayModes).filter(isValidDisplayMode)
+      ),
+      timeSeriesMetrics: new Set(
+        (parsed.timeSeriesMetrics || SERIALIZED_DEFAULTS.timeSeriesMetrics).filter(isValidMetric)
+      ),
+      timeSeriesDisplayModes: new Set(
+        (parsed.timeSeriesDisplayModes || SERIALIZED_DEFAULTS.timeSeriesDisplayModes).filter(isValidDisplayMode)
+      ),
+      timeSeriesTimeMode: isValidTimeMode(parsed.timeSeriesTimeMode)
+        ? parsed.timeSeriesTimeMode
+        : SERIALIZED_DEFAULTS.timeSeriesTimeMode,
     };
   } catch {
     return DEFAULT_STATE;
@@ -132,6 +166,7 @@ export function useViewState() {
       } else {
         newModes.add(mode);
       }
+      // Display modes can be empty (optional views); unlike metrics which require at least one
       return {
         ...prev,
         histogramDisplayModes: newModes,
@@ -163,6 +198,7 @@ export function useViewState() {
       } else {
         newModes.add(mode);
       }
+      // Display modes can be empty (optional views); unlike metrics which require at least one
       return {
         ...prev,
         timeSeriesDisplayModes: newModes,
