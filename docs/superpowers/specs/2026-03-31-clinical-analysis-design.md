@@ -29,7 +29,7 @@ Success criteria:
 
 Replace the current `activePage` state in `App.tsx` with **React Router** to support:
 - Three top-level routes: `/` (Measurement), `/history`, `/analysis`
-- Deep-linkable drill-down from Analysis → History with pre-applied filters via URL params (e.g., `/history?exercise=BrockString&from=1706745600000&to=1709337600000`)
+- Deep-linkable drill-down from Analysis → History with pre-applied filters via URL params (e.g., `/history?exercise=BrockString&from=2026-03-01&to=2026-03-31`)
 - Browser back/forward navigation
 - Future: shareable/bookmarkable report links
 
@@ -136,6 +136,163 @@ interface RecommendationInsight {
 }
 ```
 
+### Session Metric Extraction
+
+#### Motivation
+
+Mean deviation is an insufficient summary statistic for clinical assessment. A session where the user achieves fusion for 3 seconds before drifting to large deviation looks identical in mean to a session with consistently moderate deviation — yet they represent entirely different clinical realities.
+
+The primary analytical lens is the **time-distribution across deviation/rotation bins** (histogram), from which clinically meaningful per-session metrics are derived. All insight calculations in this design operate on `SessionMetrics` objects, not on raw `TimeSeries` arrays or mean values.
+
+#### Per-Session Metric Structure
+
+```typescript
+interface SessionMetrics {
+  sessionId: string;
+  date: string;
+  exerciseTag: string;
+  metric: 'deviation' | 'rotation';
+  sessionDuration: number;          // seconds: (last.t - first.t) / 1000
+
+  // Full histogram (1cm bins for deviation, 1° for rotation)
+  // Delegates to existing calculateSessionHistogram() in histogram.ts
+  histogram: HistogramBin[];
+
+  // Fusion metrics — calculated directly from raw time series (not from bins)
+  // for sub-bin precision relative to the user-defined threshold
+  fusionTime: number;               // seconds with metric value < threshold
+  fusionTimePercent: number;        // fusionTime / sessionDuration * 100
+  fusionAchieved: boolean;          // true if any point reached below threshold
+
+  // Near-fusion: metric in [threshold, threshold + nearFusionWidth)
+  // nearFusionWidth = 1cm for deviation, 1° for rotation (one bin above fusion zone)
+  nearFusionTime: number;           // seconds
+  nearFusionTimePercent: number;
+
+  // Large deviation: metric > largeDeviationThreshold
+  // largeDeviationThreshold = 2 × fusionThreshold (derived, not separately configurable in Phase 1)
+  largeDeviationTime: number;       // seconds
+  largeDeviationTimePercent: number;
+
+  // Streak analysis — calculated from contiguous runs in raw time series
+  timeToFirstFusion: number | null; // seconds from session start to first point below threshold; null if never achieved
+  longestFusionStreak: number;      // seconds of longest continuous run below threshold
+
+  // Composite session quality score (0–100)
+  sessionScore: number;
+}
+```
+
+#### Calculation Details
+
+**Fusion, near-fusion, and large deviation time** — raw time series scan:
+For each consecutive pair of points `[i, i+1]`, compute `duration = (t[i+1] - t[i]) / 1000`. Classify the interval by `metricValue(i)` (deviation = √(x²+y²), rotation = |r|):
+- `< threshold` → add to `fusionTime`
+- `[threshold, threshold + nearFusionWidth)` → add to `nearFusionTime`
+- `> 2 × threshold` → add to `largeDeviationTime`
+
+**Time-to-first-fusion**: Scan time series from start; return `(t[i] - t[0]) / 1000` for the first point where `metricValue(i) < threshold`. Return `null` if no such point exists.
+
+**Longest fusion streak**: Scan time series accumulating duration while `metricValue(i) < threshold`. Reset to 0 when the threshold is crossed. Track the maximum accumulated run.
+
+**Histogram**: Delegate directly to existing `calculateSessionHistogram(session, metric)`.
+
+#### Session Score
+
+A single 0–100 number summarising session quality, used for ranking and trend analysis:
+
+```
+sessionScore = fusionTimePercent
+             + 0.5 × nearFusionTimePercent
+             - 0.5 × largeDeviationTimePercent
+```
+
+Clamped to [0, 100]. Rewards time at or near fusion; penalises extended large deviations. Weights are intentionally simple for Phase 1 and can be tuned based on clinical feedback.
+
+#### How Insights Use SessionMetrics
+
+All insight calculations replace any use of per-point mean or raw median with `SessionMetrics`:
+
+| Insight | Primary metric |
+|---------|----------------|
+| `ProgressInsight` | `sessionScore` trend over time (or `fusionTimePercent` for raw display) |
+| `ExerciseInsight` | Median `sessionScore` per exercise type; `fusionTimePercent` distribution |
+| `SessionQualityInsight` | Outliers by `sessionScore` z-score; consistency by `fusionTimePercent` stddev |
+| `MilestoneInsight` | `fusionAchieved`, `longestFusionStreak`, sustained events from multi-session scan |
+| `RecommendationInsight` | Exercise ranking by median `sessionScore` |
+
+#### Updated Insight Structures
+
+The following insight interfaces are revised to reflect session-metric-based calculations (replacing the earlier median/stddev-of-raw-values approach):
+
+```typescript
+interface ProgressInsight {
+  metric: 'deviation' | 'rotation';
+
+  // Trend is calculated on sessionScore over the analysis period
+  trendSlope: number;              // sessionScore change per week
+  trendDirection: 'improving' | 'declining' | 'stable';
+  statisticalSignificance: { p: number; significant: boolean };
+
+  // Distribution of fusionTimePercent across sessions in the period
+  medianFusionTimePercent: number;
+  fusionAchievedCount: number;     // sessions where fusionAchieved = true
+  fusionAchievedRate: number;      // fusionAchievedCount / totalSessions * 100
+
+  // Histogram aggregate: time distribution across bins, summed across all sessions in period
+  aggregateHistogram: HistogramBin[];
+
+  // Only present when baseline is configured:
+  baselineMedianScore?: number;    // median sessionScore in baseline period
+  periodMedianScore?: number;      // median sessionScore in analysis period
+  scoreChange?: number;            // periodMedianScore - baselineMedianScore
+  improvementRate?: number;        // % of period sessions with sessionScore > baseline median score
+}
+
+interface ExerciseInsight {
+  exerciseTag: string;
+  metric: 'deviation' | 'rotation';
+  sessionCount: number;
+
+  // Session score distribution across sessions of this exercise type
+  medianSessionScore: number;
+  sessionScoreStddev: number;
+  medianFusionTimePercent: number;
+
+  trendDirection: 'improving' | 'declining' | 'stable';
+  trendSlope: number;              // sessionScore per week
+
+  // Only present when baseline is configured:
+  improvementRate?: number;        // % of sessions scoring above baseline median score for this exercise
+}
+
+interface SessionQualityInsight {
+  metric: 'deviation' | 'rotation';
+
+  // Outliers: sessions with sessionScore z-score beyond ±2 from period mean
+  outliers: Array<{
+    sessionId: string;
+    date: string;
+    exerciseTag: string;
+    sessionScore: number;
+    zScore: number;
+    fusionTimePercent: number;
+    largeDeviationTimePercent: number;
+    direction: 'unusually_good' | 'unusually_poor';
+  }>;
+  variabilityInterpretation: string;
+
+  // Only present when baseline is configured:
+  consistencyScore?: number;       // 0–100: % of sessions with fusionTimePercent within 10% of baseline median fusionTimePercent
+}
+
+// CombinedQualityInsight and MilestoneInsight unchanged from earlier definition
+// MilestoneInsight.startValue and currentValue now refer to fusionTimePercent
+// of the first and most recent session respectively, making progressPercent
+// a measure of how much fusion time has improved toward the goal state (100% fusion time).
+// Sustained threshold events remain calendar-day-based as previously defined.
+```
+
 ### Page Structure
 
 **Navigation:** React Router replaces `activePage` state. Three top-level routes: `/`, `/history`, `/analysis`.
@@ -201,8 +358,8 @@ Each block:
 *One block per selected metric, stacked vertically.*
 
 Each block:
-- Ranked table: exercises sorted by median value (best first)
-  - Columns: Exercise, Sessions, Median, Std Dev, Trend (▲/▼/→)
+- Ranked table: exercises sorted by median session score (highest first)
+  - Columns: Exercise, Sessions, Median Score (0–100), Median Fusion Time %, Score Std Dev, Trend (▲/▼/→)
   - If baseline configured: add Improvement Rate column
 - Interpretation: highlights best and worst-performing exercises
 - Drill-down: "View in History" link → navigates to `/history` with exercise filter + date range pre-applied via URL params
@@ -283,17 +440,17 @@ Clamped to 0–100:
 
 ### Outlier Detection
 
-Uses 1.5×IQR method on per-session median values within the analysis period. Each session is summarised as its median metric value before outlier detection is applied.
+Uses z-score method on per-session `sessionScore` values within the analysis period. Sessions with |z| > 2 are flagged as outliers, classified as `unusually_good` (z > +2) or `unusually_poor` (z < −2). Each outlier entry shows the session score, fusion time %, and large deviation time % to support clinical interpretation.
 
 ### Consistency Score
 
-`(count of sessions where median is within 10% of baseline median / total sessions) × 100`
+`(count of sessions where fusionTimePercent is within 10% of baseline median fusionTimePercent / total sessions) × 100`
 
-Only calculated when a baseline is configured. "Baseline median" = median of all sessions in the baseline period matching the baseline exercise type filter.
+Only calculated when a baseline is configured. "Baseline median fusionTimePercent" = median of `fusionTimePercent` across all sessions in the baseline period matching the baseline exercise type filter.
 
 ### Improvement Rate
 
-`(count of period sessions where median < baseline median / total period sessions) × 100`
+`(count of period sessions where sessionScore > baseline median sessionScore / total period sessions) × 100`
 
 Only calculated when baseline is configured. Per-exercise improvement rate uses baseline sessions filtered to the same exercise type (falls back to full baseline if no baseline sessions exist for that exercise).
 
@@ -305,16 +462,19 @@ All trend slopes expressed in **units per week** (cm/week for deviation, °/week
 
 *(Detailed edge case handling to be resolved in implementation plan.)*
 
-- **Trend significance:** Linear regression p-value; "stable" if p ≥ 0.05 or slope magnitude < 0.05 units/week
-- **Sustained events:** Group consecutive sessions below threshold; count event only if the span of calendar days ≥ `sustainedThresholdDays`
-- **Exercise ranking:** When baseline configured, sort by improvement rate; otherwise by median value (ascending)
+- **Session metric extraction:** `SessionMetrics` is computed once per session per metric at report generation time, then reused across all insight calculations. Caching within a single report render is fine; no cross-render caching in Phase 1.
+- **Trend significance:** Linear regression p-value on `sessionScore` over time; "stable" if p ≥ 0.05 or |slope| < 1 score point/week
+- **Sustained events:** Group consecutive calendar days where the session(s) on that day had `fusionAchieved = true`; count event only if the span ≥ `sustainedThresholdDays`. Days with no sessions do not break the streak.
+- **Exercise ranking:** When baseline configured, sort by improvement rate; otherwise by median `sessionScore` (descending)
+- **MilestoneInsight `progressPercent`:** Uses `fusionTimePercent` as the value metric — `startValue` = first session's `fusionTimePercent`, `currentValue` = most recent session's `fusionTimePercent`, `targetThreshold` = 100 (perfect fusion). Clamped 0–100.
 - **Minimum session counts:** Sections with insufficient data (e.g., <3 sessions for trend, <2 exercise types for recommendations) should display a clear "insufficient data" message rather than empty or misleading output
 
 ## Implementation Dependencies
 
 - **React Router** — replace `activePage` state in `App.tsx`; update History page to read URL params for pre-applied filters
 - **Unified date range picker** — extract and enhance `DateFilterBar` into shared component
-- **Statistical utilities** — extend `stats.ts` with: linear regression + p-value, IQR/outlier detection, improvement rate, consistency score
+- **Session metric extraction** — new `sessionMetrics.ts` utility computing `SessionMetrics` from raw `TimeSeries[]`; reuses `calculateSessionHistogram()` from `histogram.ts`
+- **Statistical utilities** — extend `stats.ts` with: linear regression + p-value, z-score outlier detection, improvement rate, consistency score, session score aggregation
 - **IndexedDB migration** — add `reports` object store to `StrabismusDB`
 - **New components** — `AnalysisPage`, `ReportGenerationModal`, `ReportDisplay`, report section components
 
@@ -329,6 +489,7 @@ All trend slopes expressed in **units per week** (cm/week for deviation, °/week
 
 ## Testing Strategy
 
-1. **Unit tests:** All insight calculation functions (trend + p-value, outlier detection, consistency score, improvement rate, progress percent, sustained events)
-2. **Integration tests:** Report generation flow end-to-end, save/load from IndexedDB, drill-down navigation
-3. **Edge cases:** No sessions in range, single session, no baseline configured, all sessions in single exercise type, current value already below threshold
+1. **Unit tests — session metric extraction:** `fusionTime`, `nearFusionTime`, `largeDeviationTime`, `timeToFirstFusion`, `longestFusionStreak`, `sessionScore` for known time series fixtures
+2. **Unit tests — insight calculations:** trend + p-value, z-score outlier detection, consistency score, improvement rate, sustained event grouping, progressPercent clamping
+3. **Integration tests:** Report generation flow end-to-end, save/load from IndexedDB, drill-down navigation, History URL param pre-filtering
+4. **Edge cases:** No sessions in range, single session, no fusion ever achieved (fusionTime = 0 throughout), no baseline configured, all sessions in single exercise type, fusionTimePercent already at 100%
