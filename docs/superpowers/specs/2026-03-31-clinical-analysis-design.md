@@ -43,7 +43,7 @@ Replace the current `activePage` state in `App.tsx` with **React Router**:
 - Browser back/forward navigation supported
 
 The `/history` route reads optional URL params for pre-applied filters:
-`/history?exercise=BrockString&from=<ms>&to=<ms>&sessions=<id1>,<id2>`
+`/history?exercise=BrockString&from=2026-03-01&to=2026-03-31&sessions=<id1>,<id2>`
 
 ### User Settings: Analysis Configuration
 
@@ -51,11 +51,13 @@ Stored in localStorage under key `"strabismus_analysis_settings"`. Pre-fills all
 
 ```typescript
 interface AnalysisSettings {
-  thresholds: {
-    deviation: number;        // default: 0.5 cm
-    rotation: number;         // default: 1°
+  goal: {
+    thresholds: {
+      deviation: number;        // default: 0.5 cm
+      rotation: number;         // default: 1°
+    };
+    sustainedDays: number; // default: 7
   };
-  sustainedThresholdDays: number; // default: 7
 }
 ```
 
@@ -73,11 +75,13 @@ interface ReportSnapshot {
   name?: string;                // User-provided label (optional; auto-named if blank)
   sessionIds: string[];         // Explicit session IDs included in this report
   metrics: ('deviation' | 'rotation')[]; // At least one required
-  thresholds: {
-    deviation?: number;         // Present if 'deviation' in metrics
-    rotation?: number;          // Present if 'rotation' in metrics
+  goal: {
+    thresholds: {
+      deviation?: number;       // Present if 'deviation' in metrics
+      rotation?: number;        // Present if 'rotation' in metrics
+    };
+    sustainedDays: number;      // default: 7
   };
-  sustainedThresholdDays: number;
   baseline?: {
     dateRange: [number, number]; // [fromMs, toMs]
     exerciseTypes?: string[];    // absent = all exercise types
