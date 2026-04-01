@@ -20,7 +20,8 @@ RUN apk add --no-cache \
     gzip \
     build-base \
     python3 \
-    ca-certificates
+    ca-certificates \
+    vim
 
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
