@@ -26,6 +26,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-konva": "^19.2.3",
+    "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1",
     "simple-statistics": "^7.8.9",
     "typescript": "^5.9.3",
@@ -39,7 +40,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.0.1",
-    "vite": "^8.0.2",
+    "vite": "^8.0.3",
     "vitest": "^4.1.2"
   },
   "main": "index.js",

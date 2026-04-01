@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useRoutes, useLocation } from 'react-router-dom';
 import { CalibrationProvider } from './context/CalibrationContext';
 import { SessionProvider } from './context/SessionContext';
 import { CalibrationScreen } from './components/CalibrationScreen';
@@ -77,10 +78,27 @@ function AppContent() {
   const { calibration, isLoading } = useCalibration();
   const { currentSession, showResults, setShowResults } = useSession();
   const [showCalibration, setShowCalibration] = useState(false);
-  const [activePage, setActivePage] = useState<'measurement' | 'history'>('measurement');
   const [canvasData, setCanvasData] = useState({ x: 0, y: 0, r: 0 });
   const [savedCanvasState, setSavedCanvasState] = useState<CanvasState | undefined>();
   const [restoredCanvasState, setRestoredCanvasState] = useState<CanvasState | undefined>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const onMeasurementPage = location.pathname === '/';
+
+  const routeElement = useRoutes([
+    {
+      path: '/',
+      element: (
+        <AssessmentCanvas
+          onPositionChange={(x, y, r) => setCanvasData({ x, y, r })}
+          restoredState={restoredCanvasState}
+          onStateRestored={() => setRestoredCanvasState(undefined)}
+        />
+      ),
+    },
+    { path: '/history', element: <HistoryPage /> },
+  ]);
 
   if (isLoading) return null;
 
@@ -90,7 +108,6 @@ function AppContent() {
       <CalibrationScreen
         onComplete={() => {
           setShowCalibration(false);
-          // Restore saved canvas state if it was a recalibration
           if (savedCanvasState) {
             setRestoredCanvasState(savedCanvasState);
             setSavedCanvasState(undefined);
@@ -109,7 +126,6 @@ function AppContent() {
         <CalibrationScreen
           onComplete={() => {
             setShowCalibration(false);
-            // Restore saved canvas state if it was a recalibration
             if (savedCanvasState) {
               setRestoredCanvasState(savedCanvasState);
               setSavedCanvasState(undefined);
@@ -120,13 +136,10 @@ function AppContent() {
         />
         <div css={overlayStyle}>
           <div css={chipRowStyle}>
-            <button css={chipStyle} onClick={() => setShowCalibration(false)}>
+            <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/'); }}>
               ☰ Measurement
             </button>
-            <button css={chipStyle} onClick={() => {
-              setShowCalibration(false);
-              setActivePage('history');
-            }}>
+            <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/history'); }}>
               📊 History
             </button>
           </div>
@@ -136,7 +149,6 @@ function AppContent() {
   }
 
   const handleRecalibrate = () => {
-    // Save current canvas state before entering calibration
     setSavedCanvasState({
       x: canvasData.x,
       y: canvasData.y,
@@ -147,24 +159,14 @@ function AppContent() {
 
   return (
     <>
-      {/* Canvas fills entire screen */}
-      <AssessmentCanvas
-        onPositionChange={(x, y, r) => setCanvasData({ x, y, r })}
-        restoredState={restoredCanvasState}
-        onStateRestored={() => setRestoredCanvasState(undefined)}
-      />
+      {routeElement}
 
-      {/* Full-screen history page */}
-      {activePage === 'history' && (
-        <HistoryPage />
-      )}
-
-      {/* Floating overlay */}
+      {/* Floating overlay — always visible */}
       <div css={overlayStyle}>
 
-        {/* Top chip row — always visible */}
+        {/* Top chip row */}
         <div css={chipRowStyle}>
-          {activePage === 'measurement' && (
+          {onMeasurementPage && (
             <div css={hudStyle}>
               {canvasData.x.toFixed(2)}&thinsp;cm&ensp;
               {canvasData.y.toFixed(2)}&thinsp;cm&ensp;
@@ -174,19 +176,19 @@ function AppContent() {
               )}
             </div>
           )}
-          <button css={chipStyle} onClick={() => setActivePage('measurement')}>
+          <button css={chipStyle} onClick={() => navigate('/')}>
             ☰ Measurement
           </button>
-          <button css={chipStyle} onClick={() => setActivePage('history')}>
+          <button css={chipStyle} onClick={() => navigate('/history')}>
             📊 History
           </button>
-          <button css={chipStyle} onClick={handleRecalibrate} disabled={activePage === 'history'}>
+          <button css={chipStyle} onClick={handleRecalibrate} disabled={!onMeasurementPage}>
             Recalibrate
           </button>
         </div>
 
         {/* Collapsible controls panel */}
-        {activePage === 'measurement' && (
+        {onMeasurementPage && (
           <div css={panelStyle}>
             <DataCaptureControl />
           </div>
