@@ -1,9 +1,11 @@
 import { Session, CalibrationState } from '../types';
+import { ReportSnapshot } from '../types/analysis';
 
 const DB_NAME = 'StrabismusMeasurementDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SESSIONS_STORE = 'sessions';
 const CALIBRATION_STORE = 'calibration';
+const REPORTS_STORE = 'reports';
 
 let db: IDBDatabase | null = null;
 
@@ -27,7 +29,66 @@ export async function initDB(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains(CALIBRATION_STORE)) {
         database.createObjectStore(CALIBRATION_STORE, { keyPath: 'id' });
       }
+
+      if (!database.objectStoreNames.contains(REPORTS_STORE)) {
+        database.createObjectStore(REPORTS_STORE, { keyPath: 'reportId' });
+      }
     };
+  });
+}
+
+export async function saveReport(report: ReportSnapshot): Promise<void> {
+  const database = db || (await initDB());
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction([REPORTS_STORE], 'readwrite');
+    const store = tx.objectStore(REPORTS_STORE);
+    const request = store.put(report);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+}
+
+export async function getReport(reportId: string): Promise<ReportSnapshot | undefined> {
+  const database = db || (await initDB());
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction([REPORTS_STORE], 'readonly');
+    const store = tx.objectStore(REPORTS_STORE);
+    const request = store.get(reportId);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+export async function getAllReports(): Promise<ReportSnapshot[]> {
+  const database = db || (await initDB());
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction([REPORTS_STORE], 'readonly');
+    const store = tx.objectStore(REPORTS_STORE);
+    const request = store.getAll();
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const reports = request.result as ReportSnapshot[];
+      resolve(reports.sort((a, b) => b.savedAt - a.savedAt));
+    };
+  });
+}
+
+export async function deleteReport(reportId: string): Promise<void> {
+  const database = db || (await initDB());
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction([REPORTS_STORE], 'readwrite');
+    const store = tx.objectStore(REPORTS_STORE);
+    const request = store.delete(reportId);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
   });
 }
 
