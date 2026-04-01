@@ -1,6 +1,6 @@
 # Clinical Analysis System Design
 
-**Date:** 2026-03-31 (last updated 2026-04-01)
+**Date:** 2026-03-31 (last updated 2026-04-02)
 **Status:** Approved
 **Scope:** Phase 1 — Session metric extraction, enhanced single-session view, multi-session analysis
 
@@ -16,7 +16,7 @@ The History page becomes the single entry point for all session review and analy
 
 **Key principles:**
 - `SessionMetrics` is computed fresh from raw time series at display time, never stored
-- Report snapshots store only config (thresholds, baseline, date range); insights recalculate on load
+- Report snapshots store only config (thresholds, baseline, session IDs); insights recalculate on load
 - Mean deviation is not used anywhere in analysis — histogram-derived and event-based metrics replace it
 - Sessions shorter than 10 seconds are excluded from all analysis
 
@@ -61,7 +61,7 @@ interface AnalysisSettings {
 }
 ```
 
-Accessible via a settings panel (gear icon or dedicated Settings route, TBD). Changes apply immediately to any non-saved analysis view.
+Accessible via a gear icon button in the top toolbar, right side after the Recalibrate button. Changes apply immediately to any non-saved analysis view.
 
 ### Data Model
 
@@ -74,6 +74,7 @@ interface ReportSnapshot {
   reportId: string;             // UUID
   name?: string;                // User-provided label (optional; auto-named if blank)
   sessionIds: string[];         // Explicit session IDs included in this report
+  dateRange: [number, number];  // [fromMs, toMs] — date range of included sessions, for display
   metrics: ('deviation' | 'rotation')[]; // At least one required
   goal: {
     thresholds: {
@@ -91,7 +92,7 @@ interface ReportSnapshot {
 ```
 
 **Notes:**
-- `sessionIds` replaces a date range — the snapshot captures exactly which sessions were analysed, so adding new sessions later does not silently change a saved report's scope
+- `sessionIds` captures exactly which sessions were analysed, so adding new sessions later does not silently change a saved report's scope; `dateRange` is derived from those sessions and stored for display only
 - `thresholds` keys match `metrics` — only keys for selected metrics are present
 - Designed to extend with optional `llmOutput` in future without migration
 - Structure is intentionally minimal; full insight caching deferred to future if performance requires it
@@ -106,7 +107,11 @@ Every session is reduced to a `SessionMetrics` object before any analysis or dis
 
 #### Signal Pre-processing
 
-Before metric extraction, the raw time series is smoothed using a **Savitzky-Golay filter** (window ≈ 5–11 points, polynomial order 2) from the `ml-savitzky-golay` library. This preserves fusion event peaks while reducing noise. The smoothed series is used for state classification and slope calculations; the raw series is used for fusion time calculations to preserve sub-bin precision.
+Before metric extraction, the raw time series is smoothed using a **Savitzky-Golay filter** (polynomial order 2) from the `ml-savitzky-golay` library. This preserves fusion event peaks while reducing noise. The smoothed series is used for state classification and slope calculations; the raw series is used for fusion time calculations to preserve sub-bin precision.
+
+**Default window: 11 points** (≈0.55s at typical 20Hz sampling). Exposed as a user-adjustable setting in the analysis config panel, range 5–21 points (odd values only; labelled in seconds based on session sampling rate).
+
+**Window quality check:** After smoothing, compute `smoothedVariance / rawVariance`. If > 0.95, the window is too small to smooth effectively; if < 0.10, the signal is over-smoothed. Show a warning inline near the config field in either case. Auto-tuning via `ml-savitzky-golay-generalized` is deferred to Phase 2 (see `docs/future.md`).
 
 #### Per-Session Metric Structure
 
@@ -142,7 +147,8 @@ interface SessionMetrics {
   // Session trajectory: did the patient improve during the session?
   // Positive = second half had lower mean than first half (improving)
   // Negative = second half worse (fatiguing or struggling)
-  trajectoryRatio: number;           // (firstHalfMean - secondHalfMean) / firstHalfMean
+  // null = indeterminate (firstHalfMean ≈ 0, patient was in near-perfect fusion throughout first half)
+  trajectoryRatio: number | null;    // (firstHalfMean - secondHalfMean) / firstHalfMean
 
   // --- Supporting metrics ---
 
@@ -160,11 +166,11 @@ interface SessionMetrics {
 }
 
 type SessionState =
-  | 'DRIFTING'       // high deviation, no clear convergence
-  | 'APPROACHING'    // deviation decreasing steadily toward threshold
-  | 'NEAR_FUSION'    // within one bin above threshold
-  | 'FUSION'         // below threshold
-  | 'LOSING_FUSION'; // deviation increasing from sub-threshold
+  | 'FUSION'            // below threshold
+  | 'NEAR_FUSION'       // within one bin above threshold
+  | 'APPROACHING'       // above near-fusion zone, deviation decreasing steadily toward threshold
+  | 'STABLE_DEVIATION'  // above near-fusion zone, holding steady (neither converging nor diverging)
+  | 'DRIFTING';         // above near-fusion zone, deviation actively increasing
 
 interface StateSegment {
   state: SessionState;
@@ -192,19 +198,22 @@ For each consecutive pair of points `[i, i+1]`, `duration = (t[i+1] - t[i]) / 10
 
 **minValue**: `Math.min(...timeSeries.map(metricValue))` on the raw series.
 
-**trajectoryRatio**: Split session at midpoint; compute mean metric value for each half using raw series. `(firstHalfMean - secondHalfMean) / firstHalfMean`. A positive ratio means the second half improved.
+**trajectoryRatio**: Split session at midpoint; compute mean metric value for each half using raw series. `(firstHalfMean - secondHalfMean) / firstHalfMean`. A positive ratio means the second half improved. Return `null` if `firstHalfMean ≈ 0` (patient was in near-perfect fusion throughout the first half — trajectory is indeterminate).
 
 **Rule-based FSM state classification** (operates on smoothed series):
+
+`nearFusionWidth = 1 bin` (1 cm for deviation, 1° for rotation) — matches the bin size used for nearFusionTime.
+
 1. Compute local slope over a sliding window (~10 points) at each time step
-2. At each point, classify:
+2. At each point, classify in priority order:
    - smoothedValue < threshold → `FUSION`
    - smoothedValue in [threshold, threshold + nearFusionWidth) → `NEAR_FUSION`
-   - smoothedValue > nearFusionWidth + threshold AND slope < −slopeThreshold → `APPROACHING`
-   - previous state was FUSION or NEAR_FUSION AND slope > +slopeThreshold → `LOSING_FUSION`
-   - otherwise → `DRIFTING`
+   - smoothedValue ≥ threshold + nearFusionWidth AND slope < −slopeThreshold → `APPROACHING`
+   - smoothedValue ≥ threshold + nearFusionWidth AND slope > +slopeThreshold → `DRIFTING`
+   - smoothedValue ≥ threshold + nearFusionWidth AND |slope| ≤ slopeThreshold → `STABLE_DEVIATION`
 3. Merge consecutive same-state points into segments
 4. Drop segments shorter than 0.5s (noise suppression)
-5. slopeThreshold: 0.1 cm/s for deviation, 0.1°/s for rotation (tunable in Phase 2)
+5. slopeThreshold: 0.1 cm/s for deviation, 0.1°/s for rotation (tunable in Phase 2; see `docs/future.md`)
 
 **Histogram**: Delegate to existing `calculateSessionHistogram(session, metric)`.
 
@@ -272,7 +281,7 @@ interface ExerciseInsight {
   fusionAchievedRate: number;    // % of sessions for this exercise where fusion occurred
 
   trendDirection: 'improving' | 'declining' | 'stable';
-  trendSlope: number;            // median streak change per week
+  trendSlope: number;            // seconds/week (median streak change per week)
 
   // Only present when baseline configured:
   improvementRate?: number;
@@ -291,16 +300,19 @@ interface SessionQualityInsight {
     zScore: number;
     direction: 'unusually_good' | 'unusually_poor';
   }>;
-  variabilityInterpretation: string;
+  variability: {
+    level: 'low' | 'moderate' | 'high';
+    streakRange: { min: number; max: number };  // seconds; range of longestFusionStreak across sessions
+  };
 
   // Only present when baseline configured:
   consistencyScore?: number;     // % of sessions with longestFusionStreak within 10% of baseline median
 }
 
 interface CombinedQualityInsight {
-  // Cross-metric analysis when both metrics selected
-  correlationNote: string;
-  overallConsistencyScore?: number;
+  // Cross-metric aggregate when both metrics selected
+  // Cross-metric correlation analysis is deferred to Phase 2 (see docs/future.md)
+  overallConsistencyScore?: number;  // Only present when baseline configured
 }
 
 interface MilestoneInsight {
@@ -321,7 +333,11 @@ interface MilestoneInsight {
     progressPercent: number;     // clamped 0–100
   };
 
-  readinessIndicators: string[]; // e.g., "Fusion sustained 7+ days on 2 occasions"
+  readinessIndicators: Array<{
+    type: 'sustained_fusion' | 'min_value_approaching_threshold' | 'high_fusion_rate';
+    value: number;   // sustained_fusion: event count; min_value_approaching: % toward threshold; high_fusion_rate: rate %
+    met: boolean;
+  }>;
 }
 
 interface RecommendationInsight {
@@ -368,10 +384,10 @@ Replaces current UnifiedSessionPanel single-session layout.
 | Time to first fusion | Xs | Only shown if fusion achieved |
 | Min deviation reached | X.Xcm | Key metric if no fusion |
 | Large deviation | X% | As % of session |
-| Session trajectory | Improving / Stable / Declining | Based on trajectoryRatio |
+| Session trajectory | Improving / Stable / Declining / — | Based on trajectoryRatio: > 0.10 = Improving, < −0.10 = Declining, null = — (indeterminate) |
 
 **State segmentation timeline:**
-- Horizontal timeline bar showing coloured state segments (DRIFTING, APPROACHING, NEAR_FUSION, FUSION, LOSING_FUSION)
+- Horizontal timeline bar showing coloured state segments (FUSION, NEAR_FUSION, APPROACHING, STABLE_DEVIATION, DRIFTING)
 - Colour legend below
 - Duration labels for segments > 2s
 - Clinically interpretable summary below: e.g., "3 fusion episodes totalling 12s. Patient reached near-fusion 5 times."
@@ -430,7 +446,7 @@ Each block:
   - Columns: Exercise, Sessions, Fusion Rate, Median Streak, Median Min Value, Trend (▲/▼/→)
   - If baseline: Improvement Rate column
 - Interpretation: best/worst exercise callout
-- "View sessions" link → navigates to `/history?exercise=<tag>&from=<ms>&to=<ms>`
+- "View sessions" link → navigates to `/history?exercise=<tag>&from=YYYY-MM-DD&to=YYYY-MM-DD`
 
 ---
 
@@ -444,8 +460,7 @@ Per-metric subsection:
 - If baseline: consistency score
 
 Combined (both metrics):
-- Cross-metric correlation note
-- Overall consistency if baseline configured
+- Overall consistency score if baseline configured (cross-metric correlation analysis deferred to Phase 2)
 
 ---
 
@@ -509,9 +524,9 @@ Shared between History filter, Analysis baseline picker, and report date display
 Formula: `((startValue - currentValue) / (startValue - threshold)) * 100`
 
 Clamped to 0–100:
+- If `startValue ≤ threshold` (patient already at or past goal from the first session): 100%
 - If `currentValue > startValue` (got worse): 0%
 - If `currentValue ≤ threshold` (goal reached or exceeded): 100%
-- If `startValue === threshold`: show 100%
 
 ### Outlier Detection
 
@@ -521,7 +536,7 @@ Z-score on `longestFusionStreak` across the period. Sessions with |z| > 2 flagge
 
 `(count of sessions where longestFusionStreak is within 10% of baseline median streak / total sessions) × 100`
 
-When most sessions have no fusion, fall back to consistency on `minValue`.
+When most sessions have no fusion (fusionAchievedRate < 30%) **or when baseline median streak = 0**, fall back to consistency on `minValue` instead.
 
 ### Improvement Rate
 
@@ -538,10 +553,10 @@ Per-exercise: uses same-exercise baseline sessions; falls back to full baseline.
 ## Calculation Logic Notes
 
 - **Session filtering:** Sessions shorter than 10 seconds are excluded from all analysis calculations
-- **Session metric caching:** `SessionMetrics` computed once per session per metric per render; recomputed if threshold changes (which affects fusion classification)
+- **Session metric caching:** `SessionMetrics` memoized per session + metric + threshold combination; recomputed when threshold changes (which affects fusion classification)
 - **FSM tuning:** `slopeThreshold` (0.1 cm/s) and minimum segment duration (0.5s) are constants in Phase 1; expose as tunable settings in Phase 2
 - **Sustained fusion events:** Group consecutive calendar days where ≥1 session had `fusionAchieved = true`; span ≥ `sustainedThresholdDays` days counts as an event. Days with no sessions do not break a streak.
-- **Exercise ranking:** When baseline configured, sort by improvement rate; otherwise by `medianLongestStreak` descending. When most sessions have no fusion, sort by `medianMinValue` ascending.
+- **Exercise ranking:** When baseline configured and improvement rate > 0, sort by improvement rate descending. When baseline is not configured, improvement rate is zero or negative, or most sessions have no fusion, sort by `medianMinValue` ascending (lower is better). Each exercise row always shows all available metrics regardless of sort order.
 - **Minimum session counts:** <3 sessions → show "Insufficient data" for trend calculations; <2 exercise types → hide Section E with explanation
 
 ## Libraries
@@ -558,7 +573,7 @@ Per-exercise: uses same-exercise baseline sessions; falls back to full baseline.
 - **`analysisInsights.ts`** — new utility: aggregates `SessionMetrics[]` into the five insight structures
 - **`stats.ts` extensions** — linear regression + p-value, z-score, improvement rate, consistency score (using `simple-statistics`)
 - **`AnalysisSettings`** — localStorage read/write utility with defaults
-- **IndexedDB migration** — add `reports` object store to `StrabismusDB`
+- **IndexedDB version bump** — increment DB version; add `reports` object store to `StrabismusDB`; no data migration required (new store only)
 - **New/updated components:**
   - `HistoryPage.tsx` — add three-mode right panel, report history section in left panel
   - `SingleSessionView.tsx` — sub-scores panel + state segmentation timeline + existing charts
@@ -570,20 +585,20 @@ Per-exercise: uses same-exercise baseline sessions; falls back to full baseline.
 
 ## Future Extensions (Out of Scope for Phase 1)
 
-1. **HMM state classifier** — replace rule-based FSM; better handles ambiguous transitions and noisy signals
-2. **LLM-generated summaries** — add optional `llmOutput` to `ReportSnapshot`
-3. **Report caching** — store computed insights in `ReportSnapshot` if recalculation exceeds 1s
-4. **Comparison mode** — overlay two saved reports
-5. **Patient-facing simplified view** — plain-language interpretation mode
-6. **Measurement page scheduling** — daily exercise schedule recommendations
-7. **Export** — PDF or clinical note format
-8. **Bimodality and entropy** — histogram shape analysis using Sarle's BC and Shannon entropy (both implementable with `simple-statistics`)
-9. **Changepoint detection** — CUSUM or ED-PELT for detecting regime changes within sessions
+See `docs/future.md` for the full list with implementation notes. Summary:
+
+- Savitzky-Golay auto-tuning (`ml-savitzky-golay-generalized`)
+- HMM state classifier (replaces rule-based FSM)
+- Cross-metric correlation analysis in Session Quality view
+- Composite session quality score (requires clinically validated weights)
+- Histogram shape metrics — bimodality (Sarle's BC), Shannon entropy
+- Changepoint detection — CUSUM, PELT
+- Report caching, comparison mode, export, patient-facing view, scheduling
 
 ## Testing Strategy
 
 1. **Unit — `sessionMetrics.ts`:** `fusionTime`, `nearFusionTime`, `largeDeviationTime`, `fusionEventCount`, `longestFusionStreak`, `timeToFirstFusion`, `minValue`, `trajectoryRatio`, FSM state segments for known fixture time series
 2. **Unit — `analysisInsights.ts`:** all five insight types; trend + p-value; z-score outliers; consistency score; improvement rate; progressPercent clamping; sustained event grouping
-3. **Unit — edge cases:** session < 10s excluded; no fusion achieved anywhere; all sessions same exercise type; threshold equals first session's minValue
+3. **Unit — edge cases:** session < 10s excluded; no fusion achieved anywhere; all sessions same exercise type; threshold equals first session's minValue; `trajectoryRatio` null when firstHalfMean ≈ 0; `progressPercent` = 100 when startValue ≤ threshold
 4. **Integration:** save/load ReportSnapshot from IndexedDB; URL param pre-filtering; "Save to settings" writes AnalysisSettings; report history restores session selection
 5. **Regression:** existing History page filter, multi-select, TimeSeriesGraph, HistogramChart unaffected
