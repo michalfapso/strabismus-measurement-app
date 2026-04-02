@@ -1,8 +1,8 @@
 import { SessionMetrics } from '../types/analysis';
 import SubScoresPanel from './SubScoresPanel';
 import StateSegmentationTimeline from './StateSegmentationTimeline';
-import HistogramChart from './HistogramChart';
-import TimeSeriesGraph from './TimeSeriesGraph';
+import { HistogramChart } from './HistogramChart';
+import { TimeSeriesGraph } from './TimeSeriesGraph';
 import { Session } from '../types';
 import { css } from '@emotion/react';
 
@@ -48,13 +48,13 @@ export default function SingleSessionView({ metrics, session }: SingleSessionVie
       {/* Histogram */}
       <div css={css`border: 1px solid #ddd; border-radius: 4px; padding: 12px;`}>
         <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Distribution</h3>
-        <HistogramChart sessions={[session]} metric={metrics.metric} />
+        <HistogramChart sessions={[session]} isSingleSession={true} />
       </div>
 
       {/* Time series */}
       <div css={css`border: 1px solid #ddd; border-radius: 4px; padding: 12px;`}>
         <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Time Series</h3>
-        <TimeSeriesGraph sessions={[session]} metric={metrics.metric} />
+        <TimeSeriesGraph sessions={[session]} isSingleSession={true} />
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import * as ss from 'simple-statistics';
-import { mean, standardDeviation } from 'simple-statistics';
 
 export interface StatsResult {
   mean: number;
@@ -20,8 +19,8 @@ export function calculateStats(values: number[]): StatsResult {
     return { mean: 0, stddev: 0 };
   }
   return {
-    mean: mean(values),
-    stddev: values.length > 1 ? standardDeviation(values) : 0,
+    mean: ss.mean(values),
+    stddev: values.length > 1 ? ss.standardDeviation(values) : 0,
   };
 }
 
@@ -93,7 +92,7 @@ export function sessionsStdDev<T>(
   if (sessions.length < 2) return 0;
   const values = sessions.map(extractor).filter(v => isFinite(v));
   if (values.length < 2) return 0;
-  return standardDeviation(values);
+  return ss.standardDeviation(values);
 }
 
 /**
@@ -197,4 +196,20 @@ export function trendDirection(
 export function median(values: number[]): number {
   if (values.length === 0) return 0;
   return ss.median(values);
+}
+
+/**
+ * Compute mean of an array.
+ */
+export function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  return ss.mean(values);
+}
+
+/**
+ * Compute standard deviation.
+ */
+export function stdDev(values: number[]): number {
+  if (values.length < 2) return 0;
+  return ss.standardDeviation(values);
 }

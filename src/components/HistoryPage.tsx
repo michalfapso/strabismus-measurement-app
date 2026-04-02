@@ -19,10 +19,14 @@ export function HistoryPage({}: HistoryPageProps) {
   const { loadHistoricalSessions, deleteSelectedSessions } = useContext(SessionContext);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [analysisConfig, setAnalysisConfig] = useState(() => {
+  const [analysisConfig, setAnalysisConfig] = useState<{
+    metrics: ('deviation' | 'rotation')[];
+    thresholds: { deviation: number; rotation: number };
+    sustainedDays: number;
+  }>(() => {
     const settings = getAnalysisSettings();
     return {
-      metrics: ['deviation' as const],
+      metrics: ['deviation'],
       thresholds: settings.goal.thresholds,
       sustainedDays: settings.goal.sustainedDays,
     };
@@ -280,7 +284,7 @@ export function HistoryPage({}: HistoryPageProps) {
             </div>
           )}
 
-          {selectedCount === 1 && selectedSessions.length === 1 && (
+          {selectedCount === 1 && selectedSessions.length > 0 && (
             (() => {
               try {
                 const metrics = computeSessionMetrics(
@@ -308,7 +312,7 @@ export function HistoryPage({}: HistoryPageProps) {
             <MultiSessionAnalysisView
               sessions={selectedSessions}
               config={analysisConfig}
-              onConfigChange={setAnalysisConfig}
+              onConfigChange={(config) => setAnalysisConfig(config)}
             />
           )}
 
