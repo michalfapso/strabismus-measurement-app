@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
@@ -195,11 +195,6 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState<GlobalSettings>(() => getGlobalSettings());
 
-  useEffect(() => {
-    const currentSettings = getGlobalSettings();
-    setSettings(currentSettings);
-  }, []);
-
   const handleMetricToggle = (metric: 'deviation' | 'x' | 'y' | 'rotation') => {
     const isCurrentlySelected = settings.selectedMetrics.includes(metric);
     let newSelectedMetrics: Array<'deviation' | 'x' | 'y' | 'rotation'>;
@@ -272,8 +267,9 @@ export function SettingsPage() {
         </div>
         <div css={metricsGridStyle}>
           {allMetrics.map(metric => (
-            <label key={metric} css={checkboxContainerStyle}>
+            <label key={metric} htmlFor={`metric-${metric}`} css={checkboxContainerStyle}>
               <input
+                id={`metric-${metric}`}
                 type="checkbox"
                 css={checkboxInputStyle}
                 checked={settings.selectedMetrics.includes(metric)}
@@ -298,10 +294,11 @@ export function SettingsPage() {
           <div css={thresholdsGridStyle}>
             {settings.selectedMetrics.map(metric => (
               <div key={metric} css={thresholdInputGroupStyle}>
-                <label css={thresholdLabelStyle}>
+                <label htmlFor={`threshold-${metric}`} css={thresholdLabelStyle}>
                   {metricLabelMap[metric]} ({metricUnitMap[metric]})
                 </label>
                 <input
+                  id={`threshold-${metric}`}
                   type="number"
                   css={thresholdInputStyle}
                   value={settings.thresholds[metric] ?? metricDefaultMap[metric]}
