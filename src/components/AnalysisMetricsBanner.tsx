@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 import { getGlobalSettings } from '../utils/globalSettings';
@@ -60,8 +60,11 @@ function formatMetricName(metric: 'deviation' | 'x' | 'y' | 'rotation'): string 
 }
 
 export function AnalysisMetricsBanner({ mode, metric }: AnalysisMetricsBannerProps) {
-  const navigate = useNavigate();
   const settings = getGlobalSettings();
+
+  if (mode === 'single' && !metric) {
+    throw new Error('AnalysisMetricsBanner: metric prop is required when mode is "single"');
+  }
 
   if (mode === 'single' && metric) {
     const threshold = settings.thresholds[metric] ?? 1.0;
@@ -71,19 +74,9 @@ export function AnalysisMetricsBanner({ mode, metric }: AnalysisMetricsBannerPro
         <span>
           Viewing: <strong>{formatMetricName(metric)}</strong> (threshold {threshold} {unit})
         </span>
-        <a
-          css={linkStyle}
-          onClick={() => navigate('/settings')}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              navigate('/settings');
-            }
-          }}
-        >
+        <Link to="/settings" css={linkStyle}>
           Change settings →
-        </a>
+        </Link>
       </div>
     );
   }
@@ -102,19 +95,9 @@ export function AnalysisMetricsBanner({ mode, metric }: AnalysisMetricsBannerPro
       <span>
         Metrics: <strong>{metricsList}</strong>
       </span>
-      <a
-        css={linkStyle}
-        onClick={() => navigate('/settings')}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            navigate('/settings');
-          }
-        }}
-      >
+      <Link to="/settings" css={linkStyle}>
         Change settings →
-      </a>
+      </Link>
     </div>
   );
 }
