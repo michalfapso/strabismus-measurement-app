@@ -2,13 +2,23 @@
 
 ## Theme
 
+All components use the centralized theme defined in `src/theme.ts`. Import with:
+```typescript
+import { THEME } from '../theme';
+```
+
+### Color Variables
+
 | Role | Value |
 |------|-------|
 | Background | `rgba(10, 10, 10, 0.98)` |
-| Primary accent | `#00ff00` (green) — active states, borders, buttons |
-| Header text | `#fff` |
+| Background light (panels) | `rgba(20, 20, 20, 0.8)` |
+| Primary text | `#fff` |
 | Secondary text | `#888` |
-| Subtle borders | `rgba(255,255,255,0.1)` |
+| Muted text | `rgba(255, 255, 255, 0.5)` |
+| Primary border | `rgba(255,255,255,0.1)` |
+| Secondary border | `rgba(255,255,255,0.05)` |
+| Primary accent | `#00ff00` (green) — active states, buttons |
 
 ## Metric Colors
 

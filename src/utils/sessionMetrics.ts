@@ -116,6 +116,7 @@ export function classifyStates(
   if (timeSeries.length < 2) return [];
 
   const rawValues = timeSeries.map(p => getMetricValue(p, metric));
+  const halfWindow = Math.floor(sgWindowSize / 2);
 
   let smoothed: number[];
   try {
@@ -125,9 +126,18 @@ export function classifyStates(
     smoothed = rawValues;
   }
 
+  // For edges where smoothing may be unreliable, use raw values instead
+  const valuesToClassify = rawValues.map((raw, i) => {
+    // Use raw values at edges (first and last halfWindow points)
+    if (i < halfWindow || i >= rawValues.length - halfWindow) {
+      return raw;
+    }
+    return smoothed[i];
+  });
+
   const slopes = calculateSlope(smoothed, 10);
 
-  const classifications: SessionState[] = smoothed.map((value, i) => {
+  const classifications: SessionState[] = valuesToClassify.map((value, i) => {
     const slope = slopes[i] ?? 0;
     if (value < threshold) return 'FUSION';
     if (value < threshold + NEAR_FUSION_WIDTH) return 'NEAR_FUSION';

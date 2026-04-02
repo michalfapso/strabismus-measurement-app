@@ -1,12 +1,13 @@
 import { StateSegment, SessionState } from '../types/analysis';
 import { css } from '@emotion/react';
+import { THEME } from '../theme';
 
 const STATE_COLORS: Record<SessionState, string> = {
-  FUSION: '#4CAF50',
-  NEAR_FUSION: '#8BC34A',
-  APPROACHING: '#FFC107',
-  STABLE_DEVIATION: '#FF9800',
-  DRIFTING: '#F44336',
+  FUSION: THEME.stateFusion,
+  NEAR_FUSION: THEME.stateNearFusion,
+  APPROACHING: THEME.stateApproaching,
+  STABLE_DEVIATION: THEME.stateStableDeviation,
+  DRIFTING: THEME.stateDrifting,
 };
 
 const STATE_LABELS: Record<SessionState, string> = {
@@ -31,15 +32,15 @@ export default function StateSegmentationTimeline({
   }
 
   return (
-    <div css={css`padding: 16px; border: 1px solid #ddd; border-radius: 4px;`}>
-      <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Session State Timeline</h3>
+    <div css={css`padding: 16px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.panelBg};`}>
+      <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Session State Timeline</h3>
 
       {/* Timeline bar */}
       <div
         css={css`
           display: flex;
           height: 40px;
-          border: 1px solid #999;
+          border: 1px solid ${THEME.borderPrimary};
           border-radius: 4px;
           overflow: hidden;
           margin-bottom: 12px;
@@ -85,7 +86,7 @@ export default function StateSegmentationTimeline({
       </div>
 
       {/* Summary text */}
-      <div css={css`font-size: 13px; color: #555; line-height: 1.6;`}>
+      <div css={css`font-size: 13px; color: ${THEME.textSecondary}; line-height: 1.6;`}>
         <p css={css`margin: 0 0 8px 0;`}>
           {segments.filter(s => s.state === 'FUSION').length} fusion episode
           {segments.filter(s => s.state === 'FUSION').length !== 1 ? 's' : ''} totalling{' '}

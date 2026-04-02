@@ -1,5 +1,6 @@
 import { SessionMetrics } from '../types/analysis';
 import { css } from '@emotion/react';
+import { THEME } from '../theme';
 
 function getTrajectoryLabel(ratio: number | null): string {
   if (ratio === null) return '—';
@@ -16,11 +17,11 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
   return (
     <div css={css`
       padding: 16px;
-      border: 1px solid #ddd;
+      border: 1px solid ${THEME.borderPrimary};
       border-radius: 4px;
-      background-color: #f9f9f9;
+      background-color: ${THEME.panelBg};
     `}>
-      <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Session Sub-Scores</h3>
+      <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Session Sub-Scores</h3>
       <table css={css`
         width: 100%;
         border-collapse: collapse;
@@ -28,11 +29,12 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
 
         td {
           padding: 8px 0;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid ${THEME.borderSecondary};
+          color: ${THEME.textSecondary};
 
           &:first-child {
             font-weight: 500;
-            color: #333;
+            color: ${THEME.textPrimary};
           }
         }
 

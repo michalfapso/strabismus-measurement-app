@@ -4,6 +4,7 @@ import { computeSessionMetrics } from '../utils/sessionMetrics';
 import { calculateProgressInsight, calculateExerciseInsights, calculateSessionQualityInsight, calculateMilestoneInsight, calculateRecommendationInsight } from '../utils/analysisInsights';
 import { css } from '@emotion/react';
 import { useState } from 'react';
+import { THEME } from '../theme';
 
 interface AnalysisConfig {
   metrics: ('deviation' | 'rotation')[];
@@ -41,7 +42,7 @@ export default function MultiSessionAnalysisView({
 
   if (sessionMetrics.length === 0) {
     return (
-      <div css={css`padding: 16px; color: #999;`}>
+      <div css={css`padding: 16px; color: ${THEME.textSecondary};`}>
         No valid sessions for analysis (minimum 10 seconds each).
       </div>
     );
@@ -79,15 +80,15 @@ export default function MultiSessionAnalysisView({
     `}>
       {/* Config Panel */}
       <div css={css`
-        border: 1px solid #ddd;
+        border: 1px solid ${THEME.borderPrimary};
         border-radius: 4px;
         padding: 16px;
-        background-color: #f9f9f9;
+        background-color: ${THEME.panelBg};
       `}>
-        <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Analysis Configuration</h3>
+        <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Analysis Configuration</h3>
 
         <div css={css`margin-bottom: 12px;`}>
-          <label css={css`display: block; margin-bottom: 8px; font-weight: 500;`}>
+          <label css={css`display: block; margin-bottom: 8px; font-weight: 500; color: ${THEME.textPrimary};`}>
             Metrics:
           </label>
           <div css={css`display: flex; gap: 12px;`}>
@@ -103,7 +104,7 @@ export default function MultiSessionAnalysisView({
                     onConfigChange({ ...config, metrics: newMetrics });
                   }}
                 />
-                {metric === 'deviation' ? 'Deviation' : 'Rotation'}
+                <span css={css`color: ${THEME.textPrimary};`}>{metric === 'deviation' ? 'Deviation' : 'Rotation'}</span>
               </label>
             ))}
           </div>
@@ -111,7 +112,7 @@ export default function MultiSessionAnalysisView({
 
         <div css={css`display: grid; grid-template-columns: 1fr 1fr; gap: 12px;`}>
           <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px;`}>
+            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
               Deviation threshold (cm)
             </label>
             <input
@@ -124,12 +125,12 @@ export default function MultiSessionAnalysisView({
                   thresholds: { ...config.thresholds, deviation: parseFloat(e.target.value) || 0.5 },
                 })
               }
-              css={css`width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;`}
+              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
             />
           </div>
 
           <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px;`}>
+            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
               Rotation threshold (°)
             </label>
             <input
@@ -142,12 +143,12 @@ export default function MultiSessionAnalysisView({
                   thresholds: { ...config.thresholds, rotation: parseFloat(e.target.value) || 1 },
                 })
               }
-              css={css`width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;`}
+              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
             />
           </div>
 
           <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px;`}>
+            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
               Sustained days
             </label>
             <input
@@ -159,7 +160,7 @@ export default function MultiSessionAnalysisView({
                   sustainedDays: parseInt(e.target.value, 10) || 7,
                 })
               }
-              css={css`width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;`}
+              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
             />
           </div>
         </div>
@@ -170,13 +171,14 @@ export default function MultiSessionAnalysisView({
         <div
           key={`progress-${i}`}
           css={css`
-            border: 1px solid #ddd;
+            border: 1px solid ${THEME.borderPrimary};
             border-radius: 4px;
             padding: 16px;
+            background-color: ${THEME.panelBg};
           `}
         >
-          <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Progress ({insight.metric})</h3>
-          <p css={css`margin: 0; font-size: 13px; color: #666;`}>
+          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Progress ({insight.metric})</h3>
+          <p css={css`margin: 0; font-size: 13px; color: ${THEME.textSecondary};`}>
             Fusion streak trend: {insight.fusionStreakTrend.direction} (slope: {insight.fusionStreakTrend.slope.toFixed(2)} s/week, p={insight.fusionStreakTrend.significance.p.toFixed(3)})<br />
             Fusion achieved in {insight.fusionAchievedCount}/{insight.totalSessions} sessions ({insight.fusionAchievedRate.toFixed(0)}%)
           </p>
@@ -185,8 +187,8 @@ export default function MultiSessionAnalysisView({
 
       {/* Exercise Effectiveness */}
       {exerciseInsights.length > 0 && (
-        <div css={css`border: 1px solid #ddd; border-radius: 4px; padding: 16px;`}>
-          <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Exercise Effectiveness</h3>
+        <div css={css`border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; padding: 16px; background-color: ${THEME.panelBg};`}>
+          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Exercise Effectiveness</h3>
           <table css={css`
             width: 100%;
             font-size: 13px;
@@ -195,12 +197,14 @@ export default function MultiSessionAnalysisView({
             th, td {
               padding: 8px;
               text-align: left;
-              border-bottom: 1px solid #eee;
+              border-bottom: 1px solid ${THEME.borderSecondary};
+              color: ${THEME.textSecondary};
             }
 
             th {
               font-weight: 600;
-              background-color: #f5f5f5;
+              background-color: ${THEME.backgroundLight};
+              color: ${THEME.textPrimary};
             }
           `}>
             <thead>
@@ -227,9 +231,9 @@ export default function MultiSessionAnalysisView({
 
       {/* Recommendations */}
       {recommendations.generalNotes.length > 0 && (
-        <div css={css`border: 1px solid #ddd; border-radius: 4px; padding: 16px;`}>
-          <h3 css={css`margin-top: 0; margin-bottom: 12px;`}>Recommendations</h3>
-          <ul css={css`margin: 0; padding-left: 20px; font-size: 13px;`}>
+        <div css={css`border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; padding: 16px; background-color: ${THEME.panelBg};`}>
+          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Recommendations</h3>
+          <ul css={css`margin: 0; padding-left: 20px; font-size: 13px; color: ${THEME.textSecondary};`}>
             {recommendations.generalNotes.map((note, i) => (
               <li key={i}>{note}</li>
             ))}
