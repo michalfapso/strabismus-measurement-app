@@ -33,8 +33,8 @@ export const THEME = {
   // State Colors for Session Timeline
   stateFusion: '#4CAF50',
   stateNearFusion: '#8BC34A',
-  stateApproaching: '#FFC107',
-  stateStableDeviation: '#FF9800',
+  stateApproaching: '#FF9800',
+  stateStableDeviation: '#FFEB3B',
   stateDrifting: '#F44336',
 
   // Component-specific
