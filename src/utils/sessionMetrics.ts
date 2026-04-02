@@ -120,6 +120,8 @@ export function classifyStates(
 
   let smoothed: number[];
   try {
+    // Use simple moving average for robust smoothing
+    // (Savitzky-Golay was producing negative values from positive data)
     const effectiveWindow = Math.min(sgWindowSize, rawValues.length % 2 === 0 ? rawValues.length - 1 : rawValues.length);
     smoothed = effectiveWindow >= 5 ? smoothSeries(rawValues, effectiveWindow) : rawValues;
   } catch {
