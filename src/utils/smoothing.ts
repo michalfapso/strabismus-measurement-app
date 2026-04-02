@@ -9,7 +9,21 @@ export function smoothSeries(data: number[], windowSize: number): number[] {
   }
 
   const smoothed = savitzkyGolay(data, 1, { windowSize, polynomial: 2 });
-  return Array.from(smoothed);
+  const halfWindow = Math.floor(windowSize / 2);
+
+  // Pad edges with original values since SG can't smooth full window at edges
+  const result = new Array(data.length);
+  for (let i = 0; i < halfWindow; i++) {
+    result[i] = data[i];
+  }
+  for (let i = 0; i < smoothed.length; i++) {
+    result[halfWindow + i] = smoothed[i];
+  }
+  for (let i = data.length - halfWindow; i < data.length; i++) {
+    result[i] = data[i];
+  }
+
+  return result;
 }
 
 export function calculateSlope(data: number[], windowSize: number = 10): number[] {
