@@ -7,7 +7,11 @@ import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
 import { UnifiedSessionPanel } from './UnifiedSessionPanel';
+import SingleSessionView from './SingleSessionView';
+import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
+import { computeSessionMetrics } from '../utils/sessionMetrics';
+import { getAnalysisSettings } from '../utils/analysisSettings';
 
 export interface HistoryPageProps {}
 
@@ -15,6 +19,14 @@ export function HistoryPage({}: HistoryPageProps) {
   const { loadHistoricalSessions, deleteSelectedSessions } = useContext(SessionContext);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analysisConfig, setAnalysisConfig] = useState(() => {
+    const settings = getAnalysisSettings();
+    return {
+      metrics: ['deviation' as const],
+      thresholds: settings.goal.thresholds,
+      sustainedDays: settings.goal.sustainedDays,
+    };
+  });
 
   const {
     state,
@@ -247,18 +259,64 @@ export function HistoryPage({}: HistoryPageProps) {
         </div>
 
         {/* Detail side */}
-        {selectedCount > 0 && (
-          <div style={{
-            flex: 1,
-            borderLeft: '1px solid rgba(255,255,255,0.1)',
-            overflow: 'auto',
-            position: 'relative',
-          }}>
-            <UnifiedSessionPanel
+        <div style={{
+          flex: 1,
+          borderLeft: '1px solid rgba(255,255,255,0.1)',
+          overflow: 'auto',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          {selectedCount === 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              color: '#999',
+              fontSize: '14px',
+            }}>
+              Select one or more sessions to view analysis
+            </div>
+          )}
+
+          {selectedCount === 1 && selectedSessions.length === 1 && (
+            (() => {
+              try {
+                const metrics = computeSessionMetrics(
+                  selectedSessions[0],
+                  analysisConfig.thresholds,
+                  analysisConfig.metrics[0]
+                );
+                return (
+                  <SingleSessionView
+                    metrics={metrics}
+                    session={selectedSessions[0]}
+                  />
+                );
+              } catch {
+                return (
+                  <div style={{ padding: '16px', color: '#999' }}>
+                    Unable to compute metrics (session may be too short)
+                  </div>
+                );
+              }
+            })()
+          )}
+
+          {selectedCount > 1 && (
+            <MultiSessionAnalysisView
               sessions={selectedSessions}
+              config={analysisConfig}
+              onConfigChange={setAnalysisConfig}
             />
-          </div>
-        )}
+          )}
+
+          {/* Keep UnifiedSessionPanel as fallback for backward compatibility */}
+          {selectedCount > 1 && false && (
+            <UnifiedSessionPanel sessions={selectedSessions} />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,10 @@ import { prepareSessionGraphData } from '../services/graphData';
 import { StatCards } from './StatCards';
 import { PositionGraph } from './PositionGraph';
 import { RotationGraph } from './RotationGraph';
+import SubScoresPanel from './SubScoresPanel';
+import { computeSessionMetrics } from '../utils/sessionMetrics';
+import { getAnalysisSettings } from '../utils/analysisSettings';
+import { useState, useMemo } from 'react';
 
 export interface ResultsPanelProps {
   session: Session | null;
@@ -13,6 +17,21 @@ export interface ResultsPanelProps {
 
 export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps) {
   const stats = useSessionStats(session);
+  const settings = useMemo(() => getAnalysisSettings(), []);
+
+  // Compute session metrics for post-recording summary
+  const sessionMetrics = useMemo(() => {
+    if (!session) return null;
+    try {
+      return computeSessionMetrics(
+        session,
+        settings.goal.thresholds,
+        'deviation'
+      );
+    } catch {
+      return null;
+    }
+  }, [session, settings]);
 
   if (!visible || !session) {
     return null;
@@ -108,6 +127,8 @@ export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps)
           meanDeviation={stats.meanDeviation}
           exerciseTag={session.exerciseTag}
         />
+
+        {sessionMetrics && <SubScoresPanel metrics={sessionMetrics} />}
 
         <PositionGraph data={graphData} />
         <RotationGraph data={graphData} />
