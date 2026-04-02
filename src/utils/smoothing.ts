@@ -1,5 +1,8 @@
-import savitzkyGolay from 'ml-savitzky-golay';
-
+/**
+ * Simple moving average smoothing.
+ * More robust than Savitzky-Golay for this use case.
+ * Preserves data range (no negative values from positive inputs).
+ */
 export function smoothSeries(data: number[], windowSize: number): number[] {
   if (windowSize % 2 === 0) {
     throw new Error(`Window size must be odd, got ${windowSize}`);
@@ -7,20 +10,27 @@ export function smoothSeries(data: number[], windowSize: number): number[] {
   if (windowSize > data.length) {
     throw new Error(`Window size ${windowSize} exceeds data length ${data.length}`);
   }
+  if (windowSize < 1) {
+    throw new Error(`Window size must be at least 1, got ${windowSize}`);
+  }
 
-  const smoothed = savitzkyGolay(data, 1, { windowSize, polynomial: 2 });
   const halfWindow = Math.floor(windowSize / 2);
-
-  // Pad edges with original values since SG can't smooth full window at edges
   const result = new Array(data.length);
-  for (let i = 0; i < halfWindow; i++) {
-    result[i] = data[i];
-  }
-  for (let i = 0; i < smoothed.length; i++) {
-    result[halfWindow + i] = smoothed[i];
-  }
-  for (let i = data.length - halfWindow; i < data.length; i++) {
-    result[i] = data[i];
+
+  for (let i = 0; i < data.length; i++) {
+    // Calculate window boundaries
+    const start = Math.max(0, i - halfWindow);
+    const end = Math.min(data.length - 1, i + halfWindow);
+
+    // Compute average of values in window
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j <= end; j++) {
+      sum += data[j];
+      count++;
+    }
+
+    result[i] = sum / count;
   }
 
   return result;
