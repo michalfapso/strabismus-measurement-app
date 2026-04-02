@@ -148,35 +148,6 @@ export function classifyStates(
     return 'STABLE_DEVIATION';
   });
 
-  // Debug logging: log raw, smoothed, and classifications for analysis
-  console.log('=== FSM State Classification Debug ===');
-  console.log(`Metric: ${metric}, Threshold: ${threshold}, Data points: ${rawValues.length}`);
-  console.log(`SG Window: ${sgWindowSize}, Half-window edge buffer: ${halfWindow}`);
-  console.log('\nFirst 50 points (index, time, raw, smoothed, classified, slope):');
-  const debugRows = timeSeries.slice(0, 50).map((ts, i) => {
-    const time = (ts.t - timeSeries[0].t) / 1000;
-    const raw = rawValues[i];
-    const sm = smoothed[i];
-    const classified = classifications[i];
-    const slope = slopes[i] ?? 0;
-    return [i, time.toFixed(2), raw.toFixed(2), sm.toFixed(2), classified, slope.toFixed(3)];
-  });
-  console.table(debugRows);
-
-  console.log('\nLast 20 points (index, time, raw, smoothed, classified, slope):');
-  const startIdx = Math.max(0, timeSeries.length - 20);
-  const debugRowsEnd = timeSeries.slice(startIdx).map((ts, offset) => {
-    const i = startIdx + offset;
-    const time = (ts.t - timeSeries[0].t) / 1000;
-    const raw = rawValues[i];
-    const sm = smoothed[i];
-    const classified = classifications[i];
-    const slope = slopes[i] ?? 0;
-    return [i, time.toFixed(2), raw.toFixed(2), sm.toFixed(2), classified, slope.toFixed(3)];
-  });
-  console.table(debugRowsEnd);
-  console.log('=====================================\n');
-
   const segments: StateSegment[] = [];
   let segStart = 0;
 
