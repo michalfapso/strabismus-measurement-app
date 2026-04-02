@@ -10,6 +10,8 @@ describe('GlobalSettings', () => {
       const settings = getGlobalSettings();
       expect(settings.selectedMetrics).toEqual(['deviation']);
       expect(settings.thresholds.deviation).toBe(1.0);
+      expect(settings.thresholds.x).toBe(1.0);
+      expect(settings.thresholds.y).toBe(1.0);
       expect(settings.thresholds.rotation).toBe(1);
     });
 
@@ -33,7 +35,7 @@ describe('GlobalSettings', () => {
       setGlobalSettings(partial);
       const settings = getGlobalSettings();
       expect(settings.thresholds.x).toBe(0.8);
-      expect(settings.thresholds.y).toBeUndefined(); // Not set in partial
+      expect(settings.thresholds.y).toBe(1.0); // Merged with default
     });
 
     it('returns defaults if stored data is invalid', () => {
@@ -74,12 +76,13 @@ describe('GlobalSettings', () => {
       expect(getThresholdForMetric('rotation')).toBe(1.5);
     });
 
-    it('returns undefined for unselected metric', () => {
+    it('returns threshold for unselected metric (from defaults)', () => {
       setGlobalSettings({
         selectedMetrics: ['deviation'],
         thresholds: { deviation: 1.0 },
       });
-      expect(getThresholdForMetric('rotation')).toBeUndefined();
+      // Rotation threshold is still available from defaults, even if not selected
+      expect(getThresholdForMetric('rotation')).toBe(1);
     });
   });
 

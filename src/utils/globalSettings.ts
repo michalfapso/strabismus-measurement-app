@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   selectedMetrics: ['deviation'],
   thresholds: {
     deviation: 1.0,
+    x: 1.0,
+    y: 1.0,
     rotation: 1,
   },
 };
