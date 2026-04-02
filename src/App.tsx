@@ -12,6 +12,7 @@ import { useCalibration } from './hooks/useCalibration';
 import { useSession } from './hooks/useSession';
 import { CanvasState } from './types';
 import { css } from '@emotion/react';
+import { APP_BASE_URL } from './config';
 
 /* ── overlay container (top-right corner) ─────────────────────── */
 const overlayStyle = css`
@@ -87,6 +88,13 @@ function AppContent() {
 
   const onMeasurementPage = location.pathname === '/';
 
+  // Helper function to navigate to History page, preserving last URL if available
+  const handleHistoryClick = () => {
+    const lastUrl = localStorage.getItem('lastHistoryUrl');
+    const defaultUrl = `${APP_BASE_URL}history`;
+    navigate(lastUrl || defaultUrl);
+  };
+
   const routeElement = useRoutes([
     {
       path: '/',
@@ -141,7 +149,7 @@ function AppContent() {
             <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/'); }}>
               ☰ Measurement
             </button>
-            <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/history'); }}>
+            <button css={chipStyle} onClick={() => { setShowCalibration(false); handleHistoryClick(); }}>
               📊 History
             </button>
             <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/settings'); }}>
@@ -184,7 +192,7 @@ function AppContent() {
           <button css={chipStyle} onClick={() => navigate('/')}>
             ☰ Measurement
           </button>
-          <button css={chipStyle} onClick={() => navigate('/history')}>
+          <button css={chipStyle} onClick={handleHistoryClick}>
             📊 History
           </button>
           <button css={chipStyle} onClick={() => navigate('/settings')}>

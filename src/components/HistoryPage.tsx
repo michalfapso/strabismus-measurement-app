@@ -1,4 +1,5 @@
 import { useContext, useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Session } from '../types';
 import { SessionContext } from '../context/SessionContext';
 import { useViewState } from '../hooks/useViewState';
@@ -17,6 +18,7 @@ export interface HistoryPageProps {}
 
 export function HistoryPage({}: HistoryPageProps) {
   const { loadHistoricalSessions, deleteSelectedSessions } = useContext(SessionContext);
+  const location = useLocation();
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisConfig, setAnalysisConfig] = useState<{
@@ -37,6 +39,12 @@ export function HistoryPage({}: HistoryPageProps) {
     updateFilters,
     updateSelectedSessions,
   } = useViewState();
+
+  // Save the History page URL to localStorage whenever it changes
+  useEffect(() => {
+    const fullUrl = window.location.pathname + window.location.search;
+    localStorage.setItem('lastHistoryUrl', fullUrl);
+  }, [location]);
 
   // Load sessions on mount
   useEffect(() => {

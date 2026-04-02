@@ -107,7 +107,7 @@ export function useViewState() {
   });
 
   // Debounced save to localStorage
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Clear pending timeout
     if (saveTimeoutRef.current) {
