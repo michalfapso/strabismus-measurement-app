@@ -6,6 +6,7 @@ import { CalibrationScreen } from './components/CalibrationScreen';
 import { AssessmentCanvas } from './components/AssessmentCanvas';
 import { DataCaptureControl } from './components/DataCaptureControl';
 import { HistoryPage } from './components/HistoryPage';
+import { SettingsPage } from './components/SettingsPage';
 import { ResultsPanel } from './components/ResultsPanel';
 import { useCalibration } from './hooks/useCalibration';
 import { useSession } from './hooks/useSession';
@@ -98,6 +99,7 @@ function AppContent() {
       ),
     },
     { path: '/history', element: <HistoryPage /> },
+    { path: '/settings', element: <SettingsPage /> },
   ]);
 
   if (isLoading) return null;
@@ -142,6 +144,9 @@ function AppContent() {
             <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/history'); }}>
               📊 History
             </button>
+            <button css={chipStyle} onClick={() => { setShowCalibration(false); navigate('/settings'); }}>
+              ⚙️ Settings
+            </button>
           </div>
         </div>
       </>
@@ -181,6 +186,9 @@ function AppContent() {
           </button>
           <button css={chipStyle} onClick={() => navigate('/history')}>
             📊 History
+          </button>
+          <button css={chipStyle} onClick={() => navigate('/settings')}>
+            ⚙️ Settings
           </button>
           <button css={chipStyle} onClick={handleRecalibrate} disabled={!onMeasurementPage}>
             Recalibrate
