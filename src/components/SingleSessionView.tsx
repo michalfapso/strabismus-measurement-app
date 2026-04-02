@@ -6,6 +6,7 @@ import { TimeSeriesGraph } from './TimeSeriesGraph';
 import { Session } from '../types';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
+import { getGlobalSettings } from '../utils/globalSettings';
 
 interface SingleSessionViewProps {
   metrics: SessionMetrics;
@@ -13,6 +14,7 @@ interface SingleSessionViewProps {
 }
 
 export default function SingleSessionView({ metrics, session }: SingleSessionViewProps) {
+  const { selectedMetrics } = getGlobalSettings();
   return (
     <div css={css`
       display: flex;
@@ -55,7 +57,7 @@ export default function SingleSessionView({ metrics, session }: SingleSessionVie
       {/* Time series */}
       <div css={css`border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; padding: 12px; background-color: ${THEME.panelBg};`}>
         <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Time Series</h3>
-        <TimeSeriesGraph sessions={[session]} isSingleSession={true} />
+        <TimeSeriesGraph sessions={[session]} isSingleSession={true} selectedMetrics={selectedMetrics} />
       </div>
     </div>
   );

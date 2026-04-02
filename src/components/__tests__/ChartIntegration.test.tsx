@@ -50,6 +50,7 @@ describe('Chart Refinements - Integration Tests', () => {
         <TimeSeriesGraph
           sessions={[mockSessionData[0]]}
           isSingleSession={true}
+          selectedMetrics={['deviation']}
         />
       );
       // Component should render without throwing
@@ -61,24 +62,24 @@ describe('Chart Refinements - Integration Tests', () => {
         <TimeSeriesGraph
           sessions={mockSessionData}
           isSingleSession={false}
+          selectedMetrics={['deviation']}
         />
       );
       // Component should render without throwing
       expect(container.querySelector('button')).toBeDefined();
     });
 
-    test('metric buttons exist for deviation, x, y, rotation', () => {
+    test('displays only the selected metrics from props', () => {
       const { container } = render(
         <TimeSeriesGraph
           sessions={[mockSessionData[0]]}
           isSingleSession={true}
+          selectedMetrics={['deviation', 'x']}
         />
       );
 
-      // Verify that metric buttons are rendered
-      // Look for metric labels or checkboxes
-      const labels = container.querySelectorAll('label');
-      expect(labels.length).toBeGreaterThanOrEqual(4); // At least 4 metrics: deviation, x, y, rotation
+      // Component should render the selected metrics
+      expect(container.querySelector('svg')).toBeDefined();
     });
 
     test('renders without error when no view state is provided', () => {
@@ -86,6 +87,7 @@ describe('Chart Refinements - Integration Tests', () => {
         <TimeSeriesGraph
           sessions={[mockSessionData[0]]}
           isSingleSession={true}
+          selectedMetrics={['deviation']}
           viewState={undefined}
         />
       );

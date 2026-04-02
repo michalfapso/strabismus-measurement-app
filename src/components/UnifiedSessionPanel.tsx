@@ -1,6 +1,7 @@
 import { Session } from '../types';
 import { useSessionStats } from '../hooks/useSessionStats';
 import { useViewState } from '../hooks/useViewState';
+import { getGlobalSettings } from '../utils/globalSettings';
 import { StatCards } from './StatCards';
 import { TimeSeriesGraph } from './TimeSeriesGraph';
 import { HistogramChart } from './HistogramChart';
@@ -13,6 +14,7 @@ export interface UnifiedSessionPanelProps {
 export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
   const isSingleSession = sessions.length === 1;
   const viewState = useViewState();
+  const { selectedMetrics } = getGlobalSettings();
 
   // For single session, calculate stats for that session
   const singleSessionStats = useSessionStats(isSingleSession ? sessions[0] : null);
@@ -92,7 +94,7 @@ export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         marginBottom: '16px',
       }}>
-        <TimeSeriesGraph sessions={sessions} isSingleSession={isSingleSession} viewState={viewState} />
+        <TimeSeriesGraph sessions={sessions} isSingleSession={isSingleSession} selectedMetrics={selectedMetrics} viewState={viewState} />
       </div>
 
       {/* HistogramChart section */}

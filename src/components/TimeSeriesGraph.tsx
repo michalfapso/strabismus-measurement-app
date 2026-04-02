@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { css } from '@emotion/react';
 import { Session } from '../types';
 import {
@@ -10,13 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { formatTimeSeconds, formatTimeSecondsVerbose } from '../utils/timeFormatting';
+import { formatTimeSeconds } from '../utils/timeFormatting';
 import { useViewState } from '../hooks/useViewState';
-import { metricCheckboxStyle, timeModButtonStyle } from '../styles/chartControlsStyles';
+import { timeModButtonStyle } from '../styles/chartControlsStyles';
 
 export interface TimeSeriesGraphProps {
   sessions: Session[];
   isSingleSession: boolean;
+  selectedMetrics: ('deviation' | 'x' | 'y' | 'rotation')[];
   viewState?: ReturnType<typeof useViewState>;
 }
 
@@ -169,13 +169,13 @@ function CustomTooltip({
   }
 }
 
-export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedViewState }: TimeSeriesGraphProps) {
+export function TimeSeriesGraph({ sessions, isSingleSession, selectedMetrics: propsSelectedMetrics, viewState: passedViewState }: TimeSeriesGraphProps) {
   // Use passed viewState if provided (from UnifiedSessionPanel), otherwise create our own
   const defaultViewState = useViewState();
-  const { state, toggleTimeSeriesMetric, toggleTimeSeriesDisplayMode, setTimeSeriesTimeMode } = passedViewState || defaultViewState;
+  const { state, toggleTimeSeriesDisplayMode, setTimeSeriesTimeMode } = passedViewState || defaultViewState;
 
-  // Read from viewState
-  const selectedMetrics = state.timeSeriesMetrics;
+  // Use selectedMetrics from props (from global settings)
+  const selectedMetricsSet = new Set(propsSelectedMetrics);
   const displayMode = state.timeSeriesDisplayModes;
   const timeMode = state.timeSeriesTimeMode;
 
@@ -197,11 +197,6 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
     );
   }
 
-  // Toggle metric selection
-  const toggleMetric = (metric: MetricType) => {
-    toggleTimeSeriesMetric(metric);
-  };
-
   // Toggle display mode (aggregate only)
   const toggleDisplayMode = (mode: DisplayMode) => {
     toggleTimeSeriesDisplayMode(mode);
@@ -214,7 +209,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
 
   // Prepare chart data
   const prepareChartData = () => {
-    if (sessions.length === 0 || selectedMetrics.size === 0) return null;
+    if (sessions.length === 0 || selectedMetricsSet.size === 0) return null;
 
     // For relative mode: normalize each session to 0-100% and create common grid
     if (timeMode === 'relative') {
@@ -229,7 +224,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         const session = sessions[0];
         const chartData: any[] = [];
 
-        for (const metric of selectedMetrics) {
+        for (const metric of selectedMetricsSet) {
           const normalizedData = normalizeSessionTimeToRelative(session, metric);
 
           // Create time grid entries with interpolation
@@ -261,7 +256,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
       relativeTimeGrid.forEach((timePercent) => {
         const entry: any = { normalizedTime: timePercent };
 
-        for (const metric of selectedMetrics) {
+        for (const metric of selectedMetricsSet) {
           const metricValues: number[] = [];
           const sessionValues: Record<string, number> = {};
 
@@ -331,7 +326,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
       const session = sessions[0];
       const chartData: any[] = [];
 
-      for (const metric of selectedMetrics) {
+      for (const metric of selectedMetricsSet) {
         const resampledData = resampleSessionForMetric(session, metric, absoluteTimeGrid);
 
         resampledData.forEach((point) => {
@@ -357,7 +352,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
     absoluteTimeGrid.forEach((timePoint) => {
       const entry: any = { t: timePoint };
 
-      for (const metric of selectedMetrics) {
+      for (const metric of selectedMetricsSet) {
         const metricValues: number[] = [];
         const sessionValues: Record<string, number> = {};
 
@@ -394,43 +389,6 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
 
   return (
     <div style={{ marginBottom: '20px' }}>
-      {/* Metric Selector */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '12px',
-          fontSize: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ fontSize: '11px', color: '#888' }}>Metrics:</div>
-        {(['deviation', 'x', 'y', 'rotation'] as MetricType[]).map((metric) => (
-          <label
-            key={metric}
-            css={[
-              metricCheckboxStyle,
-              css`
-                color: ${METRIC_COLORS[metric]};
-                display: flex;
-                align-items: center;
-                gap: 4px;
-              `,
-            ]}
-          >
-            <input
-              type="checkbox"
-              checked={selectedMetrics.has(metric)}
-              onChange={() => toggleMetric(metric)}
-              style={{ cursor: 'pointer' }}
-            />
-            <span>
-              {metric === 'deviation' ? 'Deviation' : metric.toUpperCase()}
-            </span>
-          </label>
-        ))}
-      </div>
-
       {/* Aggregate-only controls */}
       {!isSingleSession && (
         <>
@@ -509,12 +467,12 @@ export function TimeSeriesGraph({ sessions, isSingleSession, viewState: passedVi
         }}
       >
         {chartData && chartData.length > 0 ? (
-          selectedMetrics.size === 0 ? (
-            <div style={{ color: '#888', fontSize: '10px' }}>Select a metric to view</div>
+          selectedMetricsSet.size === 0 ? (
+            <div style={{ color: '#888', fontSize: '10px' }}>No metrics selected</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {Array.from(selectedMetrics).map((metric, metricIndex) => {
-                const isBottomChart = metricIndex === selectedMetrics.size - 1;
+              {Array.from(selectedMetricsSet).map((metric, metricIndex) => {
+                const isBottomChart = metricIndex === selectedMetricsSet.size - 1;
 
                 return (
                   <ResponsiveContainer key={metric} width="100%" height={250}>
