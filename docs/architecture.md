@@ -35,6 +35,34 @@ TimeSeriesGraph + HistogramChart + TrendChart
 Single entry point for all analysis. Mode determined by `sessions.length === 1`.
 Sections (in order): Header + StatCards → TimeSeriesGraph → HistogramChart → TrendChart (aggregate only)
 
+### Global Settings System (utils/globalSettings.ts)
+**Single source of truth for user preferences across the entire app.** Separate from view state — persists to localStorage key `"strabismus_global_settings"`.
+
+**State shape:**
+```typescript
+interface GlobalSettings {
+  selectedMetrics: ('deviation' | 'x' | 'y' | 'rotation')[];  // at least 1 required
+  thresholds: {
+    deviation?: number;    // default 1.0 cm
+    x?: number;           // default 1.0 cm
+    y?: number;           // default 1.0 cm
+    rotation?: number;    // default 1.0 °
+  };
+}
+```
+
+**Behavior:**
+- Initialized with defaults; merged with stored values (allows backward compatibility)
+- Used by: SettingsPage (read/write), SingleSessionView (read), MultiSessionAnalysisView (read), AnalysisMetricsBanner (read), TimeSeriesSegmentationGraph (read)
+- At least one metric always selected (enforced in SettingsPage validation)
+- Changes apply immediately across all views (no confirmation)
+
+**Usage pattern:**
+```typescript
+const settings = getGlobalSettings();  // read
+setGlobalSettings(newSettings);        // write (triggers all consumers to re-render)
+```
+
 ### useViewState Hook (hooks/useViewState.ts)
 Centralized persistent state for HistoryPage analysis view. Replaces scattered state hooks (previously useHistoryFilters, useMultiSelect as primary state).
 
@@ -171,7 +199,14 @@ src/
 │   ├── stats.ts
 │   └── export.ts    # CSV
 ├── utils/
+│   ├── globalSettings.ts      # Global metric/threshold configuration (localStorage)
+│   ├── sessionMetrics.ts      # FSM state classification, segmentation, metrics computation
+│   ├── smoothing.ts           # Moving average & slope calculation
 │   ├── timeFormatting.ts
 │   └── histogram.ts
+├── pages/
+│   └── SettingsPage.tsx       # Global metric & threshold UI
+├── theme.ts                   # Centralized color palette
+├── config.ts                  # Vite base URL export
 └── types.ts
 ```

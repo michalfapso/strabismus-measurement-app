@@ -14,11 +14,13 @@ import { THEME } from '../theme';
 | Background | `rgba(10, 10, 10, 0.98)` |
 | Background light (panels) | `rgba(20, 20, 20, 0.8)` |
 | Primary text | `#fff` |
-| Secondary text | `#888` |
+| Secondary text | `#aaa` |
 | Muted text | `rgba(255, 255, 255, 0.5)` |
 | Primary border | `rgba(255,255,255,0.1)` |
 | Secondary border | `rgba(255,255,255,0.05)` |
 | Primary accent | `#00ff00` (green) — active states, buttons |
+
+**⚠️ Contrast:** Do not use `#888` for secondary text on dark backgrounds — insufficient contrast for WCAG A. Use `#aaa` or lighter.
 
 ## Metric Colors
 
@@ -28,6 +30,18 @@ import { THEME } from '../theme';
 | X position | `#FF00FF` magenta |
 | Y position | `#FF9500` orange |
 | Rotation | `#FFC107` gold |
+
+## State Segmentation Colors
+
+Used in TimeSeriesSegmentationGraph and segmentation strip to visualize FSM state classification:
+
+| State | Color | Label |
+|-------|-------|-------|
+| FUSION | `#4CAF50` green | Fusion |
+| NEAR_FUSION | `#8BC34A` light green | Near Fusion |
+| APPROACHING | `#FF9800` orange | Approaching |
+| STABLE_DEVIATION | `#FFEB3B` yellow | Stable Deviation |
+| DRIFTING | `#F44336` red | Drifting |
 
 ## Data Visualization
 
