@@ -127,7 +127,7 @@ describe('FSM State Classification', () => {
     expect(states[0].state).toBe('FUSION');
   });
 
-  it('filters segments shorter than 0.5s', () => {
+  it('filters segments shorter than 0.25s (MIN_SEGMENT_DURATION)', () => {
     const timeSeries: TimeSeries[] = [
       { t: 0, x: 0.2, y: 0, r: 0 },
       { t: 100, x: 0.3, y: 0, r: 0 },
@@ -135,7 +135,58 @@ describe('FSM State Classification', () => {
       { t: 2000, x: 1.5, y: 0, r: 0 },
     ];
     const states = classifyStates(timeSeries, 0.5, 'deviation', 11);
-    expect(states.every(s => s.duration >= 0.5)).toBe(true);
+    // All returned segments should be >= 0.25s (after stretching and merging)
+    expect(states.every(s => s.duration >= 0.25)).toBe(true);
+  });
+
+  it('stretches neighboring segments to fill gaps from filtered short segments', () => {
+    // Create a scenario: FUSION state (0.5s) -> SHORT UNSTABLE (0.1s, filtered) -> STABLE (0.5s)
+    // Expected: After stretching and merging, we get segments without gaps
+    const timeSeries: TimeSeries[] = [
+      // 0-0.5s: below threshold (FUSION)
+      { t: 0, x: 0.1, y: 0, r: 0 },
+      { t: 500, x: 0.15, y: 0, r: 0 },
+      // 0.5-0.6s: above threshold (STABLE_DEVIATION or DRIFTING) - very short, will be filtered
+      { t: 500, x: 1.5, y: 0, r: 0 },
+      { t: 600, x: 1.4, y: 0, r: 0 },
+      // 0.6-1.1s: back below threshold (FUSION)
+      { t: 600, x: 0.2, y: 0, r: 0 },
+      { t: 1100, x: 0.18, y: 0, r: 0 },
+    ];
+    const states = classifyStates(timeSeries, 0.5, 'deviation', 11);
+
+    // After stretching, segments should span the entire duration with no gaps
+    const totalDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+    const coveredDuration = states.reduce((sum, seg) => sum + seg.duration, 0);
+    expect(coveredDuration).toBeCloseTo(totalDuration, 2);
+  });
+
+  it('merges consecutive segments with the same state after stretching', () => {
+    // Create a scenario where stretching causes adjacent segments of same type to meet
+    // FUSION (0.5s) -> SHORT UNSTABLE (0.1s, filtered) -> FUSION (0.5s)
+    // Expected: After stretching and merging, we get 1 FUSION segment, not 2
+    const timeSeries: TimeSeries[] = [
+      // 0-0.5s: below threshold (FUSION)
+      { t: 0, x: 0.1, y: 0, r: 0 },
+      { t: 100, x: 0.15, y: 0, r: 0 },
+      { t: 200, x: 0.2, y: 0, r: 0 },
+      { t: 300, x: 0.12, y: 0, r: 0 },
+      { t: 500, x: 0.18, y: 0, r: 0 },
+      // 0.5-0.6s: above threshold, short duration (will be filtered)
+      { t: 500, x: 1.5, y: 0, r: 0 },
+      { t: 600, x: 1.4, y: 0, r: 0 },
+      // 0.6-1.1s: back below threshold (FUSION)
+      { t: 600, x: 0.2, y: 0, r: 0 },
+      { t: 700, x: 0.15, y: 0, r: 0 },
+      { t: 800, x: 0.22, y: 0, r: 0 },
+      { t: 1100, x: 0.19, y: 0, r: 0 },
+    ];
+    const states = classifyStates(timeSeries, 0.5, 'deviation', 11);
+
+    // Find FUSION segments - after merging, there should be only one continuous FUSION segment
+    const fusionSegments = states.filter(s => s.state === 'FUSION');
+    expect(fusionSegments.length).toBe(1);
+    expect(fusionSegments[0].duration).toBeCloseTo(1.1, 1);
   });
 });
 
