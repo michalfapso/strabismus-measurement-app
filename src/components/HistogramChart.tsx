@@ -184,9 +184,9 @@ export function aggregateHistogramData(
 
 /**
  * Custom tooltip component for histogram displays (bar chart and box plot)
- * Renders with consistent font sizing and smart positioning
+ * Renders with consistent font sizing
  */
-function HistogramTooltip({
+export function HistogramTooltip({
   active,
   payload,
   label,
@@ -194,22 +194,29 @@ function HistogramTooltip({
   active?: boolean;
   payload?: Array<{
     name: string;
-    value: number;
-    payload: { coverage?: number; count?: number; totalMeasurements?: number };
+    value?: number;
+    payload: {
+      coverage?: number;
+      count?: number;
+      totalMeasurements?: number;
+    };
   }>;
   label?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  const data = payload[0]?.payload;
-  if (!data) return null;
+  const binData = payload[0]?.payload;
+  if (!binData) return null;
 
   // Check if this is box plot data (has coverage field) or bar chart data
-  const isBoxPlot = data.coverage !== undefined;
+  const isBoxPlot = binData.coverage !== undefined;
 
   if (isBoxPlot) {
     // Box plot tooltip
-    const { coverage = 0, count = 0, totalMeasurements = 0 } = data;
+    if (binData.coverage === undefined || binData.count === undefined || binData.totalMeasurements === undefined) {
+      return null;
+    }
+    const { coverage, count, totalMeasurements } = binData;
     return (
       <div
         css={css`
@@ -230,6 +237,7 @@ function HistogramTooltip({
   } else {
     // Bar chart tooltip
     const duration = payload[0]?.value;
+    if (typeof duration !== 'number') return null;
     return (
       <div
         css={css`
@@ -243,7 +251,7 @@ function HistogramTooltip({
           {label}
         </p>
         <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
-          duration: {(duration as number).toFixed(2)}s
+          duration: {duration.toFixed(2)}s
         </p>
       </div>
     );
