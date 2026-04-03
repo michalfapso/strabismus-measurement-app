@@ -191,21 +191,26 @@ const HistogramTooltipWrapper = memo(function HistogramTooltipWrapper(props: any
   const [position, setPosition] = React.useState<'left' | 'right'>('right');
 
   React.useEffect(() => {
-    if (wrapperRef.current) {
-      const rect = wrapperRef.current.getBoundingClientRect();
-      const chartContainer = wrapperRef.current.closest('[class*="recharts"]')?.parentElement;
+    if (!wrapperRef.current) return;
 
-      if (chartContainer) {
-        const containerRect = chartContainer.getBoundingClientRect();
-        // If tooltip right edge is within 50px of container right edge, position left
-        if (rect.right > containerRect.right - 50) {
-          setPosition('left');
-        } else {
-          setPosition('right');
-        }
-      }
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const chartContainer = wrapperRef.current.closest('[class*="recharts"]')?.parentElement;
+
+    if (!chartContainer) {
+      setPosition('right');
+      return;
     }
-  });
+
+    const containerRect = chartContainer.getBoundingClientRect();
+    const tooltipWidth = rect.width || 150; // estimate if width not ready
+    const requiredSpace = tooltipWidth + 50; // 50px margin buffer
+
+    if (rect.right + requiredSpace > containerRect.right) {
+      setPosition('left');
+    } else {
+      setPosition('right');
+    }
+  }, [wrapperRef]);
 
   const positionStyle = position === 'right'
     ? css`margin-left: 12px;`
