@@ -258,45 +258,6 @@ export function HistogramTooltip({
   }
 }
 
-/**
- * Custom tooltip component for box plot displays
- * Shows coverage percentage and measurement count
- */
-function BoxPlotTooltip({ active, payload }: {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    payload: {
-      coverage: number;
-      count: number;
-      totalMeasurements: number;
-    };
-  }>;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const { coverage, count, totalMeasurements } = payload[0]?.payload || {};
-
-  return (
-    <div
-      css={css`
-        background-color: rgba(0, 0, 0, 0.8);
-        padding: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-      `}
-    >
-      <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
-        {coverage.toFixed(0)}% of measurements
-      </p>
-      <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
-        n={count} of {totalMeasurements}
-      </p>
-    </div>
-  );
-}
-
 export interface HistogramChartProps {
   sessions: Session[];
   isSingleSession: boolean;
@@ -705,8 +666,8 @@ function renderAggregateBoxPlots(
         />
 
         <Tooltip
-          content={<BoxPlotTooltip />}
-          cursor={{ fill: 'rgba(255, 255, 255, 0.3)' }}
+          content={<HistogramTooltip />}
+          cursor={{ fill: 'rgba(255, 255, 255, 0.08)' }}
         />
       </ComposedChart>
     </ResponsiveContainer>
