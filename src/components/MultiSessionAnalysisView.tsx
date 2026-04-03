@@ -1,38 +1,332 @@
 import { Session } from '../types';
-import { SessionMetrics } from '../types/analysis';
+import { SessionMetrics, ProgressInsight, ExerciseInsight, SessionQualityInsight, MilestoneInsight } from '../types/analysis';
 import { computeSessionMetrics } from '../utils/sessionMetrics';
 import { calculateProgressInsight, calculateExerciseInsights, calculateSessionQualityInsight, calculateMilestoneInsight, calculateRecommendationInsight } from '../utils/analysisInsights';
+import { getGlobalSettings } from '../utils/globalSettings';
+import { AnalysisMetricsBanner } from './AnalysisMetricsBanner';
 import { css } from '@emotion/react';
-import { useState } from 'react';
 import { THEME } from '../theme';
 
-interface AnalysisConfig {
-  metrics: ('deviation' | 'rotation')[];
-  thresholds: { deviation: number; rotation: number };
-  sustainedDays: number;
-}
+// Analysis only supports deviation and rotation metrics
+type AnalysisMetric = 'deviation' | 'rotation';
 
 interface MultiSessionAnalysisViewProps {
   sessions: Session[];
-  config: AnalysisConfig;
-  onConfigChange: (config: AnalysisConfig) => void;
 }
 
-export default function MultiSessionAnalysisView({
-  sessions,
-  config,
-  onConfigChange,
-}: MultiSessionAnalysisViewProps) {
-  // Compute session metrics for all sessions
+const SUSTAINED_FUSION_DAYS = 7;
+
+const panelStyle = css`
+  border: 1px solid ${THEME.borderPrimary};
+  border-radius: 4px;
+  padding: 16px;
+  background-color: ${THEME.panelBg};
+`;
+
+const sectionTitleStyle = css`
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: ${THEME.textPrimary};
+  font-size: 15px;
+`;
+
+const metricGroupStyle = css`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const metricGroupHeaderStyle = css`
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid ${THEME.accentGreen};
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: ${THEME.textPrimary};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const subSectionStyle = css`
+  border: 1px solid ${THEME.borderSecondary};
+  border-radius: 4px;
+  padding: 14px;
+  background-color: ${THEME.panelBg};
+`;
+
+const subSectionTitleStyle = css`
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: ${THEME.textSecondary};
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+`;
+
+const labelStyle = css`
+  font-size: 13px;
+  color: ${THEME.textSecondary};
+  margin: 0;
+  line-height: 1.6;
+`;
+
+const tableStyle = css`
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+
+  th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid ${THEME.borderSecondary};
+    color: ${THEME.textSecondary};
+  }
+
+  th {
+    font-weight: 600;
+    background-color: ${THEME.backgroundLight};
+    color: ${THEME.textPrimary};
+  }
+`;
+
+const progressBarContainerStyle = css`
+  margin-top: 8px;
+  background-color: ${THEME.backgroundLight};
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+`;
+
+function ProgressBar({ percent }: { percent: number }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <div css={progressBarContainerStyle}>
+      <div css={css`
+        height: 100%;
+        width: ${clamped}%;
+        background-color: ${THEME.accentGreen};
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      `} />
+    </div>
+  );
+}
+
+function ProgressSection({ insight }: { insight: ProgressInsight }) {
+  return (
+    <div css={subSectionStyle}>
+      <h4 css={subSectionTitleStyle}>A — Progress</h4>
+      <p css={labelStyle}>
+        Fusion streak trend:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.fusionStreakTrend.direction}</strong>{' '}
+        (slope: {insight.fusionStreakTrend.slope.toFixed(2)} s/week,{' '}
+        p={insight.fusionStreakTrend.significance.p.toFixed(3)}
+        {insight.fusionStreakTrend.significance.significant ? ' *' : ''})
+        <br />
+        Min value trend:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.minValueTrend.direction}</strong>{' '}
+        (slope: {insight.minValueTrend.slope.toFixed(3)}/week,{' '}
+        p={insight.minValueTrend.significance.p.toFixed(3)}
+        {insight.minValueTrend.significance.significant ? ' *' : ''})
+        <br />
+        Start value: {insight.minValueTrend.startValue.toFixed(2)}{' '}
+        → Current: {insight.minValueTrend.currentValue.toFixed(2)}
+        <br />
+        Fusion achieved in{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>
+          {insight.fusionAchievedCount}/{insight.totalSessions}
+        </strong>{' '}
+        sessions ({insight.fusionAchievedRate.toFixed(0)}%)
+      </p>
+    </div>
+  );
+}
+
+function ExerciseEffectivenessSection({ insights }: { insights: ExerciseInsight[] }) {
+  if (insights.length === 0) return null;
+  return (
+    <div css={subSectionStyle}>
+      <h4 css={subSectionTitleStyle}>B — Exercise Effectiveness</h4>
+      <table css={tableStyle}>
+        <thead>
+          <tr>
+            <th>Exercise</th>
+            <th>Sessions</th>
+            <th>Fusion Rate</th>
+            <th>Median Streak</th>
+            <th>Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          {insights
+            .slice()
+            .sort((a, b) => b.fusionAchievedRate - a.fusionAchievedRate)
+            .map((insight, i) => (
+              <tr key={i}>
+                <td>{insight.exerciseTag}</td>
+                <td>{insight.sessionCount}</td>
+                <td>{insight.fusionAchievedRate.toFixed(0)}%</td>
+                <td>{insight.medianLongestStreak.toFixed(1)}s</td>
+                <td>{insight.trendDirection}</td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SessionQualitySection({ insight }: { insight: SessionQualityInsight }) {
+  return (
+    <div css={subSectionStyle}>
+      <h4 css={subSectionTitleStyle}>C — Session Quality</h4>
+      <p css={labelStyle}>
+        Variability:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.variability.level}</strong>{' '}
+        (streak range: {insight.variability.streakRange.min.toFixed(1)}s –{' '}
+        {insight.variability.streakRange.max.toFixed(1)}s)
+      </p>
+      {insight.outliers.length > 0 ? (
+        <>
+          <p css={css`${labelStyle}; margin-top: 8px; margin-bottom: 6px;`}>
+            Outlier sessions ({insight.outliers.length}):
+          </p>
+          <table css={tableStyle}>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Exercise</th>
+                <th>Direction</th>
+                <th>Z-Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {insight.outliers.map((o, i) => (
+                <tr key={i}>
+                  <td>{o.date}</td>
+                  <td>{o.exerciseTag}</td>
+                  <td>{o.direction === 'unusually_good' ? 'Unusually good' : 'Unusually poor'}</td>
+                  <td>{o.zScore.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <p css={labelStyle}>No significant outliers detected.</p>
+      )}
+    </div>
+  );
+}
+
+function MilestonesSection({ insight, metricUnit }: { insight: MilestoneInsight; metricUnit: string }) {
+  return (
+    <div css={subSectionStyle}>
+      <h4 css={subSectionTitleStyle}>D — Milestones</h4>
+
+      {/* Min value progress bar */}
+      <p css={labelStyle}>
+        Min value progress toward threshold ({insight.minValueProgress.targetThreshold} {metricUnit}):
+      </p>
+      <ProgressBar percent={insight.minValueProgress.progressPercent} />
+      <p css={css`${labelStyle}; margin-top: 6px;`}>
+        {insight.minValueProgress.progressPercent.toFixed(0)}% —{' '}
+        {insight.minValueProgress.currentValue.toFixed(2)} {metricUnit}{' '}
+        (started at {insight.minValueProgress.startValue.toFixed(2)} {metricUnit})
+      </p>
+
+      {/* Sustained fusion events */}
+      <p css={css`${labelStyle}; margin-top: 10px;`}>
+        Sustained fusion events (≥{SUSTAINED_FUSION_DAYS} consecutive days with fusion):{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.sustainedFusionEvents.length}</strong>
+      </p>
+      {insight.sustainedFusionEvents.length > 0 && (
+        <ul css={css`margin: 4px 0 0 0; padding-left: 18px; font-size: 13px; color: ${THEME.textSecondary};`}>
+          {insight.sustainedFusionEvents.map((e, i) => (
+            <li key={i}>{e.startDate} → {e.endDate} ({e.durationDays} days)</li>
+          ))}
+        </ul>
+      )}
+
+      {/* Readiness indicators */}
+      <p css={css`${labelStyle}; margin-top: 10px; margin-bottom: 6px;`}>Readiness indicators:</p>
+      <ul css={css`margin: 0; padding-left: 18px; font-size: 13px; color: ${THEME.textSecondary};`}>
+        {insight.readinessIndicators.map((r, i) => (
+          <li key={i} css={css`color: ${r.met ? THEME.accentGreen : THEME.textSecondary};`}>
+            {r.type === 'sustained_fusion' && `Sustained fusion: ${r.value} event(s)`}
+            {r.type === 'min_value_approaching_threshold' && `Min value progress: ${r.value.toFixed(0)}%`}
+            {r.type === 'high_fusion_rate' && `High fusion rate: ${r.value.toFixed(0)}%`}
+            {r.met ? ' ✓' : ''}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function MetricGroup({
+  metric,
+  sessionMetrics,
+  thresholds,
+}: {
+  metric: AnalysisMetric;
+  sessionMetrics: SessionMetrics[];
+  thresholds: { deviation: number; rotation: number };
+}) {
+  const metricSessionMetrics = sessionMetrics.filter(m => m.metric === metric);
+  if (metricSessionMetrics.length === 0) return null;
+
+  const progressInsight = calculateProgressInsight(metricSessionMetrics, thresholds);
+  const exerciseInsights = calculateExerciseInsights(metricSessionMetrics);
+  const qualityInsight = calculateSessionQualityInsight(metricSessionMetrics);
+  const milestoneInsight = calculateMilestoneInsight(metricSessionMetrics, thresholds, SUSTAINED_FUSION_DAYS);
+
+  const metricLabel = metric === 'deviation' ? 'Deviation' : 'Rotation';
+  const metricUnit = metric === 'rotation' ? '°' : 'cm';
+
+  return (
+    <div css={panelStyle}>
+      <div css={metricGroupHeaderStyle}>{metricLabel}</div>
+      <div css={css`${metricGroupStyle}; margin-top: 12px;`}>
+        <ProgressSection insight={progressInsight} />
+        <ExerciseEffectivenessSection insights={exerciseInsights} />
+        <SessionQualitySection insight={qualityInsight} />
+        <MilestonesSection insight={milestoneInsight} metricUnit={metricUnit} />
+      </div>
+    </div>
+  );
+}
+
+export default function MultiSessionAnalysisView({ sessions }: MultiSessionAnalysisViewProps) {
+  const settings = getGlobalSettings();
+  const { selectedMetrics, thresholds } = settings;
+
+  // Filter to only metrics supported by the analysis pipeline
+  const analysisMetrics = selectedMetrics.filter(
+    (m): m is AnalysisMetric => m === 'deviation' || m === 'rotation'
+  );
+
+  // Normalize thresholds for insight functions (which expect deviation + rotation)
+  const normalizedThresholds = {
+    deviation: thresholds.deviation ?? 1.0,
+    rotation: thresholds.rotation ?? 1.0,
+  };
+
+  // Compute session metrics for all sessions × all selected analysis metrics
   const sessionMetrics = sessions
     .filter(s => {
-      const duration = s.timeSeries.length > 1 ? (s.timeSeries[s.timeSeries.length - 1].t - s.timeSeries[0].t) / 1000 : 0;
+      const duration =
+        s.timeSeries.length > 1
+          ? (s.timeSeries[s.timeSeries.length - 1].t - s.timeSeries[0].t) / 1000
+          : 0;
       return duration >= 10;
     })
     .flatMap(session =>
-      config.metrics.map(metric => {
+      analysisMetrics.map(metric => {
         try {
-          return computeSessionMetrics(session, config.thresholds, metric);
+          return computeSessionMetrics(session, normalizedThresholds, metric);
         } catch {
           return null;
         }
@@ -40,34 +334,35 @@ export default function MultiSessionAnalysisView({
     )
     .filter((m): m is SessionMetrics => m !== null);
 
+  // Date range for header (use timestamp, format as YYYY-MM-DD)
+  const dates = sessions
+    .map(s => s.timestamp.slice(0, 10))
+    .sort();
+  const dateFrom = dates[0] ?? '';
+  const dateTo = dates[dates.length - 1] ?? '';
+  const dateRange = dateFrom === dateTo ? dateFrom : `${dateFrom} – ${dateTo}`;
+
+  // Cross-metric recommendations (based on all exercise insights combined)
+  const allExerciseInsights = calculateExerciseInsights(sessionMetrics);
+  const recommendations = calculateRecommendationInsight(allExerciseInsights);
+
   if (sessionMetrics.length === 0) {
     return (
-      <div css={css`padding: 16px; color: ${THEME.textSecondary};`}>
-        No valid sessions for analysis (minimum 10 seconds each).
+      <div css={css`
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px;
+        overflow-y: auto;
+        flex: 1;
+      `}>
+        <AnalysisMetricsBanner mode="multi" />
+        <div css={css`padding: 16px; color: ${THEME.textSecondary};`}>
+          No valid sessions for analysis (minimum 10 seconds each).
+        </div>
       </div>
     );
   }
-
-  // Calculate insights
-  const progressInsights = config.metrics.map(metric =>
-    calculateProgressInsight(
-      sessionMetrics.filter(m => m.metric === metric),
-      config.thresholds
-    )
-  );
-
-  const exerciseInsights = calculateExerciseInsights(sessionMetrics);
-  const qualityInsights = config.metrics.map(metric =>
-    calculateSessionQualityInsight(sessionMetrics.filter(m => m.metric === metric))
-  );
-  const milestoneInsights = config.metrics.map(metric =>
-    calculateMilestoneInsight(
-      sessionMetrics.filter(m => m.metric === metric),
-      config.thresholds,
-      config.sustainedDays
-    )
-  );
-  const recommendations = calculateRecommendationInsight(exerciseInsights);
 
   return (
     <div css={css`
@@ -78,162 +373,64 @@ export default function MultiSessionAnalysisView({
       overflow-y: auto;
       flex: 1;
     `}>
-      {/* Config Panel */}
-      <div css={css`
-        border: 1px solid ${THEME.borderPrimary};
-        border-radius: 4px;
-        padding: 16px;
-        background-color: ${THEME.panelBg};
-      `}>
-        <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Analysis Configuration</h3>
-
-        <div css={css`margin-bottom: 12px;`}>
-          <label css={css`display: block; margin-bottom: 8px; font-weight: 500; color: ${THEME.textPrimary};`}>
-            Metrics:
-          </label>
-          <div css={css`display: flex; gap: 12px;`}>
-            {['deviation', 'rotation'].map(metric => (
-              <label key={metric} css={css`display: flex; align-items: center; gap: 6px;`}>
-                <input
-                  type="checkbox"
-                  checked={config.metrics.includes(metric as any)}
-                  onChange={e => {
-                    const newMetrics = e.target.checked
-                      ? [...config.metrics, metric as any]
-                      : config.metrics.filter(m => m !== metric);
-                    onConfigChange({ ...config, metrics: newMetrics });
-                  }}
-                />
-                <span css={css`color: ${THEME.textPrimary};`}>{metric === 'deviation' ? 'Deviation' : 'Rotation'}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div css={css`display: grid; grid-template-columns: 1fr 1fr; gap: 12px;`}>
-          <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
-              Deviation threshold (cm)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              value={config.thresholds.deviation}
-              onChange={e =>
-                onConfigChange({
-                  ...config,
-                  thresholds: { ...config.thresholds, deviation: parseFloat(e.target.value) || 0.5 },
-                })
-              }
-              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
-            />
-          </div>
-
-          <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
-              Rotation threshold (°)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              value={config.thresholds.rotation}
-              onChange={e =>
-                onConfigChange({
-                  ...config,
-                  thresholds: { ...config.thresholds, rotation: parseFloat(e.target.value) || 1 },
-                })
-              }
-              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
-            />
-          </div>
-
-          <div>
-            <label css={css`display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: ${THEME.textPrimary};`}>
-              Sustained days
-            </label>
-            <input
-              type="number"
-              value={config.sustainedDays}
-              onChange={e =>
-                onConfigChange({
-                  ...config,
-                  sustainedDays: parseInt(e.target.value, 10) || 7,
-                })
-              }
-              css={css`width: 100%; padding: 6px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.backgroundLight}; color: ${THEME.textPrimary};`}
-            />
-          </div>
-        </div>
+      {/* Header */}
+      <div>
+        <h2 css={css`margin: 0 0 4px 0; color: ${THEME.textPrimary}; font-size: 18px;`}>
+          Analysis: {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+        </h2>
+        {dateRange && (
+          <p css={css`margin: 0; font-size: 13px; color: ${THEME.textSecondary};`}>{dateRange}</p>
+        )}
       </div>
 
-      {/* Progress Section */}
-      {progressInsights.map((insight, i) => (
-        <div
-          key={`progress-${i}`}
-          css={css`
-            border: 1px solid ${THEME.borderPrimary};
-            border-radius: 4px;
-            padding: 16px;
-            background-color: ${THEME.panelBg};
-          `}
-        >
-          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Progress ({insight.metric})</h3>
-          <p css={css`margin: 0; font-size: 13px; color: ${THEME.textSecondary};`}>
-            Fusion streak trend: {insight.fusionStreakTrend.direction} (slope: {insight.fusionStreakTrend.slope.toFixed(2)} s/week, p={insight.fusionStreakTrend.significance.p.toFixed(3)})<br />
-            Fusion achieved in {insight.fusionAchievedCount}/{insight.totalSessions} sessions ({insight.fusionAchievedRate.toFixed(0)}%)
-          </p>
+      {/* Metric Settings Banner */}
+      <AnalysisMetricsBanner mode="multi" />
+
+      {/* Metric sections (A–D per metric) */}
+      {analysisMetrics.length === 0 ? (
+        <div css={css`padding: 12px; color: ${THEME.textSecondary}; font-size: 13px;`}>
+          No supported analysis metrics selected. Go to Settings and select Deviation or Rotation.
         </div>
-      ))}
-
-      {/* Exercise Effectiveness */}
-      {exerciseInsights.length > 0 && (
-        <div css={css`border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; padding: 16px; background-color: ${THEME.panelBg};`}>
-          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Exercise Effectiveness</h3>
-          <table css={css`
-            width: 100%;
-            font-size: 13px;
-            border-collapse: collapse;
-
-            th, td {
-              padding: 8px;
-              text-align: left;
-              border-bottom: 1px solid ${THEME.borderSecondary};
-              color: ${THEME.textSecondary};
-            }
-
-            th {
-              font-weight: 600;
-              background-color: ${THEME.backgroundLight};
-              color: ${THEME.textPrimary};
-            }
-          `}>
-            <thead>
-              <tr>
-                <th>Exercise</th>
-                <th>Sessions</th>
-                <th>Fusion Rate</th>
-                <th>Median Streak</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exerciseInsights.map((insight, i) => (
-                <tr key={i}>
-                  <td>{insight.exerciseTag}</td>
-                  <td>{insight.sessionCount}</td>
-                  <td>{insight.fusionAchievedRate.toFixed(0)}%</td>
-                  <td>{insight.medianLongestStreak.toFixed(1)}s</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : (
+        analysisMetrics.map(metric => (
+          <MetricGroup
+            key={metric}
+            metric={metric}
+            sessionMetrics={sessionMetrics}
+            thresholds={normalizedThresholds}
+          />
+        ))
       )}
 
-      {/* Recommendations */}
+      {/* Section E: Recommendations (cross-metric, shown once) */}
       {recommendations.generalNotes.length > 0 && (
-        <div css={css`border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; padding: 16px; background-color: ${THEME.panelBg};`}>
-          <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Recommendations</h3>
-          <ul css={css`margin: 0; padding-left: 20px; font-size: 13px; color: ${THEME.textSecondary};`}>
+        <div css={panelStyle}>
+          <h3 css={sectionTitleStyle}>E — Recommendations</h3>
+          {recommendations.prioritize.length > 0 && (
+            <div css={css`margin-bottom: 10px;`}>
+              <p css={css`margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: ${THEME.textPrimary};`}>
+                Prioritize:
+              </p>
+              <ul css={css`margin: 0; padding-left: 18px; font-size: 13px; color: ${THEME.textSecondary};`}>
+                {recommendations.prioritize.map((r, i) => (
+                  <li key={i}><strong>{r.exerciseTag}</strong> — {r.reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {recommendations.reduce.length > 0 && (
+            <div css={css`margin-bottom: 10px;`}>
+              <p css={css`margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: ${THEME.textPrimary};`}>
+                Consider reducing:
+              </p>
+              <ul css={css`margin: 0; padding-left: 18px; font-size: 13px; color: ${THEME.textSecondary};`}>
+                {recommendations.reduce.map((r, i) => (
+                  <li key={i}><strong>{r.exerciseTag}</strong> — {r.reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <ul css={css`margin: 0; padding-left: 18px; font-size: 13px; color: ${THEME.textSecondary};`}>
             {recommendations.generalNotes.map((note, i) => (
               <li key={i}>{note}</li>
             ))}

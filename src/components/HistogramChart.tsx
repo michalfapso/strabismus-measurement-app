@@ -225,6 +225,8 @@ export interface HistogramChartProps {
   sessions: Session[];
   isSingleSession: boolean;
   viewState?: ReturnType<typeof useViewState>;
+  /** When provided in single-session mode, overrides the default 'deviation' metric */
+  metric?: HistogramMetric;
 }
 
 // Metric colors matching TimeSeriesGraph
@@ -787,14 +789,15 @@ const HistogramBar = memo(function HistogramBar({
   );
 });
 
-export function HistogramChart({ sessions, isSingleSession, viewState: passedViewState }: HistogramChartProps) {
+export function HistogramChart({ sessions, isSingleSession, viewState: passedViewState, metric: metricOverride }: HistogramChartProps) {
   // Use passed viewState if provided (from UnifiedSessionPanel), otherwise create our own
   const defaultViewState = useViewState();
   const { state, toggleHistogramMetric, toggleHistogramDisplayMode } = passedViewState || defaultViewState;
 
-  // For single session, always show deviation; for aggregate, use selected metrics from state
+  // For single session, use metricOverride if provided, otherwise default to deviation
+  // For aggregate, use selected metrics from state
   const metricsToShow: HistogramMetric[] = isSingleSession
-    ? ['deviation']
+    ? [metricOverride ?? 'deviation']
     : Array.from(state.histogramMetrics) as HistogramMetric[];
 
   // Determine display mode for histogram calculation

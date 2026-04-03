@@ -12,7 +12,7 @@ import SingleSessionView from './SingleSessionView';
 import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
 import { computeSessionMetrics } from '../utils/sessionMetrics';
-import { getAnalysisSettings } from '../utils/analysisSettings';
+import { getGlobalSettings } from '../utils/globalSettings';
 
 export interface HistoryPageProps {}
 
@@ -21,18 +21,6 @@ export function HistoryPage({}: HistoryPageProps) {
   const location = useLocation();
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [analysisConfig, setAnalysisConfig] = useState<{
-    metrics: ('deviation' | 'rotation')[];
-    thresholds: { deviation: number; rotation: number };
-    sustainedDays: number;
-  }>(() => {
-    const settings = getAnalysisSettings();
-    return {
-      metrics: ['deviation'],
-      thresholds: settings.goal.thresholds,
-      sustainedDays: settings.goal.sustainedDays,
-    };
-  });
 
   const {
     state,
@@ -295,10 +283,18 @@ export function HistoryPage({}: HistoryPageProps) {
           {selectedCount === 1 && selectedSessions.length > 0 && (
             (() => {
               try {
+                const globalSettings = getGlobalSettings();
+                const primaryMetric = (globalSettings.selectedMetrics.find(
+                  m => m === 'deviation' || m === 'rotation'
+                ) ?? 'deviation') as 'deviation' | 'rotation';
+                const thresholds = {
+                  deviation: globalSettings.thresholds.deviation ?? 1.0,
+                  rotation: globalSettings.thresholds.rotation ?? 1.0,
+                };
                 const metrics = computeSessionMetrics(
                   selectedSessions[0],
-                  analysisConfig.thresholds,
-                  analysisConfig.metrics[0]
+                  thresholds,
+                  primaryMetric
                 );
                 return (
                   <SingleSessionView
@@ -319,8 +315,6 @@ export function HistoryPage({}: HistoryPageProps) {
           {selectedCount > 1 && (
             <MultiSessionAnalysisView
               sessions={selectedSessions}
-              config={analysisConfig}
-              onConfigChange={(config) => setAnalysisConfig(config)}
             />
           )}
 
