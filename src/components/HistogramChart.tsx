@@ -183,6 +183,74 @@ export function aggregateHistogramData(
 }
 
 /**
+ * Custom tooltip component for histogram displays (bar chart and box plot)
+ * Renders with consistent font sizing and smart positioning
+ */
+function HistogramTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { coverage?: number; count?: number; totalMeasurements?: number };
+  }>;
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  // Check if this is box plot data (has coverage field) or bar chart data
+  const isBoxPlot = data.coverage !== undefined;
+
+  if (isBoxPlot) {
+    // Box plot tooltip
+    const { coverage = 0, count = 0, totalMeasurements = 0 } = data;
+    return (
+      <div
+        css={css`
+          background-color: rgba(0, 0, 0, 0.8);
+          padding: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        `}
+      >
+        <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
+          {coverage.toFixed(0)}% of measurements
+        </p>
+        <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
+          n={count} of {totalMeasurements}
+        </p>
+      </div>
+    );
+  } else {
+    // Bar chart tooltip
+    const duration = payload[0]?.value;
+    return (
+      <div
+        css={css`
+          background-color: rgba(0, 0, 0, 0.8);
+          padding: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        `}
+      >
+        <p css={css`margin: 0; color: #fff; font-size: 12px;`}>
+          {label}
+        </p>
+        <p css={css`margin: 4px 0 0 0; color: #ccc; font-size: 11px;`}>
+          duration: {(duration as number).toFixed(2)}s
+        </p>
+      </div>
+    );
+  }
+}
+
+/**
  * Custom tooltip component for box plot displays
  * Shows coverage percentage and measurement count
  */
