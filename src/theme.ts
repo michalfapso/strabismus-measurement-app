@@ -10,7 +10,7 @@ export const THEME = {
 
   // Text Colors
   textPrimary: '#fff',
-  textSecondary: '#888',
+  textSecondary: '#aaa',
   textMuted: 'rgba(255, 255, 255, 0.5)',
 
   // Borders & Dividers

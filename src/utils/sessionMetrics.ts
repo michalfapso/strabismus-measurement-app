@@ -172,6 +172,17 @@ export function classifyStates(
     }
   }
 
+  console.log(`classifyStates: metric=${metric}, threshold=${threshold}`);
+  console.log(`Raw values: ${rawValues.length} points, range [${Math.min(...rawValues).toFixed(3)}, ${Math.max(...rawValues).toFixed(3)}]`);
+  console.log(`Classified states (first 20):`, classifications.slice(0, 20), '...');
+  console.log(`Segments created: ${segments.length}`, segments.map(s => ({ state: s.state, duration: s.duration.toFixed(2), startTime: s.startTime.toFixed(2), endTime: s.endTime.toFixed(2) })));
+
+  // Check for gaps between segments
+  const totalDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+  let coveredTime = 0;
+  segments.forEach(s => { coveredTime += s.duration; });
+  console.log(`Total session duration: ${totalDuration.toFixed(2)}s, covered by segments: ${coveredTime.toFixed(2)}s, uncovered: ${(totalDuration - coveredTime).toFixed(2)}s`);
+
   return segments;
 }
 

@@ -78,7 +78,7 @@ export function StatCards({ positionRange, rotationRange, duration, meanDeviatio
       <div style={cardStyle}>
         <div style={labelStyle}>Mean Deviation</div>
         <div style={valueStyle}>{meanDeviation.toFixed(2)} cm</div>
-        <div style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>from center</div>
+        <div style={{ fontSize: '12px', color: '#aaa', marginTop: '8px' }}>from center</div>
       </div>
     </div>
   );

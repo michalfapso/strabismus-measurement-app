@@ -221,7 +221,8 @@ export function HistoryPage({}: HistoryPageProps) {
       }}>
         {/* List side */}
         <div style={{
-          width: '300px',
+          width: 'fit-content',
+          minWidth: '300px',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -234,7 +235,7 @@ export function HistoryPage({}: HistoryPageProps) {
               alignItems: 'center',
               justifyContent: 'center',
               flex: 1,
-              color: '#888',
+              color: '#ddd',
             }}>
               Loading sessions...
             </div>

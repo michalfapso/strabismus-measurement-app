@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 import { GlobalSettings, getGlobalSettings, setGlobalSettings } from '../utils/globalSettings';
@@ -30,32 +29,6 @@ const titleStyle = css`
   margin: 0;
 `;
 
-const toolbarStyle = css`
-  display: flex;
-  gap: 12px;
-  align-items: center;
-`;
-
-const buttonStyle = css`
-  padding: 8px 16px;
-  font-size: 13px;
-  background: rgba(10, 10, 10, 0.82);
-  color: ${THEME.accentCyan};
-  border: 1px solid ${THEME.accentCyan};
-  border-radius: 4px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  white-space: nowrap;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: rgba(0, 255, 255, 0.12);
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-`;
 
 const sectionStyle = css`
   display: flex;
@@ -72,7 +45,7 @@ const sectionTitleStyle = css`
 
 const sectionSubtitleStyle = css`
   font-size: 14px;
-  color: ${THEME.textSecondary};
+  color: #ddd;
   margin: 0;
 `;
 
@@ -134,13 +107,14 @@ const thresholdInputGroupStyle = css`
 
 const thresholdLabelStyle = css`
   font-size: 13px;
-  color: ${THEME.textSecondary};
+  color: #ddd;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 `;
 
 const thresholdInputStyle = css`
-  padding: 10px 12px;
+  max-width: 120px;
+  padding: 8px 10px;
   font-size: 14px;
   border: 1px solid ${THEME.borderPrimary};
   background: rgba(20, 20, 20, 0.6);
@@ -164,7 +138,7 @@ const noteStyle = css`
   margin-top: 16px;
   padding: 12px 16px;
   font-size: 13px;
-  color: ${THEME.textSecondary};
+  color: #ddd;
   background-color: rgba(20, 20, 20, 0.4);
   border-left: 2px solid ${THEME.borderPrimary};
   border-radius: 4px;
@@ -192,7 +166,6 @@ const metricDefaultMap: Record<'deviation' | 'x' | 'y' | 'rotation', number> = {
 };
 
 export function SettingsPage() {
-  const navigate = useNavigate();
   const [settings, setSettings] = useState<GlobalSettings>(() => getGlobalSettings());
 
   const handleMetricToggle = (metric: 'deviation' | 'x' | 'y' | 'rotation') => {
@@ -250,11 +223,6 @@ export function SettingsPage() {
     <div css={containerStyle}>
       <div css={headerStyle}>
         <h1 css={titleStyle}>Settings</h1>
-        <div css={toolbarStyle}>
-          <button css={buttonStyle} onClick={() => navigate('/history')}>
-            📊 History
-          </button>
-        </div>
       </div>
 
       {/* Metric Selection Section */}

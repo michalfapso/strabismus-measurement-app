@@ -229,10 +229,11 @@ interface MetricGraphProps {
   svgWidth: number; // actual px width available
   isLast: boolean; // show x-axis tick labels
   hoveredTime: number | null;
+  threshold: number;
   onHoverMove: (time: number | null) => void;
 }
 
-function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, onHoverMove }: MetricGraphProps) {
+function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, threshold, onHoverMove }: MetricGraphProps) {
   const { metric, rawValues, smoothedValues, segments, timeAxis } = data;
 
   const innerWidth = svgWidth - MARGIN.left - MARGIN.right;
@@ -289,10 +290,12 @@ function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, onHov
   const hoverX = hoveredTime !== null ? xScale(hoveredTime) : null;
 
   // Mouse event handler
+  // Note: getBoundingClientRect() of the capture rect already accounts for MARGIN.left,
+  // so we do NOT subtract MARGIN.left again here.
   const handleMouseEvent = useCallback(
     (e: React.MouseEvent<SVGRectElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
-      const relX = e.clientX - rect.left - MARGIN.left;
+      const relX = e.clientX - rect.left;
       if (relX < 0 || relX > innerWidth) {
         onHoverMove(null);
         return;
@@ -429,7 +432,69 @@ function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, onHov
         opacity={1}
       />
 
+      {/* Threshold horizontal line */}
+      {threshold !== undefined && threshold >= yDomain[0] && threshold <= yDomain[1] && (
+        <g>
+          <line
+            x1={MARGIN.left}
+            y1={yScale(threshold)}
+            x2={MARGIN.left + innerWidth}
+            y2={yScale(threshold)}
+            stroke="rgba(200,200,200,0.45)"
+            strokeWidth={1}
+            strokeDasharray="5,4"
+          />
+          <text
+            x={MARGIN.left + innerWidth - 2}
+            y={yScale(threshold) - 3}
+            fill="rgba(200,200,200,0.6)"
+            fontSize={8}
+            textAnchor="end"
+          >
+            threshold ({threshold})
+          </text>
+        </g>
+      )}
+
+      {/* Segmentation strip background (prevents unclassified gaps from showing black) */}
+      <rect
+        x={MARGIN.left}
+        y={stripY}
+        width={innerWidth}
+        height={SEG_STRIP_HEIGHT}
+        fill="rgba(40,40,40,0.8)"
+        stroke="rgba(100,100,100,0.3)"
+        strokeWidth="1"
+      />
+
       {/* Segmentation strip */}
+      {(() => {
+        console.log(`Rendering ${segments.length} segments for metric ${metric}, totalDuration=${totalDuration.toFixed(2)}s, innerWidth=${innerWidth}px`);
+        segments.forEach((seg, i) => {
+          const startPixel = (seg.startTime / totalDuration) * innerWidth;
+          const endPixel = (seg.endTime / totalDuration) * innerWidth;
+          console.log(`Segment ${i}: ${seg.state} from ${seg.startTime.toFixed(2)}s to ${seg.endTime.toFixed(2)}s, pixels ${startPixel.toFixed(0)}-${endPixel.toFixed(0)}`);
+        });
+        // Check for gaps between consecutive segments
+        for (let i = 1; i < segments.length; i++) {
+          const gap = segments[i].startTime - segments[i - 1].endTime;
+          if (gap > 0.01) {
+            console.warn(`GAP between segment ${i-1} and ${i}: ${gap.toFixed(3)}s (${((gap / totalDuration) * innerWidth).toFixed(1)}px) — this will appear as background color`);
+          }
+        }
+        // Check for gap at the start
+        if (segments.length > 0 && segments[0].startTime > 0.01) {
+          console.warn(`GAP at start: 0s to ${segments[0].startTime.toFixed(3)}s (${((segments[0].startTime / totalDuration) * innerWidth).toFixed(1)}px)`);
+        }
+        // Check for gap at the end
+        if (segments.length > 0) {
+          const lastSeg = segments[segments.length - 1];
+          if (totalDuration - lastSeg.endTime > 0.01) {
+            console.warn(`GAP at end: ${lastSeg.endTime.toFixed(3)}s to ${totalDuration.toFixed(3)}s (${(((totalDuration - lastSeg.endTime) / totalDuration) * innerWidth).toFixed(1)}px)`);
+          }
+        }
+        return null;
+      })()}
       {segments.map((seg, i) => {
         const x1 = xScale(seg.startTime);
         const x2 = xScale(seg.endTime);
@@ -444,6 +509,8 @@ function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, onHov
               height={SEG_STRIP_HEIGHT}
               fill={STATE_COLORS[seg.state]}
               opacity={0.9}
+              stroke="rgba(0,0,0,0.4)"
+              strokeWidth="0.5"
             />
             {showLabel && w > 30 && (
               <text
@@ -728,6 +795,7 @@ export function TimeSeriesSegmentationGraph({
               svgWidth={Math.max(containerWidth, 300)}
               isLast={isLast}
               hoveredTime={hoveredTime}
+              threshold={thresholds[data.metric] ?? 1.0}
               onHoverMove={(t) => handleHover(t, idx)}
             />
           </div>

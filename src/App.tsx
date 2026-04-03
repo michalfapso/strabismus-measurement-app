@@ -61,6 +61,12 @@ const chipStyle = css`
   &:hover {
     background: rgba(0, 255, 0, 0.12);
   }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: auto;
+  }
 `;
 
 /* ── position HUD ──────────────────────────────────────────────── */
@@ -90,8 +96,17 @@ function AppContent() {
 
   // Helper function to navigate to History page, preserving last URL if available
   const handleHistoryClick = () => {
-    const lastUrl = localStorage.getItem('lastHistoryUrl');
-    const defaultUrl = `${APP_BASE_URL}history`;
+    let lastUrl = localStorage.getItem('lastHistoryUrl');
+    const defaultUrl = `/history`;
+
+    if (lastUrl) {
+      // Strip base path prefix to avoid duplication (BrowserRouter basename already adds it)
+      const basePath = APP_BASE_URL.replace(/\/$/, ''); // remove trailing slash
+      if (basePath && lastUrl.startsWith(basePath)) {
+        lastUrl = lastUrl.substring(basePath.length);
+      }
+    }
+
     navigate(lastUrl || defaultUrl);
   };
 
@@ -198,7 +213,7 @@ function AppContent() {
           <button css={chipStyle} onClick={() => navigate('/settings')}>
             ⚙️ Settings
           </button>
-          <button css={chipStyle} onClick={handleRecalibrate} disabled={!onMeasurementPage}>
+          <button css={chipStyle} onClick={handleRecalibrate}>
             Recalibrate
           </button>
         </div>
