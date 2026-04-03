@@ -200,7 +200,7 @@ export function classifyStates(
   const keepSegment = candidateSegments.map(seg => seg.duration >= MIN_SEGMENT_DURATION);
 
   // THIRD PASS: Stretch neighboring segments to fill gaps from filtered segments
-  const segments: StateSegment[] = [];
+  let stretchedSegments: StateSegment[] = [];
   for (let i = 0; i < candidateSegments.length; i++) {
     if (!keepSegment[i]) continue; // Skip filtered segments
 
@@ -219,7 +219,20 @@ export function classifyStates(
     }
 
     seg.duration = seg.endTime - seg.startTime;
-    segments.push(seg);
+    stretchedSegments.push(seg);
+  }
+
+  // FOURTH PASS: Merge consecutive segments with the same state
+  const segments: StateSegment[] = [];
+  for (const seg of stretchedSegments) {
+    if (segments.length > 0 && segments[segments.length - 1].state === seg.state) {
+      // Merge with previous segment: extend its endTime
+      segments[segments.length - 1].endTime = seg.endTime;
+      segments[segments.length - 1].duration = seg.endTime - segments[segments.length - 1].startTime;
+    } else {
+      // Add as new segment
+      segments.push(seg);
+    }
   }
 
   // Logging
@@ -229,13 +242,13 @@ export function classifyStates(
     const status = keepSegment[idx] ? '✓' : '✗ FILTERED';
     console.log(`  [${status}] Segment ${idx}: ${seg.state} (indices ${seg.startIdx}-${seg.endIdx}, duration=${seg.duration.toFixed(3)}s)`);
   });
-  console.log(`\nAfter stretching to fill gaps:`);
-  console.log(`Final segments: ${segments.length}`);
+  console.log(`\nAfter stretching to fill gaps: ${stretchedSegments.length} segments`);
+  console.log(`\nAfter merging same states: ${segments.length} segments`);
   segments.forEach((seg, idx) => {
     console.log(`  Segment ${idx}: ${seg.state} (${seg.startTime.toFixed(3)}s-${seg.endTime.toFixed(3)}s, duration=${seg.duration.toFixed(3)}s)`);
   });
 
-  // Check for gaps in coverage (should be near 100% after stretching)
+  // Check for gaps in coverage (should be near 100% after stretching and merging)
   const totalDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
   let coveredTime = 0;
   segments.forEach(s => { coveredTime += s.duration; });

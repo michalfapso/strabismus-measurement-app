@@ -65,7 +65,7 @@ const STATE_LABELS: Record<SessionState, string> = {
   FUSION: 'Fusion',
   NEAR_FUSION: 'Near Fusion',
   APPROACHING: 'Approaching',
-  STABLE_DEVIATION: 'Stable',
+  STABLE_DEVIATION: 'Stable Deviation',
   DRIFTING: 'Drifting',
 };
 
