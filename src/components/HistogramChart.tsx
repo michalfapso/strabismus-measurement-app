@@ -210,7 +210,7 @@ const HistogramTooltipWrapper = memo(function HistogramTooltipWrapper(props: any
     } else {
       setPosition('right');
     }
-  }, [wrapperRef]);
+  }, []);
 
   const positionStyle = position === 'right'
     ? css`margin-left: 12px;`
