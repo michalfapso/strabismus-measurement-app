@@ -827,19 +827,8 @@ const HistogramBar = memo(function HistogramBar({
                 label={{ value: 'Duration (s)', angle: -90, position: 'insideLeft', fontSize: 9 }}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #333',
-                  borderRadius: '4px',
-                  color: '#fff',
-                }}
-                formatter={(value) => {
-                  if (typeof value === 'number') {
-                    return `${value.toFixed(2)}s`;
-                  }
-                  return '';
-                }}
-                labelStyle={{ color: '#888' }}
+                content={<HistogramTooltip />}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.08)' }}
               />
               <Bar
                 dataKey="duration"
