@@ -104,7 +104,7 @@ export function calculateLargeDeviationTimePercent(
 
 const SLOPE_THRESHOLD = 0.1;
 const NEAR_FUSION_WIDTH = 1;
-const MIN_SEGMENT_DURATION = 0.5;
+const MIN_SEGMENT_DURATION = 0.25;
 const DEFAULT_SG_WINDOW = 11;
 
 export function classifyStates(
@@ -148,7 +148,31 @@ export function classifyStates(
     return 'STABLE_DEVIATION';
   });
 
-  const segments: StateSegment[] = [];
+  // Log detailed classification info
+  console.log(`\n=== classifyStates: metric=${metric}, threshold=${threshold} ===`);
+  console.log(`Total points: ${rawValues.length}, thresholds: NEAR_FUSION_WIDTH=${NEAR_FUSION_WIDTH}, SLOPE_THRESHOLD=${SLOPE_THRESHOLD}`);
+  console.log(`Raw values range: [${Math.min(...rawValues).toFixed(3)}, ${Math.max(...rawValues).toFixed(3)}]`);
+
+  // Check for any undefined classifications
+  const unclassifiedIndices = classifications
+    .map((c, i) => (c === undefined || c === null) ? i : -1)
+    .filter(i => i >= 0);
+  if (unclassifiedIndices.length > 0) {
+    console.warn(`⚠️  UNCLASSIFIED DATA POINTS at indices: ${unclassifiedIndices.join(', ')}`);
+  } else {
+    console.log(`✓ All ${classifications.length} points classified successfully`);
+  }
+
+  // Log sample classifications with their values
+  console.log(`Sample classifications (indices 0, 10, 20, ..., last):`);
+  const sampleIndicesList = [0, 10, 20, 30, 40, Math.floor(classifications.length / 2), classifications.length - 2, classifications.length - 1];
+  const uniqueSampleIndices = Array.from(new Set(sampleIndicesList.filter(idx => idx < classifications.length)));
+  uniqueSampleIndices.forEach(idx => {
+    console.log(`  [${idx}] value=${valuesToClassify[idx].toFixed(3)}, slope=${(slopes[idx] ?? 0).toFixed(3)}, state=${classifications[idx]}`);
+  });
+
+  // FIRST PASS: Create all candidate segments (including short ones)
+  const candidateSegments: Array<StateSegment & { startIdx: number; endIdx: number }> = [];
   let segStart = 0;
 
   for (let i = 1; i <= timeSeries.length; i++) {
@@ -160,28 +184,63 @@ export function classifyStates(
         : (timeSeries[i].t - timeSeries[0].t) / 1000;
       const duration = endTime - startTime;
 
-      if (duration >= MIN_SEGMENT_DURATION) {
-        segments.push({
-          state: classifications[segStart],
-          startTime,
-          endTime,
-          duration,
-        });
-      }
+      candidateSegments.push({
+        state: classifications[segStart],
+        startTime,
+        endTime,
+        duration,
+        startIdx: segStart,
+        endIdx: i - 1,
+      });
       segStart = i;
     }
   }
 
-  console.log(`classifyStates: metric=${metric}, threshold=${threshold}`);
-  console.log(`Raw values: ${rawValues.length} points, range [${Math.min(...rawValues).toFixed(3)}, ${Math.max(...rawValues).toFixed(3)}]`);
-  console.log(`Classified states (first 20):`, classifications.slice(0, 20), '...');
-  console.log(`Segments created: ${segments.length}`, segments.map(s => ({ state: s.state, duration: s.duration.toFixed(2), startTime: s.startTime.toFixed(2), endTime: s.endTime.toFixed(2) })));
+  // SECOND PASS: Identify which segments to keep
+  const keepSegment = candidateSegments.map(seg => seg.duration >= MIN_SEGMENT_DURATION);
 
-  // Check for gaps between segments
+  // THIRD PASS: Stretch neighboring segments to fill gaps from filtered segments
+  const segments: StateSegment[] = [];
+  for (let i = 0; i < candidateSegments.length; i++) {
+    if (!keepSegment[i]) continue; // Skip filtered segments
+
+    let seg = { ...candidateSegments[i] };
+
+    // Stretch start time backwards to cover any filtered segments before this
+    for (let j = i - 1; j >= 0; j--) {
+      if (keepSegment[j]) break; // Stop at the previous kept segment
+      seg.startTime = candidateSegments[j].startTime;
+    }
+
+    // Stretch end time forwards to cover any filtered segments after this
+    for (let j = i + 1; j < candidateSegments.length; j++) {
+      if (keepSegment[j]) break; // Stop at the next kept segment
+      seg.endTime = candidateSegments[j].endTime;
+    }
+
+    seg.duration = seg.endTime - seg.startTime;
+    segments.push(seg);
+  }
+
+  // Logging
+  console.log(`\nSegmentation (MIN_SEGMENT_DURATION=${MIN_SEGMENT_DURATION}s):`);
+  console.log(`Total candidate segments: ${candidateSegments.length}`);
+  candidateSegments.forEach((seg, idx) => {
+    const status = keepSegment[idx] ? '✓' : '✗ FILTERED';
+    console.log(`  [${status}] Segment ${idx}: ${seg.state} (indices ${seg.startIdx}-${seg.endIdx}, duration=${seg.duration.toFixed(3)}s)`);
+  });
+  console.log(`\nAfter stretching to fill gaps:`);
+  console.log(`Final segments: ${segments.length}`);
+  segments.forEach((seg, idx) => {
+    console.log(`  Segment ${idx}: ${seg.state} (${seg.startTime.toFixed(3)}s-${seg.endTime.toFixed(3)}s, duration=${seg.duration.toFixed(3)}s)`);
+  });
+
+  // Check for gaps in coverage (should be near 100% after stretching)
   const totalDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
   let coveredTime = 0;
   segments.forEach(s => { coveredTime += s.duration; });
-  console.log(`Total session duration: ${totalDuration.toFixed(2)}s, covered by segments: ${coveredTime.toFixed(2)}s, uncovered: ${(totalDuration - coveredTime).toFixed(2)}s`);
+  console.log(`Total duration: ${totalDuration.toFixed(2)}s | Covered by final segments: ${coveredTime.toFixed(2)}s | Coverage: ${((coveredTime / totalDuration) * 100).toFixed(1)}%`);
+  console.log('===\n');
 
   return segments;
 }
