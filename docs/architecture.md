@@ -172,6 +172,20 @@ Per data point: calculate duration until next point → assign to bin → sum pe
 - Absolute: ms formatted to seconds, x-axis 0→maxTime
 - Relative: % of session duration, x-axis 0→100
 
+## Session State Classification (FSM)
+
+The FSM classifies each data point into one of five states based on deviation value and slopes at two timescales:
+
+- **FUSION:** deviation < threshold (successfully achieving fusion)
+- **NEAR_FUSION:** threshold ≤ deviation < threshold + 1 cm (close to fusion)
+- **APPROACHING:** (shortSlope < −1.0 cm/s) OR (longSlope < −0.02 cm/s) — convergence, fast or slow
+- **DRIFTING:** (shortSlope > +1.0 cm/s) OR (longSlope > +0.02 cm/s) — divergence, fast or slow
+- **STABLE_DEVIATION:** deviation ≥ threshold + 1 cm AND both slopes within thresholds
+
+**Key enhancement:** Dual-timescale slope detection uses 0.5 s (short) and 5.0 s (long) windows, converted to cm/s for slope comparison. The OR logic catches both rapid transitions (short window) and gradual, sustained trends (long window). After initial classification, segment boundaries are refined using short-window slope crossing scans for ±0.25 s precision.
+
+Each segment carries optional quality metrics: median/min/max deviation, variance, and intra-segment slope.
+
 ## File Structure
 ```
 src/
