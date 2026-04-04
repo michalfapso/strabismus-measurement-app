@@ -171,21 +171,27 @@ export function classifyStates(
   const shortSlopes = shortSlopesRaw.map(s => s * pointsPerSecond);
   const longSlopes  = longSlopesRaw.map(s => s * pointsPerSecond);
 
-  // Legacy variable for log output (will be updated in later task)
-  const slopes = shortSlopes;
-
   const classifications: SessionState[] = valuesToClassify.map((value, i) => {
-    const slope = slopes[i] ?? 0;
+    const shortSlope = shortSlopes[i] ?? 0;
+    const longSlope = longSlopes[i] ?? 0;
+
     if (value < threshold) return 'FUSION';
     if (value < threshold + NEAR_FUSION_WIDTH) return 'NEAR_FUSION';
-    if (slope < -SLOPE_THRESHOLD) return 'APPROACHING';
-    if (slope > SLOPE_THRESHOLD) return 'DRIFTING';
+
+    // Either fast approach OR slow, steady approach
+    if (shortSlope < -SHORT_SLOPE_THRESHOLD || longSlope < -LONG_SLOPE_THRESHOLD)
+      return 'APPROACHING';
+
+    // Either fast drift OR slow, steady drift
+    if (shortSlope > SHORT_SLOPE_THRESHOLD || longSlope > LONG_SLOPE_THRESHOLD)
+      return 'DRIFTING';
+
     return 'STABLE_DEVIATION';
   });
 
   // Log detailed classification info
   console.log(`\n=== classifyStates: metric=${metric}, threshold=${threshold} ===`);
-  console.log(`Total points: ${rawValues.length}, thresholds: NEAR_FUSION_WIDTH=${NEAR_FUSION_WIDTH}, SLOPE_THRESHOLD=${SLOPE_THRESHOLD}`);
+  console.log(`Total points: ${rawValues.length}, thresholds: NEAR_FUSION_WIDTH=${NEAR_FUSION_WIDTH}, SHORT_SLOPE_THRESHOLD=${SHORT_SLOPE_THRESHOLD}, LONG_SLOPE_THRESHOLD=${LONG_SLOPE_THRESHOLD}`);
   console.log(`Raw values range: [${Math.min(...rawValues).toFixed(3)}, ${Math.max(...rawValues).toFixed(3)}]`);
 
   // Check for any undefined classifications
@@ -203,7 +209,7 @@ export function classifyStates(
   const sampleIndicesList = [0, 10, 20, 30, 40, Math.floor(classifications.length / 2), classifications.length - 2, classifications.length - 1];
   const uniqueSampleIndices = Array.from(new Set(sampleIndicesList.filter(idx => idx < classifications.length)));
   uniqueSampleIndices.forEach(idx => {
-    console.log(`  [${idx}] value=${valuesToClassify[idx].toFixed(3)}, slope=${(slopes[idx] ?? 0).toFixed(3)}, state=${classifications[idx]}`);
+    console.log(`  [${idx}] value=${valuesToClassify[idx].toFixed(3)}, shortSlope=${(shortSlopes[idx] ?? 0).toFixed(3)}, longSlope=${(longSlopes[idx] ?? 0).toFixed(3)}, state=${classifications[idx]}`);
   });
 
   // FIRST PASS: Create all candidate segments (including short ones)
