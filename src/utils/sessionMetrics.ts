@@ -1,5 +1,5 @@
 import { Session, TimeSeries } from '../types';
-import { SessionMetrics, StateSegment, SessionState } from '../types/analysis';
+import { SessionMetrics, StateSegment, SessionState, SegmentMetrics } from '../types/analysis';
 import { calculateSessionHistogram } from './histogram';
 import { smoothSeries, calculateSlope } from './smoothing';
 
@@ -171,6 +171,76 @@ function refineExit(
   return lastAbove;  // last crossing in bracket → refined exit
 }
 
+function computeSegmentMetrics(
+  timeSeries: TimeSeries[],
+  segment: StateSegment,
+  metric: 'deviation' | 'rotation',
+  smoothed: number[],
+  pointsPerSecond: number
+): SegmentMetrics {
+  // Find the index range for this segment within timeSeries
+  const t0 = timeSeries[0].t;
+  const startIdx = timeSeries.findIndex(p => (p.t - t0) / 1000 >= segment.startTime);
+
+  // Last index where time <= endTime
+  let endIdx = startIdx;
+  for (let i = startIdx; i < timeSeries.length; i++) {
+    if ((timeSeries[i].t - t0) / 1000 <= segment.endTime) endIdx = i;
+    else break;
+  }
+
+  const segmentPoints = timeSeries.slice(startIdx, endIdx + 1);
+  const values = segmentPoints.map(p => getMetricValue(p, metric));
+
+  if (values.length === 0) {
+    return {
+      medianDeviation: 0,
+      minDeviation: 0,
+      maxDeviation: 0,
+      meanDeviation: 0,
+      varianceWithinSegment: 0,
+      stdDevWithinSegment: 0,
+      intraSegmentSlope: 0,
+    };
+  }
+
+  // Descriptive statistics
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  const stdDev = Math.sqrt(variance);
+
+  // Intra-segment slope (cm/s)
+  const segmentSmoothed = smoothed.slice(startIdx, endIdx + 1);
+  let intraSegmentSlope = 0;
+
+  if (segmentSmoothed.length >= 3) {
+    const longWindowPoints = Math.round(LONG_SLOPE_WINDOW_S * pointsPerSecond);
+    const segLen = segmentSmoothed.length;
+    const windowSize = Math.min(
+      longWindowPoints,
+      segLen % 2 === 0 ? segLen - 1 : segLen
+    );
+
+    const segmentSlopesRaw = calculateSlope(segmentSmoothed, windowSize);
+    const meanSlopeRaw = segmentSlopesRaw.reduce((a, b) => a + b, 0) / segmentSlopesRaw.length;
+    intraSegmentSlope = meanSlopeRaw * pointsPerSecond; // convert to cm/s
+  }
+
+  return {
+    medianDeviation: median,
+    minDeviation: min,
+    maxDeviation: max,
+    meanDeviation: mean,
+    varianceWithinSegment: variance,
+    stdDevWithinSegment: stdDev,
+    intraSegmentSlope,
+  };
+}
+
 export function classifyStates(
   timeSeries: TimeSeries[],
   threshold: number,
@@ -321,6 +391,24 @@ export function classifyStates(
     }
   }
 
+  // REFINEMENT PASS: Tighten DRIFTING/APPROACHING boundaries using short-window slopes
+  segments.forEach(seg => {
+    if (seg.state === 'DRIFTING' || seg.state === 'APPROACHING') {
+      const refinedStart = refineEnter(seg.startTime, shortSlopes, timeSeries);
+      const refinedEnd = refineExit(seg.endTime, shortSlopes, timeSeries);
+
+      if (refinedStart > refinedEnd) {
+        // Degenerate segment; use original boundaries
+      } else {
+        seg.startTime = refinedStart;
+        seg.endTime = refinedEnd;
+        seg.duration = seg.endTime - seg.startTime;
+      }
+    }
+  });
+
+  console.log(`\nBoundary refinement complete (DRIFTING/APPROACHING boundaries tightened via short-window slope scans).`);
+
   // Logging
   console.log(`\nSegmentation (MIN_SEGMENT_DURATION=${MIN_SEGMENT_DURATION}s):`);
   console.log(`Total candidate segments: ${candidateSegments.length}`);
@@ -340,6 +428,13 @@ export function classifyStates(
   segments.forEach(s => { coveredTime += s.duration; });
   console.log(`Total duration: ${totalDuration.toFixed(2)}s | Covered by final segments: ${coveredTime.toFixed(2)}s | Coverage: ${((coveredTime / totalDuration) * 100).toFixed(1)}%`);
   console.log('===\n');
+
+  // METRICS PASS: Compute quality metrics for each segment
+  segments.forEach(seg => {
+    seg.metrics = computeSegmentMetrics(timeSeries, seg, metric, smoothed, pointsPerSecond);
+  });
+
+  console.log(`\nSegment metrics computed: ${segments.length} segments have quality data.`);
 
   return segments;
 }
