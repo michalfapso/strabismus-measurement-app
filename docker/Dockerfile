@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     ca-certificates \
     vim \
+    readline-common \
+    libreadline8 \
     libx11-6 \
     libxrender1 \
     libxext6 \
@@ -58,6 +60,7 @@ ENV NODE_ENV=production
 ENV HOME=/home/node
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=false
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/node_modules/playwright/.browsers
+ENV TERM=xterm-256color
 
 # Create home directory for the non-root user
 #RUN mkdir -p /home/claude && \
@@ -65,6 +68,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/node_modules/playwright/.browsers
 
 # Switch to non-root user
 USER node
+
+# Ensure ~/.local/bin is in PATH for claude binary
+ENV PATH=$HOME/.local/bin:$PATH
 
 # Install Claude Code CLI using official installer
 RUN curl -fsSL https://claude.ai/install.sh | bash
@@ -74,9 +80,9 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # Create project volume mount point
 VOLUME /workspace
 
-# Set the entrypoint to sh (more reliable in Alpine)
+# Set the entrypoint to bash for proper terminal support
 # Users can override this to run specific commands
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/bin/bash"]
 
 # Default command
-CMD ["-c", "echo 'Claude Code CLI Sandbox Container' && echo 'Run: claude-code <command> --dangerously-skip-permissions' && /bin/sh"]
+CMD ["-c", "echo 'Claude Code CLI Sandbox Container' && echo 'Run: claude <command> --dangerously-skip-permissions' && /bin/bash"]
