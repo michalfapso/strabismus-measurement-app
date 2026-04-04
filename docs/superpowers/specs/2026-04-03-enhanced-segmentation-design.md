@@ -73,7 +73,60 @@ Use **OR logic** in classification: a point enters `APPROACHING` or `DRIFTING` i
 
 **Unit convention throughout this spec:** all slope values, thresholds, and window sizes are expressed in **cm/s** and **seconds** respectively. The implementation converts `calculateSlope()` output (cm/point) to cm/s by multiplying by the actual sampling rate, and converts window seconds to points by multiplying by the same rate. See Appendix for derivation.
 
-### 2.2 FSM Classification Logic
+### 2.2 Long-Window Boundary Lag and Refinement
+
+Because `calculateSlope()` uses a **centered** window, a long window of 5 s has `halfWindow = 2.5 s`. This means every boundary detected by the long window is displaced by up to ~2.5 s relative to the true changepoint — on both the **enter** and **exit** side:
+
+- **Enter lag:** a slow drift starting at t=5s isn't classified as `DRIFTING` until the centered window has enough data on both sides — roughly t=7.5s.
+- **Exit lag:** a drift ending at t=10s continues to produce a non-zero long-window slope until roughly t=12.5s.
+
+The short window (0.5 s) has only ±0.25 s lag but cannot detect slow drifts directly (its threshold is 1.0 cm/s). However, during a slow drift (e.g. 0.3 cm/s), the short-window slope is **above** `LONG_SLOPE_THRESHOLD` (0.02 cm/s) throughout the drift and drops to near-zero immediately when the drift ends. This makes it useful for **refining** boundaries within a bounded search range.
+
+**Boundary refinement algorithm** — applied as a post-processing pass after initial segmentation, for every boundary of a `DRIFTING` or `APPROACHING` segment:
+
+```typescript
+const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;  // 2.5 s
+
+// ENTER refinement: find actual start of DRIFTING/APPROACHING segment
+// Scan forward from (T_detected - halfLongWindow) using short-window slopes
+// crossing criterion: shortSlopes[i] > LONG_SLOPE_THRESHOLD (same threshold, noisier window)
+function refineEnter(T_detected: number, shortSlopes: number[], times: number[]): number {
+  const searchStart = T_detected - halfLongWindowS;
+  for (let i = 0; i < times.length; i++) {
+    if (times[i] >= searchStart && Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
+      return times[i];  // first crossing in the bracket → refined enter
+    }
+  }
+  return T_detected;  // fallback: no refinement found
+}
+
+// EXIT refinement: find actual end of DRIFTING/APPROACHING segment
+// Scan backward from T_detected using short-window slopes
+// crossing criterion: find last point where shortSlopes[i] > LONG_SLOPE_THRESHOLD
+function refineExit(T_detected: number, shortSlopes: number[], times: number[]): number {
+  const searchStart = T_detected - halfLongWindowS;
+  let lastAbove = T_detected;
+  for (let i = times.length - 1; i >= 0; i--) {
+    if (times[i] < searchStart) break;
+    if (Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
+      lastAbove = times[i];
+      break;
+    }
+  }
+  return lastAbove;  // last crossing in the bracket → refined exit
+}
+```
+
+**Why `LONG_SLOPE_THRESHOLD` as the crossing criterion:**
+- For fast drifts (shortSlope > SHORT_SLOPE_THRESHOLD = 1.0 cm/s): short window is already precise; refinement finds a crossing very close to the already-accurate boundary.
+- For slow/moderate drifts (shortSlope in range 0.02–1.0 cm/s): short window was always below SHORT_SLOPE_THRESHOLD (never triggered), but reliably crosses LONG_SLOPE_THRESHOLD both during and after the drift. The crossing gives ±0.25 s precision.
+- Using SHORT_SLOPE_THRESHOLD as the criterion would fail for slow drifts — no crossing exists.
+
+**Precision achieved:** ±(SHORT_SLOPE_WINDOW_S / 2) = **±0.25 s**, matching `MIN_SEGMENT_DURATION`. No finer resolution is needed.
+
+**CUSUM as Phase 2 alternative:** For very slow drifts (slope near 0.02 cm/s) the short-window slope is noisy around the LONG_SLOPE_THRESHOLD, and the scan may find a slightly imprecise crossing. Cumulative Sum (CUSUM) detection within the same bracket would give statistically cleaner results by accumulating deviations from the expected stable value. Deferred to Phase 2 if refinement precision proves insufficient on real data.
+
+### 2.3 FSM Classification Logic
 
 ```typescript
 // Window lengths in seconds — sampling-rate independent
@@ -126,7 +179,7 @@ const medianIntervalMs = sortedIntervals[Math.floor(sortedIntervals.length / 2)]
 const pointsPerSecond = medianIntervalMs > 0 ? 1000 / medianIntervalMs : 20;
 ```
 
-### 2.3 Behavior Examples
+### 2.4 Behavior Examples
 
 All slopes in cm/s. "Short slope" and "long slope" represent the converted values at the peak of the movement.
 
@@ -273,7 +326,7 @@ return segments;
 
 | File | Changes | Reason |
 |------|---------|--------|
-| `src/utils/sessionMetrics.ts` | 1. Compute `pointsPerSecond` from time series<br>2. Add `SHORT_SLOPE_WINDOW_S`, `LONG_SLOPE_WINDOW_S`, `SHORT_SLOPE_THRESHOLD`, `LONG_SLOPE_THRESHOLD` constants<br>3. Convert window seconds → points; convert slope outputs to cm/s<br>4. Update classification logic with OR condition<br>5. Add `computeSegmentMetrics()` function<br>6. Call metrics computation in fifth pass | Core FSM and metrics enhancement |
+| `src/utils/sessionMetrics.ts` | 1. Compute `pointsPerSecond` from time series<br>2. Add `SHORT_SLOPE_WINDOW_S`, `LONG_SLOPE_WINDOW_S`, `SHORT_SLOPE_THRESHOLD`, `LONG_SLOPE_THRESHOLD` constants<br>3. Convert window seconds → points; convert slope outputs to cm/s<br>4. Update classification logic with OR condition<br>5. Add `refineEnter()` and `refineExit()` functions; apply as post-processing pass after merging<br>6. Add `computeSegmentMetrics()` function<br>7. Call metrics computation in final pass | Core FSM and metrics enhancement |
 | `src/types/analysis.ts` | 1. Add `SegmentMetrics` interface (quality values only, no timing duplication)<br>2. Add optional `metrics` field to `StateSegment` | Type definitions |
 | `src/utils/__tests__/sessionMetrics.test.ts` | 1. Update existing slope-dependent tests (effective thresholds change)<br>2. Add tests for moderate and slow drift detection<br>3. Add tests for `computeSegmentMetrics()` correctness | Validate new behavior |
 
@@ -369,6 +422,8 @@ classifyStates() [ENHANCED]
     ├─ Filter by MIN_SEGMENT_DURATION
     ├─ Stretch to fill gaps
     ├─ Merge consecutive same-state segments
+    ├─ Refine DRIFTING/APPROACHING enter & exit boundaries  ← NEW
+    │    (scan ±halfLongWindow using shortSlopes vs LONG_SLOPE_THRESHOLD)
     ├─ Compute SegmentMetrics for each segment  ← NEW
     └─ Return StateSegment[] (with metrics)
     ↓
@@ -487,6 +542,8 @@ Visualizations consume metrics optionally
 | What if a segment is shorter than `LONG_SLOPE_WINDOW_S` (5 s)? | Cap window to segment length (odd, ≥3 points) | Handled in `computeSegmentMetrics()` via `Math.min(longWindowPoints, ...)` |
 | Should `LONG_SLOPE_THRESHOLD` be tunable per user? | No, use global default for now | Consistent clinical interpretation; per-user tuning deferred to Phase 2 |
 | How should metrics be displayed in UI? | Start with tooltips in TimeSeriesSegmentationGraph; add StatCards in Phase 2 | Minimal UI change for MVP; evaluate feedback before adding cards |
+| Should refinement be applied to all segment boundaries or only those triggered by long slope? | Apply uniformly to all DRIFTING/APPROACHING boundaries | For fast transitions (short slope triggered), refinement finds a crossing within ±0.25s of the existing boundary — essentially a no-op. Uniform application avoids needing to track which slope triggered each boundary. |
+| What if refinement scan finds no crossing in the bracket? | Fall back to original detected boundary | Can happen if the signal is very noisy at the LONG_SLOPE_THRESHOLD level. Fallback preserves the ~2.5s-lagged boundary rather than crashing. |
 
 ---
 
