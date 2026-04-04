@@ -126,6 +126,51 @@ function computeSamplingRate(timeSeries: TimeSeries[]): number {
   return medianIntervalMs > 0 ? 1000 / medianIntervalMs : 20;
 }
 
+function refineEnter(
+  T_detected: number,
+  shortSlopes: number[],
+  timeSeries: TimeSeries[]
+): number {
+  // Scan forward from (T_detected - halfLongWindow) using short-window slopes
+  // Find first crossing of LONG_SLOPE_THRESHOLD
+  const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
+  const searchStart = T_detected - halfLongWindowS;
+  const t0 = timeSeries[0].t;
+
+  for (let i = 0; i < timeSeries.length; i++) {
+    const time = (timeSeries[i].t - t0) / 1000;
+    if (time >= searchStart && Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
+      return time;  // first crossing in the bracket → refined enter
+    }
+  }
+
+  return T_detected;  // fallback: no refinement found
+}
+
+function refineExit(
+  T_detected: number,
+  shortSlopes: number[],
+  timeSeries: TimeSeries[]
+): number {
+  // Scan backward from T_detected using short-window slopes
+  // Find last crossing of LONG_SLOPE_THRESHOLD within bracket
+  const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
+  const searchStart = T_detected - halfLongWindowS;
+  const t0 = timeSeries[0].t;
+
+  let lastAbove = T_detected;
+  for (let i = timeSeries.length - 1; i >= 0; i--) {
+    const time = (timeSeries[i].t - t0) / 1000;
+    if (time < searchStart) break;
+    if (Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
+      lastAbove = time;
+      break;
+    }
+  }
+
+  return lastAbove;  // last crossing in bracket → refined exit
+}
+
 export function classifyStates(
   timeSeries: TimeSeries[],
   threshold: number,
