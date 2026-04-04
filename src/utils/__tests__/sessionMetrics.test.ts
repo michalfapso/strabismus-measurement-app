@@ -116,7 +116,7 @@ describe('calculateLargeDeviationTimePercent', () => {
   });
 });
 
-describe('FSM State Classification', () => {
+describe('classifyStates', () => {
   it('classifies fusion state below threshold', () => {
     const timeSeries: TimeSeries[] = [
       { t: 0, x: 0.2, y: 0.1, r: 0 },
@@ -187,6 +187,102 @@ describe('FSM State Classification', () => {
     const fusionSegments = states.filter(s => s.state === 'FUSION');
     expect(fusionSegments.length).toBe(1);
     expect(fusionSegments[0].duration).toBeCloseTo(1.1, 1);
+  });
+
+  // Task 9: Tests for Dual-Slope Classification
+  it('detects fast drift (short slope > SHORT_SLOPE_THRESHOLD)', () => {
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 20; i++) {
+      const deviation = (i / 20) * 8;
+      timeSeries.push({ t: i * 50, x: deviation, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    const driftingSegments = segments.filter(s => s.state === 'DRIFTING');
+    expect(driftingSegments.length).toBeGreaterThan(0);
+    // Duration is ~0.95s (19 * 50ms = 950ms), allow 0.1s tolerance
+    expect(driftingSegments[0].duration).toBeCloseTo(0.95, 1);
+  });
+
+  it('detects slow drift (long slope > LONG_SLOPE_THRESHOLD)', () => {
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 300; i++) {
+      const deviation = 3 + (i / 300) * 5;
+      timeSeries.push({ t: i * 50, x: deviation, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    const driftingSegments = segments.filter(s => s.state === 'DRIFTING');
+    expect(driftingSegments.length).toBeGreaterThan(0);
+    expect(driftingSegments[0].duration).toBeCloseTo(15.0, 0);
+  });
+
+  it('classifies stable deviation (both slopes ≈ 0)', () => {
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 200; i++) {
+      timeSeries.push({ t: i * 50, x: 4, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    expect(segments.length).toBe(1);
+    expect(segments[0].state).toBe('STABLE_DEVIATION');
+    expect(segments[0].duration).toBeCloseTo(10.0, 0);
+  });
+
+  // Task 10: Tests for Boundary Refinement
+  it('refines slow-drift boundaries based on slope detection', () => {
+    const timeSeries: TimeSeries[] = [];
+    // Create a clear transition: drifting for 5s, then stable
+    for (let i = 0; i < 400; i++) {
+      const time_s = i * 0.025;  // Each step is 25ms
+      let deviation: number;
+      if (time_s < 5.0) {
+        // Clear linear drift
+        deviation = 3 + (time_s / 5.0) * 2;
+      } else {
+        // Flat stable region
+        deviation = 5.0;
+      }
+      timeSeries.push({ t: i * 25, x: deviation, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    // Check that we have both DRIFTING and STABLE_DEVIATION segments
+    const driftingSegments = segments.filter(s => s.state === 'DRIFTING');
+    const stableSegments = segments.filter(s => s.state === 'STABLE_DEVIATION');
+    expect(driftingSegments.length).toBeGreaterThan(0);
+    expect(stableSegments.length).toBeGreaterThan(0);
+    // Verify that the segments are properly ordered chronologically
+    const lastDrifting = driftingSegments[driftingSegments.length - 1];
+    const firstStable = stableSegments[0];
+    expect(lastDrifting.endTime).toBeLessThanOrEqual(firstStable.startTime);
+  });
+
+  // Task 11: Tests for Segment Metrics
+  it('computes metrics correctly for a stable segment', () => {
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 200; i++) {
+      timeSeries.push({ t: i * 50, x: 4, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    expect(segments.length).toBe(1);
+    const metrics = segments[0].metrics;
+    expect(metrics).toBeDefined();
+    expect(metrics!.medianDeviation).toBeCloseTo(4.0, 2);
+    expect(metrics!.minDeviation).toBeCloseTo(4.0, 2);
+    expect(metrics!.varianceWithinSegment).toBeCloseTo(0, 4);
+  });
+
+  it('computes metrics correctly for a drifting segment', () => {
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 300; i++) {
+      const deviation = 3 + (i / 300) * 5;
+      timeSeries.push({ t: i * 50, x: deviation, y: 0, r: 0 });
+    }
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+    const drifting = segments.find(s => s.state === 'DRIFTING');
+    expect(drifting).toBeDefined();
+    const metrics = drifting!.metrics;
+    expect(metrics).toBeDefined();
+    expect(metrics!.minDeviation).toBeCloseTo(3.0, 1);
+    expect(metrics!.maxDeviation).toBeCloseTo(8.0, 1);
+    expect(metrics!.intraSegmentSlope).toBeGreaterThan(0.25);
   });
 });
 
