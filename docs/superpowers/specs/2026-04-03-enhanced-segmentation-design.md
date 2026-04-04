@@ -64,31 +64,35 @@ Without fusion, users lose visibility into meaningful progress:
 ### 2.1 Core Principle
 
 Compute slopes at two independent timescales and **convert both to cm/s** before threshold comparison:
-- **Short window (~0.5 s, 10 points):** detects rapid transitions (existing behavior, corrected units)
-- **Long window (~5 s, 100 points):** reveals sustained trends
+- **Short window (0.5 s):** detects rapid transitions
+- **Long window (5.0 s):** reveals sustained trends
+
+Window lengths are specified in **seconds** and converted to points at runtime using the actual sampling rate. This keeps their intent unchanged if the sampling rate ever changes.
 
 Use **OR logic** in classification: a point enters `APPROACHING` or `DRIFTING` if *either* slope (in cm/s) exceeds its threshold.
 
-**Unit convention throughout this spec:** all slope values and thresholds are expressed in **cm/s**. The implementation converts `calculateSlope()` output (cm/point) to cm/s by multiplying by the actual sampling rate. See Appendix for derivation.
+**Unit convention throughout this spec:** all slope values, thresholds, and window sizes are expressed in **cm/s** and **seconds** respectively. The implementation converts `calculateSlope()` output (cm/point) to cm/s by multiplying by the actual sampling rate, and converts window seconds to points by multiplying by the same rate. See Appendix for derivation.
 
 ### 2.2 FSM Classification Logic
 
 ```typescript
-const SHORT_SLOPE_WINDOW = 10;        // points; ~0.5s at 50ms sampling
-const LONG_SLOPE_WINDOW = 100;        // points; ~5s at 50ms sampling
+// Window lengths in seconds — sampling-rate independent
+const SHORT_SLOPE_WINDOW_S = 0.5;    // seconds
+const LONG_SLOPE_WINDOW_S  = 5.0;    // seconds
 
 // Thresholds in cm/s
-const SHORT_SLOPE_THRESHOLD = 0.1;   // cm/s — detects rapid changes (≥0.1 cm/s)
-const LONG_SLOPE_THRESHOLD = 0.02;   // cm/s — detects slow, sustained changes (≥0.02 cm/s)
+const SHORT_SLOPE_THRESHOLD = 1.0;   // cm/s — detects rapid changes (≥1 cm/s)
+const LONG_SLOPE_THRESHOLD  = 0.02;  // cm/s — detects slow, sustained changes (≥0.02 cm/s)
 const NEAR_FUSION_WIDTH = 1;         // cm (existing, unchanged)
 
 // Sampling rate: derived from time series data
 // pointsPerSecond = 1000 / medianIntervalMs  (typically ~20 at 50ms sampling)
-// slopeTocms = pointsPerSecond  (multiply cm/point by points/s to get cm/s)
+const shortWindowPoints = Math.round(SHORT_SLOPE_WINDOW_S * pointsPerSecond); // e.g. 10 at 50ms
+const longWindowPoints  = Math.round(LONG_SLOPE_WINDOW_S  * pointsPerSecond); // e.g. 100 at 50ms
 
 // Compute slopes at both timescales
-const shortSlopesRaw = calculateSlope(smoothed, SHORT_SLOPE_WINDOW);
-const longSlopesRaw  = calculateSlope(smoothed, LONG_SLOPE_WINDOW);
+const shortSlopesRaw = calculateSlope(smoothed, shortWindowPoints);
+const longSlopesRaw  = calculateSlope(smoothed, longWindowPoints);
 
 // Convert cm/point → cm/s using actual sampling rate
 const shortSlopes = shortSlopesRaw.map(s => s * pointsPerSecond);
@@ -128,10 +132,10 @@ All slopes in cm/s. "Short slope" and "long slope" represent the converted value
 
 | Scenario | Short Slope (cm/s) | Long Slope (cm/s) | Classification | Triggering condition |
 |----------|--------------------|-------------------|-----------------|----------------------|
-| Fast divergence (0→8 cm in 1 s) | +8.0 | +8.0 | `DRIFTING` | Short: 8.0 > 0.1 |
+| Fast divergence (0→8 cm in 1 s) | +8.0 | +8.0 | `DRIFTING` | Short: 8.0 > 1.0 |
 | Moderate drift (3→8 cm in 15 s) | +0.33 | +0.33 | `DRIFTING` | Long: 0.33 > 0.02 |
 | Slow drift (4→4.3 cm in 10 s) | +0.03 | +0.03 | `DRIFTING` | Long: 0.03 > 0.02 |
-| Rapid stabilization (8→2 cm in 2 s) | −3.0 | −3.0 | `APPROACHING` | Short: −3.0 < −0.1 |
+| Rapid stabilization (8→2 cm in 2 s) | −3.0 | −3.0 | `APPROACHING` | Short: −3.0 < −1.0 |
 | Gentle convergence (4→3.8 cm in 10 s) | −0.02 | −0.02 | `APPROACHING` | Long: −0.02 < −0.02 |
 | Holds steady (4 cm ± 0.1 cm for 10 s) | ≈0 | ≈0 | `STABLE_DEVIATION` | Both below thresholds |
 
@@ -215,9 +219,10 @@ function computeSegmentMetrics(
   const segmentSmoothed = smoothed.slice(startIdx, endIdx + 1);
   let intraSegmentSlope = 0;
   if (segmentSmoothed.length >= 3) {
+    const segLen = segmentSmoothed.length;
     const windowSize = Math.min(
-      LONG_SLOPE_WINDOW,
-      segmentSmoothed.length % 2 === 0 ? segmentSmoothed.length - 1 : segmentSmoothed.length
+      longWindowPoints,
+      segLen % 2 === 0 ? segLen - 1 : segLen
     );
     const segmentSlopesRaw = calculateSlope(segmentSmoothed, windowSize);
     const meanSlopeRaw = segmentSlopesRaw.reduce((a, b) => a + b, 0) / segmentSlopesRaw.length;
@@ -236,7 +241,7 @@ function computeSegmentMetrics(
 }
 ```
 
-**Short-segment fallback:** When a segment is shorter than `LONG_SLOPE_WINDOW` (100 points, ~5 s), the window is capped to the segment length (minus 1 if even, to keep it odd). This gives the best available slope estimate for short segments without crashing.
+**Short-segment fallback:** When a segment is shorter than `LONG_SLOPE_WINDOW_S` (5 s), the window is capped to the segment length (minus 1 if even, to keep it odd). This gives the best available slope estimate for short segments without crashing.
 
 **Integration into `classifyStates()`:**
 
@@ -268,7 +273,7 @@ return segments;
 
 | File | Changes | Reason |
 |------|---------|--------|
-| `src/utils/sessionMetrics.ts` | 1. Compute `pointsPerSecond` from time series<br>2. Add `LONG_SLOPE_WINDOW` and `LONG_SLOPE_THRESHOLD` constants<br>3. Compute and convert `shortSlopes` and `longSlopes` to cm/s<br>4. Update classification logic with OR condition<br>5. Add `computeSegmentMetrics()` function<br>6. Call metrics computation in fifth pass | Core FSM and metrics enhancement |
+| `src/utils/sessionMetrics.ts` | 1. Compute `pointsPerSecond` from time series<br>2. Add `SHORT_SLOPE_WINDOW_S`, `LONG_SLOPE_WINDOW_S`, `SHORT_SLOPE_THRESHOLD`, `LONG_SLOPE_THRESHOLD` constants<br>3. Convert window seconds → points; convert slope outputs to cm/s<br>4. Update classification logic with OR condition<br>5. Add `computeSegmentMetrics()` function<br>6. Call metrics computation in fifth pass | Core FSM and metrics enhancement |
 | `src/types/analysis.ts` | 1. Add `SegmentMetrics` interface (quality values only, no timing duplication)<br>2. Add optional `metrics` field to `StateSegment` | Type definitions |
 | `src/utils/__tests__/sessionMetrics.test.ts` | 1. Update existing slope-dependent tests (effective thresholds change)<br>2. Add tests for moderate and slow drift detection<br>3. Add tests for `computeSegmentMetrics()` correctness | Validate new behavior |
 
@@ -284,13 +289,13 @@ return segments;
 **In `src/utils/sessionMetrics.ts`:**
 
 ```typescript
-// Slope detection windows (in points; assumes ~50ms sampling → ~20 points/s)
-const SHORT_SLOPE_WINDOW = 10;        // ~0.5s  (halfWindow = 5 points)
-const LONG_SLOPE_WINDOW = 100;        // ~5s    (halfWindow = 50 points)
+// Slope detection windows in seconds — sampling-rate independent
+const SHORT_SLOPE_WINDOW_S = 0.5;    // seconds; converted to points at runtime
+const LONG_SLOPE_WINDOW_S  = 5.0;    // seconds; converted to points at runtime
 
 // Slope thresholds (cm/s) — compared against slopes already converted to cm/s
-const SHORT_SLOPE_THRESHOLD = 0.1;   // Detects rapid changes ≥ 0.1 cm/s
-const LONG_SLOPE_THRESHOLD = 0.02;   // Detects slow, sustained changes ≥ 0.02 cm/s
+const SHORT_SLOPE_THRESHOLD = 1.0;   // Detects rapid changes ≥ 1 cm/s
+const LONG_SLOPE_THRESHOLD  = 0.02;  // Detects slow, sustained changes ≥ 0.02 cm/s
 
 // Existing constants (unchanged)
 const NEAR_FUSION_WIDTH = 1;          // cm
@@ -300,8 +305,10 @@ const DEFAULT_SG_WINDOW = 11;         // smoothing window (separate from slope w
 
 **Tuning Guidance:**
 
-- `SHORT_SLOPE_THRESHOLD = 0.1 cm/s`: Previously implicit at 2 cm/s (unconverted); lowering to 0.1 cm/s greatly increases sensitivity for moderate changes. The unit conversion is required to make this effective.
-- `LONG_SLOPE_THRESHOLD = 0.02 cm/s`: A sustained drift of 0.02 cm/s over 5 seconds equals 0.1 cm net change — clinically perceptible. If real-world data shows false positives from residual smoothing noise, raise to 0.03–0.04. If very slow drifts (e.g., 0.1 cm over a full minute) are still missed, lower to 0.01.
+- `SHORT_SLOPE_WINDOW_S = 0.5 s`: A half-second window reacts quickly to sudden movements. At 50 ms sampling this is 10 points; at 25 ms sampling it becomes 20 points automatically.
+- `LONG_SLOPE_WINDOW_S = 5.0 s`: Five seconds is long enough to average out noise and reveal a sustained clinical trend without being so coarse that it misses session-level structure.
+- `SHORT_SLOPE_THRESHOLD = 1.0 cm/s`: 1 cm change in 1 second is clearly a rapid movement. The previous implicit value was 2 cm/s (far too insensitive); 1 cm/s is a better clinical cut-off for "sudden drift or approach".
+- `LONG_SLOPE_THRESHOLD = 0.02 cm/s`: A sustained drift of 0.02 cm/s over 5 seconds equals 0.1 cm net change — clinically perceptible. If real-world data shows false positives, raise to 0.03–0.04; if very slow drifts are still missed, lower to 0.01.
 - Both windows compute slopes on the already-smoothed signal, providing additional noise filtering.
 
 ---
@@ -477,7 +484,7 @@ Visualizations consume metrics optionally
 | Should metrics be computed eagerly or on-demand? | Eagerly, during `classifyStates()` | Simplifies API; metrics always available; overhead is negligible |
 | Should segment metrics be persisted to IndexedDB? | No; recompute on load | Derived data; recomputing is cheap; avoids stale metrics if thresholds change in future |
 | What if long window exceeds session length (session < 5 s)? | `calculateSlope()` uses available data; minimum session is 10 s (enforced by `computeSessionMetrics()`), so this cannot happen in practice | Minimum session length guard prevents edge case |
-| What if a segment is shorter than LONG_SLOPE_WINDOW? | Cap window to segment length (odd, ≥3 points) | Handled in `computeSegmentMetrics()` via `Math.min(LONG_SLOPE_WINDOW, ...)` |
+| What if a segment is shorter than `LONG_SLOPE_WINDOW_S` (5 s)? | Cap window to segment length (odd, ≥3 points) | Handled in `computeSegmentMetrics()` via `Math.min(longWindowPoints, ...)` |
 | Should `LONG_SLOPE_THRESHOLD` be tunable per user? | No, use global default for now | Consistent clinical interpretation; per-user tuning deferred to Phase 2 |
 | How should metrics be displayed in UI? | Start with tooltips in TimeSeriesSegmentationGraph; add StatCards in Phase 2 | Minimal UI change for MVP; evaluate feedback before adding cards |
 
@@ -528,10 +535,10 @@ where `pointsPerSecond = 1000 / medianSamplingIntervalMs` (typically ~20 at 50 m
 
 | Threshold | Value (cm/s) | In cm/point at 50ms | Clinical meaning |
 |-----------|-------------|---------------------|-----------------|
-| `SHORT_SLOPE_THRESHOLD` | 0.1 | 0.005 | Any movement faster than 0.1 cm/s is "approaching" or "drifting" |
-| `LONG_SLOPE_THRESHOLD` | 0.02 | 0.001 | A sustained drift of 0.1 cm over 5 seconds is clinically significant |
+| `SHORT_SLOPE_THRESHOLD` | 1.0 | 0.05 | Movement faster than 1 cm/s over the 0.5 s window — clearly a rapid divergence or convergence |
+| `LONG_SLOPE_THRESHOLD` | 0.02 | 0.001 | A sustained drift of 0.1 cm over 5 seconds — perceptible clinical loss of control |
 
-**Previous effective threshold (for reference):** The old `SLOPE_THRESHOLD = 0.1` was implicitly 0.1 cm/point = 2 cm/s, which was too insensitive for most clinical drifts.
+**Previous effective threshold (for reference):** The old `SLOPE_THRESHOLD = 0.1` was implicitly 0.1 cm/point = 2 cm/s, which was too insensitive for most clinical drifts. `SHORT_SLOPE_THRESHOLD = 1.0 cm/s` halves this, catching meaningful rapid motion while remaining robust to noise.
 
 ---
 
