@@ -191,6 +191,10 @@ describe('classifyStates', () => {
 
   // Task 9: Tests for Dual-Slope Classification
   it('detects fast drift (short slope > SHORT_SLOPE_THRESHOLD)', () => {
+    // Dual-timescale detection uses an OR logic:
+    // A point is classified as DRIFTING if:
+    // - (shortSlope > 1.0 cm/s) OR (longSlope > 0.02 cm/s)
+    // This test validates the shortSlope path: rapid deviation changes (≥1 cm/s) detected via 0.5s window
     const timeSeries: TimeSeries[] = [];
     for (let i = 0; i < 20; i++) {
       const deviation = (i / 20) * 8;
@@ -204,6 +208,11 @@ describe('classifyStates', () => {
   });
 
   it('detects slow drift (long slope > LONG_SLOPE_THRESHOLD)', () => {
+    // Validates the longSlope path of dual-slope OR logic:
+    // With dual-timescale detection, slow drifts (>0.02 cm/s over 5s window)
+    // are detected as DRIFTING via longSlope > LONG_SLOPE_THRESHOLD.
+    // This validates: (shortSlope > 1.0) OR (longSlope > 0.02 cm/s)
+    // Even if shortSlope is below threshold, longSlope > 0.02 triggers DRIFTING
     const timeSeries: TimeSeries[] = [];
     for (let i = 0; i < 300; i++) {
       const deviation = 3 + (i / 300) * 5;
@@ -216,6 +225,11 @@ describe('classifyStates', () => {
   });
 
   it('classifies stable deviation (both slopes ≈ 0)', () => {
+    // With dual-slope classification, a point is STABLE_DEVIATION when:
+    // - NOT below threshold (value >= threshold)
+    // - NOT approaching (both shortSlope > -1.0 and longSlope > -0.02)
+    // - NOT drifting (both shortSlope <= 1.0 and longSlope <= 0.02)
+    // This validates the stable case where deviation remains constant (~4 cm)
     const timeSeries: TimeSeries[] = [];
     for (let i = 0; i < 200; i++) {
       timeSeries.push({ t: i * 50, x: 4, y: 0, r: 0 });
@@ -228,6 +242,11 @@ describe('classifyStates', () => {
 
   // Task 10: Tests for Boundary Refinement
   it('refines slow-drift boundaries based on slope detection', () => {
+    // After initial classification via dual-slope thresholds, boundaries
+    // are refined using short-window slopes to tighten DRIFTING/APPROACHING segments.
+    // refineEnter/refineExit scan for crossings of LONG_SLOPE_THRESHOLD (0.02 cm/s).
+    // This test verifies both the classification accuracy and boundary refinement:
+    // transitions from DRIFTING (longSlope > 0.02) to STABLE_DEVIATION occur at correct time.
     const timeSeries: TimeSeries[] = [];
     // Create a clear transition: drifting for 5s, then stable
     for (let i = 0; i < 400; i++) {
@@ -256,6 +275,9 @@ describe('classifyStates', () => {
 
   // Task 11: Tests for Segment Metrics
   it('computes metrics correctly for a stable segment', () => {
+    // After state classification (including dual-slope logic), segments are analyzed
+    // to compute quality metrics: median, min, max, variance, intra-segment slope.
+    // For STABLE_DEVIATION segments where both slopes ≈ 0, deviation should be constant.
     const timeSeries: TimeSeries[] = [];
     for (let i = 0; i < 200; i++) {
       timeSeries.push({ t: i * 50, x: 4, y: 0, r: 0 });
@@ -270,6 +292,10 @@ describe('classifyStates', () => {
   });
 
   it('computes metrics correctly for a drifting segment', () => {
+    // For DRIFTING segments (detected via longSlope > 0.02 cm/s),
+    // metrics include minDeviation, maxDeviation, and intraSegmentSlope.
+    // intraSegmentSlope measures the sustained rate of change within the segment,
+    // confirming the drift behavior detected by longSlope threshold.
     const timeSeries: TimeSeries[] = [];
     for (let i = 0; i < 300; i++) {
       const deviation = 3 + (i / 300) * 5;
