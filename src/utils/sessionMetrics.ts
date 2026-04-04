@@ -102,10 +102,29 @@ export function calculateLargeDeviationTimePercent(
   return sessionDuration > 0 ? (largeDevTime / sessionDuration) * 100 : 0;
 }
 
-const SLOPE_THRESHOLD = 0.1;
-const NEAR_FUSION_WIDTH = 1;
-const MIN_SEGMENT_DURATION = 0.25;
-const DEFAULT_SG_WINDOW = 11;
+// Slope detection windows in seconds — sampling-rate independent
+const SHORT_SLOPE_WINDOW_S = 0.5;    // seconds; converted to points at runtime
+const LONG_SLOPE_WINDOW_S  = 5.0;    // seconds; converted to points at runtime
+
+// Slope thresholds (cm/s) — compared against slopes already converted to cm/s
+const SHORT_SLOPE_THRESHOLD = 1.0;   // Detects rapid changes ≥ 1 cm/s
+const LONG_SLOPE_THRESHOLD  = 0.02;  // Detects slow, sustained changes ≥ 0.02 cm/s
+
+// Existing constants (unchanged)
+const NEAR_FUSION_WIDTH = 1;         // cm
+const MIN_SEGMENT_DURATION = 0.25;   // seconds
+const DEFAULT_SG_WINDOW = 11;        // smoothing window (separate from slope windows)
+
+function computeSamplingRate(timeSeries: TimeSeries[]): number {
+  if (timeSeries.length < 2) return 20; // default fallback
+
+  // Compute median interval from time series, then derive points/second
+  const intervals = timeSeries.slice(1).map((p, i) => p.t - timeSeries[i].t);
+  const sortedIntervals = [...intervals].sort((a, b) => a - b);
+  const medianIntervalMs = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
+
+  return medianIntervalMs > 0 ? 1000 / medianIntervalMs : 20;
+}
 
 export function classifyStates(
   timeSeries: TimeSeries[],
