@@ -34,11 +34,25 @@ export type SessionState =
   | 'STABLE_DEVIATION'
   | 'DRIFTING';
 
+export interface SegmentMetrics {
+  // Univariate statistics (from raw data within segment)
+  medianDeviation: number;        // Median value within segment
+  minDeviation: number;           // Best (lowest) achieved within segment
+  maxDeviation: number;           // Worst (highest) within segment
+  meanDeviation: number;          // Arithmetic mean within segment
+  varianceWithinSegment: number;  // Population variance; low = stable, high = volatile
+  stdDevWithinSegment: number;    // Standard deviation
+
+  // Intra-segment trend (in cm/s)
+  intraSegmentSlope: number;      // Mean slope within segment; negative = improving, positive = declining
+}
+
 export interface StateSegment {
   state: SessionState;
   startTime: number;
   endTime: number;
   duration: number;
+  metrics?: SegmentMetrics;    // Computed eagerly during classifyStates(); always present after classification
 }
 
 export interface SessionMetrics {
