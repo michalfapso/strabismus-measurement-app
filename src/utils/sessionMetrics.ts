@@ -156,7 +156,23 @@ export function classifyStates(
     return smoothed[i];
   });
 
-  const slopes = calculateSlope(smoothed, 10);
+  // Compute sampling rate once
+  const pointsPerSecond = computeSamplingRate(timeSeries);
+
+  // Convert window seconds to points
+  const shortWindowPoints = Math.round(SHORT_SLOPE_WINDOW_S * pointsPerSecond);
+  const longWindowPoints  = Math.round(LONG_SLOPE_WINDOW_S  * pointsPerSecond);
+
+  // Compute slopes at both timescales
+  const shortSlopesRaw = calculateSlope(smoothed, shortWindowPoints);
+  const longSlopesRaw  = calculateSlope(smoothed, longWindowPoints);
+
+  // Convert cm/point → cm/s using actual sampling rate
+  const shortSlopes = shortSlopesRaw.map(s => s * pointsPerSecond);
+  const longSlopes  = longSlopesRaw.map(s => s * pointsPerSecond);
+
+  // Legacy variable for log output (will be updated in later task)
+  const slopes = shortSlopes;
 
   const classifications: SessionState[] = valuesToClassify.map((value, i) => {
     const slope = slopes[i] ?? 0;
