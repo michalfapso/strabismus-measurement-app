@@ -440,16 +440,61 @@ export function classifyStates(
 
   console.log(`\nBoundary refinement complete (DRIFTING/APPROACHING boundaries tightened via short-window slope scans).`);
 
-  // FINAL VALIDATION: Fix any overlaps created by boundary refinement
-  // Adjacent segments should meet at boundaries without overlap
-  for (let i = 0; i < segments.length - 1; i++) {
-    if (segments[i].endTime > segments[i + 1].startTime) {
-      // Segments overlap: adjust by meeting at the midpoint
-      const midpoint = (segments[i].endTime + segments[i + 1].startTime) / 2;
-      segments[i].endTime = midpoint;
+  // FINAL VALIDATION: Fix any overlaps, degenerate segments, and gaps
+  const sessionStart = timeSeries[0].t / 1000;
+  const sessionEnd = timeSeries[timeSeries.length - 1].t / 1000;
+
+  // Step 1: Detect and fix degenerate segments (startTime > endTime)
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].startTime > segments[i].endTime) {
+      // Swap if backward
+      const temp = segments[i].startTime;
+      segments[i].startTime = segments[i].endTime;
+      segments[i].endTime = temp;
       segments[i].duration = segments[i].endTime - segments[i].startTime;
-      segments[i + 1].startTime = midpoint;
-      segments[i + 1].duration = segments[i + 1].endTime - segments[i + 1].startTime;
+    }
+  }
+
+  // Step 2: Remove segments with zero or near-zero duration
+  const validSegments = segments.filter(seg => seg.duration > 0.001);
+
+  // Step 3: Fix overlaps by adjusting boundaries
+  for (let i = 0; i < validSegments.length - 1; i++) {
+    if (validSegments[i].endTime > validSegments[i + 1].startTime) {
+      // Segments overlap
+      const overlap = validSegments[i].endTime - validSegments[i + 1].startTime;
+      // Split the overlap: give half to each segment
+      const splitPoint = validSegments[i].startTime + (validSegments[i].duration - overlap / 2);
+      validSegments[i].endTime = splitPoint;
+      validSegments[i].duration = validSegments[i].endTime - validSegments[i].startTime;
+      validSegments[i + 1].startTime = splitPoint;
+      validSegments[i + 1].duration = validSegments[i + 1].endTime - validSegments[i + 1].startTime;
+    }
+  }
+
+  // Step 4: Ensure full coverage from session start to session end
+  // Extend first segment to session start
+  if (validSegments.length > 0) {
+    validSegments[0].startTime = sessionStart;
+    validSegments[0].duration = validSegments[0].endTime - validSegments[0].startTime;
+  }
+
+  // Extend last segment to session end
+  if (validSegments.length > 0) {
+    validSegments[validSegments.length - 1].endTime = sessionEnd;
+    validSegments[validSegments.length - 1].duration =
+      validSegments[validSegments.length - 1].endTime -
+      validSegments[validSegments.length - 1].startTime;
+  }
+
+  // Step 5: Fill any remaining gaps
+  // If there are gaps between segments, extend one side to cover it
+  for (let i = 0; i < validSegments.length - 1; i++) {
+    const gap = validSegments[i + 1].startTime - validSegments[i].endTime;
+    if (gap > 0.001) {
+      // Gap detected: extend current segment to close it
+      validSegments[i].endTime = validSegments[i + 1].startTime;
+      validSegments[i].duration = validSegments[i].endTime - validSegments[i].startTime;
     }
   }
 
@@ -461,26 +506,26 @@ export function classifyStates(
     console.log(`  [${status}] Segment ${idx}: ${seg.state} (indices ${seg.startIdx}-${seg.endIdx}, duration=${seg.duration.toFixed(3)}s)`);
   });
   console.log(`\nAfter stretching to fill gaps: ${stretchedSegments.length} segments`);
-  console.log(`\nAfter merging same states: ${segments.length} segments`);
-  segments.forEach((seg, idx) => {
+  console.log(`\nAfter validation and degenerate segment fixes: ${validSegments.length} segments`);
+  validSegments.forEach((seg, idx) => {
     console.log(`  Segment ${idx}: ${seg.state} (${seg.startTime.toFixed(3)}s-${seg.endTime.toFixed(3)}s, duration=${seg.duration.toFixed(3)}s)`);
   });
 
-  // Check for gaps in coverage (should be near 100% after stretching and merging)
-  const totalDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+  // Check for coverage (should be 100% after full coverage validation)
+  const totalDuration = sessionEnd - sessionStart;
   let coveredTime = 0;
-  segments.forEach(s => { coveredTime += s.duration; });
+  validSegments.forEach(s => { coveredTime += s.duration; });
   console.log(`Total duration: ${totalDuration.toFixed(2)}s | Covered by final segments: ${coveredTime.toFixed(2)}s | Coverage: ${((coveredTime / totalDuration) * 100).toFixed(1)}%`);
   console.log('===\n');
 
   // METRICS PASS: Compute quality metrics for each segment
-  segments.forEach(seg => {
+  validSegments.forEach(seg => {
     seg.metrics = computeSegmentMetrics(timeSeries, seg, metric, smoothed, pointsPerSecond);
   });
 
-  console.log(`\nSegment metrics computed: ${segments.length} segments have quality data.`);
+  console.log(`\nSegment metrics computed: ${validSegments.length} segments have quality data.`);
 
-  return segments;
+  return validSegments;
 }
 
 export function calculateFusionEventCount(segments: StateSegment[]): number {
