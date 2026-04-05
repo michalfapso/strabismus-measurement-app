@@ -131,14 +131,16 @@ function refineEnter(
   shortSlopes: number[],
   timeSeries: TimeSeries[]
 ): number {
-  // Scan forward from (T_detected - halfLongWindow) using short-window slopes
-  // Find first crossing of LONG_SLOPE_THRESHOLD
+  // Scan forward from (T_detected - halfLongWindow) to T_detected using short-window slopes
+  // Find first crossing of LONG_SLOPE_THRESHOLD within the ±2.5s bracket
   const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = T_detected - halfLongWindowS;
+  const searchStart = Math.max(0, T_detected - halfLongWindowS);  // Lower bound
+  const searchEnd = T_detected;  // Upper bound
   const t0 = timeSeries[0].t;
 
   for (let i = 0; i < timeSeries.length; i++) {
     const time = (timeSeries[i].t - t0) / 1000;
+    if (time > searchEnd) break;  // Stop if we've gone past T_detected
     if (time >= searchStart && Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
       return time;  // first crossing in the bracket → refined enter
     }
@@ -152,19 +154,22 @@ function refineExit(
   shortSlopes: number[],
   timeSeries: TimeSeries[]
 ): number {
-  // Scan backward from T_detected using short-window slopes
-  // Find last crossing of LONG_SLOPE_THRESHOLD within bracket
+  // Scan backward from T_detected within bracket [T_detected - 2.5s, T_detected]
+  // Find last crossing of LONG_SLOPE_THRESHOLD (first when scanning backward)
   const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = T_detected - halfLongWindowS;
+  const searchStart = Math.max(0, T_detected - halfLongWindowS);  // Lower bound
+  const searchEnd = T_detected;  // Upper bound
   const t0 = timeSeries[0].t;
 
   let lastAbove = T_detected;
+  // Scan backward from T_detected, but stop at searchStart
   for (let i = timeSeries.length - 1; i >= 0; i--) {
     const time = (timeSeries[i].t - t0) / 1000;
-    if (time < searchStart) break;
+    if (time < searchStart) break;  // Stop if we've gone below lower bound
+    if (time > searchEnd) continue;  // Skip if we haven't reached the bracket yet
     if (Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
       lastAbove = time;
-      break;
+      break;  // Found the first (last when scanning backward) crossing
     }
   }
 
@@ -378,6 +383,19 @@ export function classifyStates(
     stretchedSegments.push(seg);
   }
 
+  // VALIDATION: Ensure no overlapping segments after stretching
+  // Adjacent segments should meet at a boundary, not overlap
+  for (let i = 0; i < stretchedSegments.length - 1; i++) {
+    if (stretchedSegments[i].endTime > stretchedSegments[i + 1].startTime) {
+      // Segments overlap: adjust by meeting at the midpoint
+      const midpoint = (stretchedSegments[i].endTime + stretchedSegments[i + 1].startTime) / 2;
+      stretchedSegments[i].endTime = midpoint;
+      stretchedSegments[i].duration = stretchedSegments[i].endTime - stretchedSegments[i].startTime;
+      stretchedSegments[i + 1].startTime = midpoint;
+      stretchedSegments[i + 1].duration = stretchedSegments[i + 1].endTime - stretchedSegments[i + 1].startTime;
+    }
+  }
+
   // FOURTH PASS: Merge consecutive segments with the same state
   const segments: StateSegment[] = [];
   for (const seg of stretchedSegments) {
@@ -388,6 +406,19 @@ export function classifyStates(
     } else {
       // Add as new segment
       segments.push(seg);
+    }
+  }
+
+  // VALIDATION: Fix any overlaps created by merging
+  // Adjacent segments should meet at boundaries without overlap
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (segments[i].endTime > segments[i + 1].startTime) {
+      // Segments overlap: adjust by meeting at the midpoint
+      const midpoint = (segments[i].endTime + segments[i + 1].startTime) / 2;
+      segments[i].endTime = midpoint;
+      segments[i].duration = segments[i].endTime - segments[i].startTime;
+      segments[i + 1].startTime = midpoint;
+      segments[i + 1].duration = segments[i + 1].endTime - segments[i + 1].startTime;
     }
   }
 
@@ -408,6 +439,19 @@ export function classifyStates(
   });
 
   console.log(`\nBoundary refinement complete (DRIFTING/APPROACHING boundaries tightened via short-window slope scans).`);
+
+  // FINAL VALIDATION: Fix any overlaps created by boundary refinement
+  // Adjacent segments should meet at boundaries without overlap
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (segments[i].endTime > segments[i + 1].startTime) {
+      // Segments overlap: adjust by meeting at the midpoint
+      const midpoint = (segments[i].endTime + segments[i + 1].startTime) / 2;
+      segments[i].endTime = midpoint;
+      segments[i].duration = segments[i].endTime - segments[i].startTime;
+      segments[i + 1].startTime = midpoint;
+      segments[i + 1].duration = segments[i + 1].endTime - segments[i + 1].startTime;
+    }
+  }
 
   // Logging
   console.log(`\nSegmentation (MIN_SEGMENT_DURATION=${MIN_SEGMENT_DURATION}s):`);

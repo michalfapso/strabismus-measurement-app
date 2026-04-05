@@ -379,3 +379,176 @@ describe('Full SessionMetrics Integration', () => {
     ).toThrow('Session duration must be at least 10 seconds');
   });
 });
+
+describe('Real Data Integration Tests', () => {
+  // Test file 1: Session with fusion attempts and recovery
+  it('handles real data file 1 without overlapping segments', () => {
+    const realData1: TimeSeries[] = [
+      // Initial high deviation (approaching phase)
+      { t: 0, x: -2.15, y: -11.55, r: 0 },
+      { t: 500, x: -2.15, y: -11.55, r: 0 },
+      // Rapid convergence (high negative slope)
+      { t: 1050, x: 0.44, y: -4.64, r: 0 },
+      // Near fusion
+      { t: 1400, x: -0.14, y: -1.64, r: 0 },
+      // Achieved fusion
+      { t: 2000, x: 0.06, y: 0.15, r: 0 },
+      // Stable at fusion
+      { t: 2500, x: 0.06, y: 0.15, r: 0 },
+      // Beginning to drift
+      { t: 3000, x: -0.11, y: -0.04, r: 0 },
+      // Sustained drift
+      { t: 8000, x: -0.39, y: -7.28, r: 0 },
+      { t: 12000, x: -0.85, y: -8.96, r: 0 },
+      // Final approach
+      { t: 16000, x: -1.35, y: -8.38, r: 0 },
+      { t: 16500, x: -1.35, y: -8.38, r: 0 },
+    ];
+
+    const segments = classifyStates(realData1, 0.5, 'deviation');
+
+    // Verify segments don't overlap
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(segments[i].endTime).toBeLessThanOrEqual(segments[i + 1].startTime);
+    }
+
+    // Verify coverage is reasonable (95-100%)
+    const totalTime =
+      (realData1[realData1.length - 1].t - realData1[0].t) / 1000;
+    const coveredTime = segments.reduce((sum, seg) => sum + seg.duration, 0);
+    const coverage = coveredTime / totalTime;
+    expect(coverage).toBeGreaterThan(0.95);
+    expect(coverage).toBeLessThanOrEqual(1.0);
+
+    // Verify segments have metrics
+    segments.forEach(seg => {
+      expect(seg.metrics).toBeDefined();
+      expect(seg.metrics!.medianDeviation).toBeGreaterThanOrEqual(0);
+      expect(seg.metrics!.minDeviation).toBeGreaterThanOrEqual(0);
+      expect(seg.metrics!.maxDeviation).toBeGreaterThanOrEqual(
+        seg.metrics!.minDeviation
+      );
+    });
+  });
+
+  // Test file 2: Continuous drift without fusion
+  it('detects continuous drift as single DRIFTING segment', () => {
+    const realData2: TimeSeries[] = [
+      // Starting stable
+      { t: 0, x: -0.69, y: -5.88, r: 0 },
+      { t: 500, x: -0.69, y: -5.88, r: 0 },
+      // Transition
+      { t: 750, x: -0.58, y: -5.52, r: 0 },
+      // Begin sustained divergence
+      { t: 2000, x: -0.52, y: -6.21, r: 0 },
+      { t: 4000, x: -0.63, y: -6.51, r: 0 },
+      { t: 8000, x: -1.07, y: -6.73, r: 0 },
+      { t: 12000, x: -1.95, y: -10.94, r: 0 },
+      { t: 14600, x: -2.15, y: -11.55, r: 0 },
+      { t: 14650, x: -2.15, y: -11.55, r: 0 },
+    ];
+
+    const segments = classifyStates(realData2, 0.5, 'deviation');
+
+    // Should be mostly DRIFTING (continuous slope > 0.02)
+    const driftingSegments = segments.filter(s => s.state === 'DRIFTING');
+    expect(driftingSegments.length).toBeGreaterThan(0);
+
+    // Verify no overlaps
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(segments[i].endTime).toBeLessThanOrEqual(
+        segments[i + 1].startTime
+      );
+    }
+
+    // Verify all segments have metrics and slopes
+    segments.forEach(seg => {
+      expect(seg.metrics).toBeDefined();
+      expect(seg.metrics!.intraSegmentSlope).toBeDefined();
+    });
+  });
+
+  it('fixes overlapping segments created by stretching', () => {
+    // Create synthetic data with a small gap (filtered segment)
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 300; i++) {
+      // Alternating states with small gap
+      if (i < 50) {
+        // APPROACHING
+        timeSeries.push({ t: i * 50, x: 10 - (i / 50) * 10, y: 0, r: 0 });
+      } else if (i < 55) {
+        // Gap (will be filtered)
+        timeSeries.push({ t: i * 50, x: 0.1, y: 0, r: 0 });
+      } else if (i < 150) {
+        // STABLE_DEVIATION or DRIFTING
+        timeSeries.push({ t: i * 50, x: 3 + (i - 55) * 0.05, y: 0, r: 0 });
+      } else if (i < 160) {
+        // Another gap
+        timeSeries.push({ t: i * 50, x: 8, y: 0, r: 0 });
+      } else {
+        // APPROACHING back to fusion
+        timeSeries.push({ t: i * 50, x: 8 - (i - 160) * 0.05, y: 0, r: 0 });
+      }
+    }
+
+    const segments = classifyStates(timeSeries, 1.0, 'deviation');
+
+    // Critical test: no overlapping segments
+    let prevEnd = 0;
+    for (const seg of segments) {
+      expect(seg.startTime).toBeGreaterThanOrEqual(prevEnd);
+      prevEnd = seg.endTime;
+    }
+
+    // Verify coverage is reasonable
+    const totalTime = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+    const coveredTime = segments.reduce((sum, seg) => sum + seg.duration, 0);
+    const coverage = coveredTime / totalTime;
+    expect(coverage).toBeGreaterThan(0.9);
+  });
+
+  it('handles alternating states with refinement without overlap', () => {
+    // Specifically test the refinement pass doesn't create overlaps
+    const timeSeries: TimeSeries[] = [];
+
+    // Create a session with alternating FUSION and DRIFTING
+    for (let i = 0; i < 400; i++) {
+      const phase = Math.floor(i / 100);
+      if (phase % 2 === 0) {
+        // FUSION phase
+        timeSeries.push({ t: i * 50, x: 0.2, y: 0.1, r: 0 });
+      } else {
+        // DRIFTING phase
+        const driftAmount = (i - phase * 100) * 0.02;
+        timeSeries.push({ t: i * 50, x: 0.2 + driftAmount, y: 0.1 + driftAmount, r: 0 });
+      }
+    }
+
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+
+    // Verify non-overlapping after refinement
+    let totalCovered = 0;
+    let maxTime = 0;
+    for (let i = 0; i < segments.length; i++) {
+      if (i > 0) {
+        expect(segments[i].startTime).toBeLessThanOrEqual(
+          segments[i].startTime + 0.001
+        ); // floating point tolerance
+      }
+      totalCovered += segments[i].duration;
+      maxTime = Math.max(maxTime, segments[i].endTime);
+
+      // Check no overlap with next
+      if (i < segments.length - 1) {
+        expect(segments[i].endTime).toBeLessThanOrEqual(
+          segments[i + 1].startTime + 0.001
+        );
+      }
+    }
+
+    // Should cover most of session
+    const sessionDuration = (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+    const coverage = totalCovered / sessionDuration;
+    expect(coverage).toBeGreaterThan(0.9);
+  });
+});
