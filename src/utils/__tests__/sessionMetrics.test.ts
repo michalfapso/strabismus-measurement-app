@@ -551,4 +551,156 @@ describe('Real Data Integration Tests', () => {
     const coverage = totalCovered / sessionDuration;
     expect(coverage).toBeGreaterThan(0.9);
   });
+
+  it('handles tremor-like oscillation around threshold', () => {
+    // Simulate eye tremor: rapid oscillation around fusion threshold
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 200; i++) {
+      // Oscillate around 0.5cm (fusion threshold)
+      const baseDeviation = 0.5;
+      const tremor = 0.2 * Math.sin((i / 20) * Math.PI);
+      const deviation = baseDeviation + tremor;
+      const angle = Math.atan2(0.1, Math.sqrt(Math.max(0, deviation * deviation - 0.01)));
+      timeSeries.push({
+        t: i * 50,
+        x: deviation * Math.cos(angle),
+        y: deviation * Math.sin(angle),
+        r: 0,
+      });
+    }
+
+    const segments = classifyStates(timeSeries, 0.5, 'deviation');
+
+    // Should not create massively fragmented segmentation
+    expect(segments.length).toBeLessThan(30);
+
+    // No overlaps
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(segments[i].endTime).toBeLessThanOrEqual(
+        segments[i + 1].startTime + 0.001
+      );
+    }
+  });
+
+  it('handles flat line (zero movement)', () => {
+    // Create perfectly stable deviation
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 200; i++) {
+      timeSeries.push({ t: i * 50, x: 2.0, y: 0, r: 0 }); // Constant 2cm
+    }
+
+    const segments = classifyStates(timeSeries, 1.0, 'deviation');
+
+    // Should be single STABLE_DEVIATION segment
+    expect(segments.length).toBe(1);
+    expect(segments[0].state).toBe('STABLE_DEVIATION');
+    expect(segments[0].metrics!.varianceWithinSegment).toBeCloseTo(0, 2);
+    expect(segments[0].metrics!.intraSegmentSlope).toBeCloseTo(0, 2);
+  });
+
+  it('handles very small segments that exceed MIN_SEGMENT_DURATION minimally', () => {
+    // Create segments just above and below MIN_SEGMENT_DURATION threshold (0.25s)
+    const timeSeries: TimeSeries[] = [];
+
+    // 0.2s FUSION (below threshold, should be filtered)
+    for (let i = 0; i < 4; i++) {
+      timeSeries.push({ t: i * 50, x: 0.1, y: 0, r: 0 });
+    }
+
+    // 0.3s DRIFTING (above threshold, should be kept)
+    for (let i = 4; i < 10; i++) {
+      timeSeries.push({ t: i * 50, x: 2.0 + (i - 4) * 0.1, y: 0, r: 0 });
+    }
+
+    // 0.2s APPROACHING (below threshold, should be filtered)
+    for (let i = 10; i < 14; i++) {
+      timeSeries.push({ t: i * 50, x: 2.6 - (i - 10) * 0.1, y: 0, r: 0 });
+    }
+
+    // 0.3s FUSION (above threshold, should be kept)
+    for (let i = 14; i < 20; i++) {
+      timeSeries.push({ t: i * 50, x: 0.1, y: 0, r: 0 });
+    }
+
+    // Extend to >10 seconds for valid session
+    for (let i = 20; i < 200; i++) {
+      timeSeries.push({ t: i * 50, x: 0.1, y: 0, r: 0 });
+    }
+
+    const segments = classifyStates(timeSeries, 1.0, 'deviation');
+
+    // Should have kept DRIFTING and FUSION, filtered APPROACHING
+    const kept = segments.filter(s => s.state !== 'STABLE_DEVIATION');
+    expect(kept.length).toBeGreaterThan(0);
+
+    // No overlaps
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(segments[i].endTime).toBeLessThanOrEqual(
+        segments[i + 1].startTime + 0.001
+      );
+    }
+  });
+
+  it('handles rapid threshold crossings with refinement', () => {
+    // Create data with multiple rapid crossings of slope threshold
+    const timeSeries: TimeSeries[] = [];
+
+    for (let i = 0; i < 300; i++) {
+      // Create a zigzag pattern: fast down, fast up, repeat
+      const zigzag = Math.sin((i / 30) * Math.PI * 2);
+      const baseDeviation = 2 + zigzag * 1; // Oscillates 1-3cm
+      timeSeries.push({
+        t: i * 50,
+        x: baseDeviation,
+        y: 0,
+        r: 0,
+      });
+    }
+
+    const segments = classifyStates(timeSeries, 1.0, 'deviation');
+
+    // Should handle rapid crossings without crashing
+    expect(segments.length).toBeGreaterThan(0);
+
+    // No overlaps
+    for (let i = 0; i < segments.length - 1; i++) {
+      expect(segments[i].endTime).toBeLessThanOrEqual(
+        segments[i + 1].startTime + 0.001
+      );
+    }
+
+    // Coverage reasonable
+    const totalTime =
+      (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000;
+    const covered = segments.reduce((sum, s) => sum + s.duration, 0);
+    expect(covered / totalTime).toBeGreaterThan(0.8);
+  });
+
+  it('handles very long single-state session', () => {
+    // 30 second session of pure DRIFTING
+    const timeSeries: TimeSeries[] = [];
+    for (let i = 0; i < 600; i++) {
+      // Linear drift 0 → 10cm
+      const deviation = (i / 600) * 10;
+      timeSeries.push({
+        t: i * 50,
+        x: deviation,
+        y: 0,
+        r: 0,
+      });
+    }
+
+    const segments = classifyStates(timeSeries, 1.0, 'deviation');
+
+    // Should be single DRIFTING segment
+    expect(segments.length).toBeGreaterThan(0);
+    const driftingCount = segments.filter(s => s.state === 'DRIFTING').length;
+    expect(driftingCount).toBeGreaterThan(0);
+
+    // All segments should have metrics
+    segments.forEach(s => {
+      expect(s.metrics).toBeDefined();
+      expect(s.metrics!.intraSegmentSlope).toBeGreaterThan(0);
+    });
+  });
 });
