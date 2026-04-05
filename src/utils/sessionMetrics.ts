@@ -131,22 +131,29 @@ function refineEnter(
   shortSlopes: number[],
   timeSeries: TimeSeries[]
 ): number {
-  // Scan forward from (T_detected - halfLongWindow) to T_detected using short-window slopes
-  // Find first crossing of LONG_SLOPE_THRESHOLD within the ±2.5s bracket
+  // Find where segment ENTERS a DRIFTING/APPROACHING state
+  // Scan backward from T_detected to find where slope stopped being below threshold
+  // This marks the entry point into the drifting/approaching phase
   const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = Math.max(0, T_detected - halfLongWindowS);  // Lower bound
-  const searchEnd = T_detected;  // Upper bound
+  const searchStart = Math.max(0, T_detected - halfLongWindowS);
+  const searchEnd = T_detected;
   const t0 = timeSeries[0].t;
 
-  for (let i = 0; i < timeSeries.length; i++) {
+  // Scan backward from T_detected, looking for the transition point
+  let lastExceedTime = T_detected;
+  for (let i = timeSeries.length - 1; i >= 0; i--) {
     const time = (timeSeries[i].t - t0) / 1000;
-    if (time > searchEnd) break;  // Stop if we've gone past T_detected
-    if (time >= searchStart && Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
-      return time;  // first crossing in the bracket → refined enter
+    if (time < searchStart) break;
+    if (time > searchEnd) continue;
+    if (Math.abs(shortSlopes[i]) > SHORT_SLOPE_THRESHOLD) {
+      lastExceedTime = time;
+    } else {
+      // Slope dropped below threshold; lastExceedTime is where it re-exceeded
+      return lastExceedTime;
     }
   }
 
-  return T_detected;  // fallback: no refinement found
+  return T_detected;  // No transition found; use original
 }
 
 function refineExit(
@@ -154,26 +161,26 @@ function refineExit(
   shortSlopes: number[],
   timeSeries: TimeSeries[]
 ): number {
-  // Scan backward from T_detected within bracket [T_detected - 2.5s, T_detected]
-  // Find last crossing of LONG_SLOPE_THRESHOLD (first when scanning backward)
+  // Find where segment EXITS a DRIFTING/APPROACHING state
+  // Scan backward from T_detected to find where slope stopped exceeding threshold
+  // This marks the exit point from the drifting/approaching phase
   const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = Math.max(0, T_detected - halfLongWindowS);  // Lower bound
-  const searchEnd = T_detected;  // Upper bound
+  const searchStart = Math.max(0, T_detected - halfLongWindowS);
+  const searchEnd = T_detected;
   const t0 = timeSeries[0].t;
 
-  let lastAbove = T_detected;
-  // Scan backward from T_detected, but stop at searchStart
+  // Scan backward from T_detected, looking for last moment slope exceeds threshold
   for (let i = timeSeries.length - 1; i >= 0; i--) {
     const time = (timeSeries[i].t - t0) / 1000;
-    if (time < searchStart) break;  // Stop if we've gone below lower bound
-    if (time > searchEnd) continue;  // Skip if we haven't reached the bracket yet
-    if (Math.abs(shortSlopes[i]) > LONG_SLOPE_THRESHOLD) {
-      lastAbove = time;
-      break;  // Found the first (last when scanning backward) crossing
+    if (time < searchStart) break;
+    if (time > searchEnd) continue;
+    if (Math.abs(shortSlopes[i]) > SHORT_SLOPE_THRESHOLD) {
+      // This is the last moment where slope exceeds threshold
+      return time;
     }
   }
 
-  return lastAbove;  // last crossing in bracket → refined exit
+  return T_detected;  // No transition found; use original
 }
 
 function computeSegmentMetrics(
@@ -383,10 +390,21 @@ export function classifyStates(
     stretchedSegments.push(seg);
   }
 
-  // VALIDATION: Ensure no overlapping segments after stretching
+  // VALIDATION: Ensure no overlapping or degenerate segments after stretching
+  // Check for degenerate segments first
+  for (let i = 0; i < stretchedSegments.length; i++) {
+    if (stretchedSegments[i].startTime > stretchedSegments[i].endTime) {
+      console.warn(`Degenerate segment after stretching [${i}] ${stretchedSegments[i].state}:` +
+        ` ${stretchedSegments[i].startTime.toFixed(2)} → ${stretchedSegments[i].endTime.toFixed(2)}`);
+    }
+  }
+
   // Adjacent segments should meet at a boundary, not overlap
   for (let i = 0; i < stretchedSegments.length - 1; i++) {
     if (stretchedSegments[i].endTime > stretchedSegments[i + 1].startTime) {
+      console.warn(`Overlap after stretching [${i}-${i+1}]:` +
+        ` ${stretchedSegments[i].state} ends at ${stretchedSegments[i].endTime.toFixed(2)},` +
+        ` ${stretchedSegments[i + 1].state} starts at ${stretchedSegments[i + 1].startTime.toFixed(2)}`);
       // Segments overlap: adjust by meeting at the midpoint
       const midpoint = (stretchedSegments[i].endTime + stretchedSegments[i + 1].startTime) / 2;
       stretchedSegments[i].endTime = midpoint;
@@ -409,10 +427,21 @@ export function classifyStates(
     }
   }
 
-  // VALIDATION: Fix any overlaps created by merging
+  // VALIDATION: Check for degenerate and overlapping segments after merging
+  // Check for degenerate segments first
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].startTime > segments[i].endTime) {
+      console.warn(`Degenerate segment after merging [${i}] ${segments[i].state}:` +
+        ` ${segments[i].startTime.toFixed(2)} → ${segments[i].endTime.toFixed(2)}`);
+    }
+  }
+
   // Adjacent segments should meet at boundaries without overlap
   for (let i = 0; i < segments.length - 1; i++) {
     if (segments[i].endTime > segments[i + 1].startTime) {
+      console.warn(`Overlap after merging [${i}-${i+1}]:` +
+        ` ${segments[i].state} ends at ${segments[i].endTime.toFixed(2)},` +
+        ` ${segments[i + 1].state} starts at ${segments[i + 1].startTime.toFixed(2)}`);
       // Segments overlap: adjust by meeting at the midpoint
       const midpoint = (segments[i].endTime + segments[i + 1].startTime) / 2;
       segments[i].endTime = midpoint;
@@ -423,14 +452,23 @@ export function classifyStates(
   }
 
   // REFINEMENT PASS: Tighten DRIFTING/APPROACHING boundaries using short-window slopes
-  segments.forEach(seg => {
+  segments.forEach((seg, idx) => {
     if (seg.state === 'DRIFTING' || seg.state === 'APPROACHING') {
+      const originalStart = seg.startTime;
+      const originalEnd = seg.endTime;
       const refinedStart = refineEnter(seg.startTime, shortSlopes, timeSeries);
       const refinedEnd = refineExit(seg.endTime, shortSlopes, timeSeries);
 
       if (refinedStart > refinedEnd) {
-        // Degenerate segment; use original boundaries
+        // Degenerate segment; log the issue for debugging
+        console.warn(`Refinement created degenerate segment [${idx}] ${seg.state}:` +
+          ` original ${originalStart.toFixed(2)}-${originalEnd.toFixed(2)},` +
+          ` refined ${refinedStart.toFixed(2)}-${refinedEnd.toFixed(2)}`);
       } else {
+        if (refinedStart !== originalStart || refinedEnd !== originalEnd) {
+          console.log(`Refined [${idx}] ${seg.state}: ${originalStart.toFixed(2)}-${originalEnd.toFixed(2)}` +
+            ` → ${refinedStart.toFixed(2)}-${refinedEnd.toFixed(2)}`);
+        }
         seg.startTime = refinedStart;
         seg.endTime = refinedEnd;
         seg.duration = seg.endTime - seg.startTime;
