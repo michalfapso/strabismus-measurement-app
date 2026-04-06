@@ -11,6 +11,24 @@ const ZOOM_OUT_FACTOR = 1.2;       // Enlarge view by 20%
 const ZOOM_IN_FACTOR = 0.8;        // Shrink view by 20%
 const MIN_VISIBLE_SPAN = 2;        // Minimum sessions to show
 
+// Format datetime label for X-axis tick labels
+function formatDatetimeLabel(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 interface ProgressGraphsProps {
   sessions: SessionMetrics[];
   onDrillDown?: (sessionId: string) => void;
@@ -125,6 +143,9 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   // Initialize zoom/pan hook
   const { zoomStart, zoomEnd, handleZoom, handlePan } = useZoomPan(graphData.length);
 
+  // Responsive graph height
+  const graphHeight = window.innerWidth < 768 ? 180 : 250;
+
   // Filter data based on zoom
   const visibleData = useMemo(() => {
     return graphData.slice(Math.floor(zoomStart), Math.ceil(zoomEnd));
@@ -147,12 +168,21 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       </div>
       <div css={styles.graphContainer}>
         <h3>Best Stable Deviation (cm)</h3>
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
               label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
+              tickFormatter={(index) => {
+                if (visibleData && visibleData[index]) {
+                  return formatDatetimeLabel(visibleData[index].date);
+                }
+                return index.toString();
+              }}
+              angle={-45}
+              textAnchor="end"
+              height={80}
             />
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
@@ -170,12 +200,21 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
               label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
+              tickFormatter={(index) => {
+                if (visibleData && visibleData[index]) {
+                  return formatDatetimeLabel(visibleData[index].date);
+                }
+                return index.toString();
+              }}
+              angle={-45}
+              textAnchor="end"
+              height={80}
             />
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
@@ -193,12 +232,21 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={graphHeight}>
           <AreaChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
               label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
+              tickFormatter={(index) => {
+                if (visibleData && visibleData[index]) {
+                  return formatDatetimeLabel(visibleData[index].date);
+                }
+                return index.toString();
+              }}
+              angle={-45}
+              textAnchor="end"
+              height={80}
             />
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
@@ -219,6 +267,11 @@ const styles = {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
+
+    @media (max-width: 768px) {
+      padding: 12px;
+      gap: 12px;
+    }
   `,
   controls: css`
     display: flex;
@@ -238,16 +291,38 @@ const styles = {
         background: rgba(255, 255, 255, 0.1);
       }
     }
+
+    @media (max-width: 768px) {
+      gap: 4px;
+
+      button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+    }
   `,
   zoomInfo: css`
     font-size: 12px;
     color: ${THEME.textSecondary};
     margin-left: auto;
+
+    @media (max-width: 768px) {
+      font-size: 11px;
+    }
   `,
   graphContainer: css`
     border: 1px solid ${THEME.borderPrimary};
     border-radius: 4px;
     padding: 12px;
+
+    @media (max-width: 768px) {
+      padding: 8px;
+
+      h3 {
+        font-size: 14px;
+        margin: 4px 0 8px 0;
+      }
+    }
   `,
   tooltip: css`
     background: rgba(0, 0, 0, 1);
