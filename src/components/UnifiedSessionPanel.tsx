@@ -6,12 +6,16 @@ import { StatCards } from './StatCards';
 import { TimeSeriesGraph } from './TimeSeriesGraph';
 import { HistogramChart } from './HistogramChart';
 import { TrendChart } from './TrendChart';
+import { css } from '@emotion/react';
+import { THEME } from '../theme';
 
 export interface UnifiedSessionPanelProps {
-  sessions: Session[];
+  session: Session;
+  onBack?: () => void;
 }
 
-export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
+export function UnifiedSessionPanel({ session, onBack }: UnifiedSessionPanelProps) {
+  const sessions = [session];
   const isSingleSession = sessions.length === 1;
   const viewState = useViewState();
   const { selectedMetrics } = getGlobalSettings();
@@ -37,6 +41,29 @@ export function UnifiedSessionPanel({ sessions }: UnifiedSessionPanelProps) {
         gap: '0',
       }}
     >
+      {/* Back button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          css={css`
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid ${THEME.borderPrimary};
+            border-radius: 4px;
+            color: ${THEME.textPrimary};
+            cursor: pointer;
+            font-size: 13px;
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+            }
+          `}
+        >
+          ← Back to Analysis
+        </button>
+      )}
+
       {/* Header section */}
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ margin: '0', fontSize: '14px', color: '#fff' }}>

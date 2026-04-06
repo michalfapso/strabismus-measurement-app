@@ -4,6 +4,9 @@ import { computeSessionMetrics } from '../utils/sessionMetrics';
 import { calculateProgressInsight, calculateExerciseInsights, calculateSessionQualityInsight, calculateMilestoneInsight, calculateRecommendationInsight } from '../utils/analysisInsights';
 import { getGlobalSettings } from '../utils/globalSettings';
 import { AnalysisMetricsBanner } from './AnalysisMetricsBanner';
+import { ProgressGraphs } from './ProgressGraphs';
+import { UnifiedSessionPanel } from './UnifiedSessionPanel';
+import { useSessionAnalysisState } from '../hooks/useSessionAnalysisState';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 
@@ -315,6 +318,30 @@ function MetricGroup({
 export default function MultiSessionAnalysisView({ sessions }: MultiSessionAnalysisViewProps) {
   const settings = getGlobalSettings();
   const { selectedMetrics, thresholds } = settings;
+  const { state, setState } = useSessionAnalysisState();
+
+  // Handler for drill-down: user clicks a graph point to see session details
+  const handleDrillDown = (sessionId: string) => {
+    setState({ ...state, drilledDownSessionId: sessionId });
+  };
+
+  // Handler for exercise filter changes
+  const handleExerciseFilterChange = (exerciseFilter?: string) => {
+    setState({ ...state, exerciseFilter });
+  };
+
+  // If user is viewing a drilled-down session, show UnifiedSessionPanel instead
+  if (state.drilledDownSessionId) {
+    const session = sessions.find(s => s.sessionId === state.drilledDownSessionId);
+    if (session) {
+      return (
+        <UnifiedSessionPanel
+          session={session}
+          onBack={() => setState({ ...state, drilledDownSessionId: undefined })}
+        />
+      );
+    }
+  }
 
   // Filter to only metrics supported by the analysis pipeline
   const analysisMetrics = selectedMetrics.filter(
@@ -398,6 +425,16 @@ export default function MultiSessionAnalysisView({ sessions }: MultiSessionAnaly
 
       {/* Metric Settings Banner */}
       <AnalysisMetricsBanner mode="multi" />
+
+      {/* Progress Graphs Section */}
+      <div css={panelStyle}>
+        <h3 css={sectionTitleStyle}>Progress Over Time</h3>
+        <ProgressGraphs
+          sessions={sessionMetrics}
+          onDrillDown={handleDrillDown}
+          exerciseFilter={state.exerciseFilter}
+        />
+      </div>
 
       {/* Metric sections (A–D per metric) */}
       {analysisMetrics.length === 0 ? (

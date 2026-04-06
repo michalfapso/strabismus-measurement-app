@@ -318,11 +318,6 @@ export function HistoryPage({}: HistoryPageProps) {
               sessions={selectedSessions}
             />
           )}
-
-          {/* Keep UnifiedSessionPanel as fallback for backward compatibility */}
-          {selectedCount > 1 && false && (
-            <UnifiedSessionPanel sessions={selectedSessions} />
-          )}
         </div>
       </div>
     </div>
