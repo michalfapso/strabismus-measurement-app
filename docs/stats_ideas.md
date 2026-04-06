@@ -1,7 +1,10 @@
 # Statistical Analysis Ideas for Measurement Time Series
 
-This document collects ideas for extracting meaningful insights from strabismus measurement sessions.
+This document collects ideas for extracting meaningful insights from strabismus measurement sessions,
+and documents the design decisions, bugs, and lessons learned in the segmentation algorithm.
 It is a living research document — add ideas freely, mark promising ones, note dead ends.
+
+---
 
 ## The Core Problem
 
@@ -14,8 +17,114 @@ Naive summary statistics (mean deviation, median) are clinically misleading beca
   then spends a long time trying to re-achieve it, gets penalised by a low fusion time %.
 - A session with no fusion but consistently low-moderate deviation may be more clinically
   meaningful than one with one brief fusion spike followed by chaotic deviation.
+- **A user who never achieves fusion will produce only STABLE_DEVIATION segments, but sessions
+  with lower mean deviation or less drift are still meaningfully better.** The algorithm needs
+  to distinguish between them.
 
-## Promising Directions
+---
+
+## Segmentation Algorithm: Design Notes & Lessons Learned
+
+This section documents the implementation of the rule-based state machine classifier, the bugs
+encountered in real clinical data, and the open design problems that remain.
+
+### Overview: Dual-Timescale Slope Detection
+
+The classifier works by computing slopes at two timescales on the smoothed deviation series:
+
+| Window | Size | Threshold (enter) | Purpose |
+|--------|------|-------------------|---------|
+| Short  | 0.5s | 1.0 cm/s          | Detects rapid changes (fast convergence/divergence) |
+| Long   | 2.5s | 0.15 cm/s (enter), 0.08 cm/s (stay) | Detects slow, sustained drift |
+
+Classification at each point uses OR logic:
+- `APPROACHING` if shortSlope < -1.0 **or** longSlope < -0.15 (or -0.08 while already APPROACHING)
+- `DRIFTING` if shortSlope > 1.0 **or** longSlope > 0.15 (or 0.08 while already DRIFTING)
+- `STABLE_DEVIATION` otherwise (and deviation above fusion threshold)
+
+A **local flatness check** runs before slope logic: if stddev of raw values in a ±0.25s window
+is < 0.05 cm, the point is classified as STABLE_DEVIATION regardless of slopes. This handles
+step changes between flat quantization levels that slope windows cannot detect.
+
+After initial classification, boundaries of DRIFTING/APPROACHING segments are **refined** by scanning
+within a ±2.5s bracket using short-window slopes to find more precise entry/exit points.
+
+Short STABLE_DEVIATION segments are filtered by context:
+- Surrounded by same-direction segments (DRIFTING+DRIFTING or APPROACHING+APPROACHING): kept only if ≥ 3s
+- Turning point (DRIFTING+APPROACHING or vice versa): kept if ≥ 1.5s
+
+### Bug History
+
+#### Bug 1: Wrong Threshold in Refinement Functions (Critical — Fixed)
+
+`refineEnter()` and `refineExit()` were comparing short-window slopes against
+`LONG_SLOPE_THRESHOLD` (0.02 cm/s, later 0.1 cm/s) instead of `SHORT_SLOPE_THRESHOLD` (1.0 cm/s).
+Almost any short-window slope exceeds 0.02, so the refinement would find crossings everywhere
+and produce boundary times outside the intended bracket.
+
+**Symptom:** Backward segments (`startTime > endTime`), overlapping segments (coverage > 100%).
+
+**Fix:** Use `SHORT_SLOPE_THRESHOLD` (1.0 cm/s) in both refinement functions.
+
+#### Bug 2: Unbounded Refinement Bracket (Critical — Fixed)
+
+`refineEnter()` had no upper bound check; `refineExit()` scanned from the end of the entire
+dataset rather than within the bracket. Both could return times far outside the intended
+`[T_detected - bracket, T_detected]` range.
+
+**Symptom:** Segment boundaries extending to arbitrary positions across the session.
+
+**Fix:** Both functions now constrain their search to `[T_detected - REFINEMENT_BRACKET_S, T_detected]`.
+
+#### Bug 3: Stretching Creating Overlapping Segments (Critical — Fixed)
+
+After filtering short segments by MIN_SEGMENT_DURATION and stretching neighbors to cover gaps,
+two adjacent kept segments could both stretch into the same gap, creating overlaps.
+
+**Fix:** Five-step validation pipeline after stretching: detect/swap degenerate segments,
+remove zero-duration segments, smarter overlap resolution, force first segment to session start,
+force last segment to session end, fill remaining gaps.
+
+### Key Design Decision: Decouple Refinement Bracket from Slope Window
+
+The refinement bracket (`REFINEMENT_BRACKET_S = 2.5s`) is now independent of the long slope
+window (`LONG_SLOPE_WINDOW_S = 2.5s`). These serve different purposes:
+
+- **Slope window**: Controls lag and responsiveness of classification. Smaller = faster response
+  but more sensitive to noise.
+- **Refinement bracket**: Controls the search range when looking for precise boundaries.
+  Must be large enough to encompass the true boundary even when initial classification placed it
+  up to half-a-window away from reality.
+
+Coupling them (setting bracket = window/2) caused the bracket to shrink when we reduced the
+window from 5.0s to 2.5s, making the refinement unable to find boundaries in flat sections
+longer than 1.25s.
+
+### Hysteresis on Long-Slope Threshold
+
+Using a single threshold for both entering and staying in DRIFTING/APPROACHING caused rapid
+state oscillation when the long slope was near the threshold. The 2.5s window slides across
+transition boundaries, causing the slope to drift up and down through the threshold.
+
+**Fix:** Separate enter/stay thresholds:
+- `LONG_SLOPE_THRESHOLD_ENTER = 0.15 cm/s` — harder to trigger a state change
+- `LONG_SLOPE_THRESHOLD_STAY  = 0.08 cm/s` — easier to remain in current state
+
+This creates a dead band that prevents rapid flipping without requiring a significantly
+larger window.
+
+### Remaining Edge Cases
+
+| Case | Severity | Status |
+|------|----------|--------|
+| Flat → flat step change misclassified as APPROACHING | Medium | Fixed by flatness check |
+| Long window lag at transition boundaries | Medium | Partially mitigated by hysteresis + shorter window |
+| Metrics on segments < 0.5s may be unreliable | Low | Documented, no fix planned |
+| Short-slope never fires in gradual drift (slope < 1.0 always) | Low | Long-slope handles this case |
+
+---
+
+## Promising Directions for Session Analytics
 
 ### 1. Absolute Event-Based Metrics (no length normalisation)
 
@@ -29,448 +138,51 @@ Instead of percentages, focus on *what the user achieved* regardless of session 
 
 These are comparable across sessions of different lengths when used in combination.
 
-### 2. Session State Classification
+### 2. Metrics for Non-Fusion Users
+
+For users who never achieve fusion, all segments are STABLE_DEVIATION or DRIFTING. Meaningful
+comparisons across their sessions still exist:
+
+- **Mean deviation** per STABLE_DEVIATION segment — lower is better
+- **Intra-segment slope** — negative slope means the patient is still improving within the stable period
+- **Duration of STABLE_DEVIATION vs DRIFTING** — more stable time, less drift is better
+- **Maximum deviation reached** — a proxy for how far the patient is from fusion threshold
+- **Recovery speed after drift** — how quickly deviation drops after DRIFTING ends
+
+These allow a STABLE_DEVIATION-only session at 3 cm to be correctly ranked better than one at 7 cm,
+even though both have the same state profile.
+
+### 3. Session State Classification (Current Implementation)
 
 Model the time series as transitions between clinical states:
 
 ```
-DRIFTING → APPROACHING → NEAR_FUSION → FUSION → LOSING_FUSION → DRIFTING
+DRIFTING → APPROACHING → NEAR_FUSION → FUSION → DRIFTING
+      ↑                                              ↓
+      └──────────── STABLE_DEVIATION ────────────────┘
 ```
 
-Possible states:
-- **Drifting**: deviation high, no clear convergence trend
-- **Approaching**: deviation decreasing steadily toward threshold
-- **Near-fusion**: deviation within near-fusion band (threshold to threshold + 1 bin)
-- **Fusion**: deviation below threshold
-- **Losing fusion**: deviation increasing from below threshold
-- **Recovered**: returned to near-fusion or fusion after losing it
+States:
+- **DRIFTING**: deviation high, moving further from threshold
+- **APPROACHING**: deviation decreasing toward threshold
+- **NEAR_FUSION**: deviation within near-fusion band (threshold to threshold + 1 cm)
+- **FUSION**: deviation below threshold
+- **STABLE_DEVIATION**: deviation above threshold but not changing significantly
 
 Per-session insight from classification:
-- Duration of each state
-- Number of fusion + losing-fusion cycles (attempt count)
-- Whether user recovered fusion after losing it (resilience indicator)
+- Duration and count of each state
+- Number of fusion cycles (attempt count)
 - Time spent approaching vs drifting (effort quality)
+- Segment quality metrics: median, min, max, variance, intra-segment slope
 
-Possible classification approaches:
-- **Rule-based state machine**: simple threshold + slope rules, deterministic
-- **Hidden Markov Model (HMM)**: probabilistic, handles noise well, learns transition probabilities
-- **Sliding window slope classifier**: classify each window by mean deviation + local trend
-
-### 3. Changepoint Detection
-
-Identify structural breakpoints in the time series where behaviour changes significantly.
-Useful for finding:
-- When the user first "got it" (fusion onset)
-- When fatigue set in (sustained deviation increase)
-- Regime changes mid-session
-
-Libraries/algorithms to evaluate:
-- PELT (Pruned Exact Linear Time) — efficient, good for offline analysis
-- BOCPD (Bayesian Online Changepoint Detection) — probabilistic, handles uncertainty
-- `ruptures` (Python) — reference implementation; evaluate if JS port exists
-
-### 4. Within-Session Trajectory Analysis
-
-Score a session by its *trajectory* not just its values:
-- Is the patient improving *during* the session (negative slope of deviation over time)?
-- Do they maintain improvements or regress?
-- Is the first half better or worse than the second half? (fatigue indicator)
-
-### 5. Cross-Session Patterns
-
-Beyond single-session metrics, look for patterns across sessions:
-- Time-of-day effects (morning vs evening sessions)
-- Day-after effects (does performance dip after intense sessions?)
-- Exercise sequence effects (does Brock String priming improve Pencil Push-up performance?)
-- Learning curves per exercise type (how quickly does the patient improve at each exercise?)
-
-### 6. Distribution Shape Analysis
-
-Rather than collapsing the histogram to a single number, characterise its shape:
-- **Skewness**: right-skewed = mostly large deviation with occasional fusion; left-skewed = mostly near-fusion
-- **Bimodality**: two peaks may indicate the user oscillates between two stable states
-- **Entropy**: high entropy = chaotic; low entropy = consistent behaviour (good or bad)
-
-### 7. Composite Session Quality Score (revised)
-
-Instead of fusion time %, a score based on clinical achievement:
-- Weight: **best fusion streak** (captures peak capability)
-- Weight: **number of fusion events** (captures repeatability)
-- Weight: **time-to-first-fusion** (captures responsiveness — lower is better)
-- Weight: **large deviation time** (penalty for extended poor performance)
-- Possible formula: `score = w1 * log(1 + bestFusionStreak) + w2 * fusionEventCount - w3 * largeDeviationTime`
-  (log dampens the effect of one very long streak; weights to be determined clinically)
-
-## Open Questions
-
-- ~~What is the minimum session length to produce meaningful stats?~~ **→ 10 seconds minimum**
-- ~~Should near-fusion time contribute positively to the session score?~~ **→ Yes, near-fusion time counts**
-- ~~How to handle sessions where fusion is never achieved?~~ **→ Track `minValue` (minimum deviation reached); its trend across sessions shows progress even without fusion**
-- Is there a clinically established scoring system for orthoptic exercise sessions to reference? *(Research R4: no per-session score exists; `minValue` trend maps loosely to vergence amplitude)*
-- Are there published HMM or changepoint approaches for oculomotor assessment data? *(Research R2: Larsson et al. 2019 used HMM for eye-tracking state classification — see R2 findings)*
-
----
-
-## Research Findings (March 2026)
-
-The following sections document research conducted across six areas. Each subsection notes
-libraries, approaches, clinical references, and implementation recommendations.
-
----
-
-### R1. JS/TS Library Survey
-
-#### General Statistics
-
-**`simple-statistics`**
-- npm: `simple-statistics`
-- Features: descriptive stats (mean, median, std dev, variance, IQR, skewness, kurtosis),
-  linear regression, correlation, t-tests, chi-squared, Mann-Whitney U, Pearson r,
-  kernel density estimation.
-- Bundle size: ~35 KB minified, ~10 KB gzipped (no dependencies).
-- TypeScript: ships its own `.d.ts` declarations.
-- Maintenance: actively maintained, high weekly downloads (millions), well-documented.
-- **Recommendation: USE.** This should be the first-choice library for all basic stats needs
-  in this project. Covers skewness, kurtosis, regression, and hypothesis tests with zero
-  dependencies and a small footprint. Sufficient for Phase 1 analytics.
-
-**`jStat` / `jstat-esm`**
-- npm: `jstat` (legacy, CommonJS) or `jstat-esm` (ES module fork with tree-shaking)
-- Features: statistical distributions (beta, gamma, Weibull, Poisson, hypergeometric, etc.),
-  pdf, cdf, inverse CDF, sampling. Broader distribution coverage than `simple-statistics`.
-- Bundle size: `jstat-esm` is ~50 KB minified, ~18 KB gzipped with full import; tree-shaking
-  reduces this significantly if only a few functions are used.
-- TypeScript: `jstat-esm` exports types; the original `jstat` requires `@types/jstat`.
-- Maintenance: `jstat-esm` is more actively maintained than the original.
-- **Recommendation: CONSIDER** if distribution-based hypothesis tests (e.g. t-distribution
-  p-values, F-distribution) are needed beyond what `simple-statistics` provides. Not needed
-  for Phase 1.
-
-#### Signal Processing / Smoothing
-
-**`ml-savitzky-golay`**
-- npm: `ml-savitzky-golay`
-- Purpose: Savitzky-Golay smoothing filter — polynomial least-squares fit over a sliding window.
-  Preserves peaks and local features (important for detecting fusion events in a noisy signal).
-- Maintained by the mljs organisation (actively developed; `ml-signal-processing` v2.1 published
-  February 2026).
-- TypeScript: full TypeScript support across the mljs ecosystem.
-- Bundle size: small (single-purpose module, <5 KB).
-- Also available: `ml-savitzky-golay-generalized` (auto-tunes parameters based on SNR/entropy).
-- **Recommendation: USE** for pre-processing deviation time series before state classification
-  or changepoint detection. Savitzky-Golay is preferred over simple EMA for this use case
-  because it preserves fusion-event peaks rather than rounding them.
-
-**`kalmanjs`**
-- npm: `kalmanjs` (1D Kalman filter)
-- Purpose: lightweight noise filter for 1D streams, no dependencies.
-- TypeScript: via `@types/kalmanjs` (DefinitelyTyped).
-- Maintenance: last published ~7 years ago; types updated more recently. Dormant but stable.
-- Bundle size: negligible (<3 KB).
-- Alternative: `kalman-filter` (npm) — more configurable multi-dimensional version, actively
-  maintained, browser-compatible.
-- **Recommendation: CONSIDER** as an alternative to Savitzky-Golay for real-time smoothing
-  during live session recording. Less suitable than Savitzky-Golay for post-hoc analysis
-  because it is causal (only uses past data) and lags the signal.
-
-**EMA / Moving Average (`moving-averages`)**
-- npm: `moving-averages`
-- Features: SMA, EMA, DMA, WMA.
-- TypeScript: limited (may need manual types).
-- **Recommendation: CONSIDER** only if simplicity is paramount. EMA is trivial to implement
-  from scratch (~5 lines) and should probably not require a dependency. Avoid adding a package
-  for this.
-
-**`dsp-collection`**
-- npm: `dsp-collection`
-- Written in TypeScript; last published early 2026 (recently active).
-- Provides IIR/FIR filters, FFT, window functions.
-- **Recommendation: CONSIDER** if frequency-domain analysis (e.g. detecting oscillatory
-  patterns in deviation) is needed in a later phase. Overkill for current use cases.
-
-#### Hidden Markov Models (HMM)
-
-**`hidden-markov-model-tf`**
-- npm: `hidden-markov-model-tf`
-- Maintained by NearForm; uses TensorFlow.js as backend.
-- Implements Baum-Welch (EM training) and Viterbi (state decoding) for Gaussian-emission HMMs.
-- TypeScript: yes (TensorFlow.js is fully typed).
-- Bundle size: **very large** — depends on `@tensorflow/tfjs`, which is ~300–500 KB gzipped
-  depending on which backends are included.
-- **Recommendation: AVOID** for production use in this app. The TensorFlow.js dependency is
-  disproportionate for a 5-state HMM on 200–6000 points. The added weight would be felt in
-  first load of an offline SPA. If HMM is needed, a custom Baum-Welch implementation for a
-  discrete or Gaussian HMM over 5 states is tractable (~200 lines of TypeScript) and avoids
-  the dependency entirely.
-
-**Other HMM packages (`hmm`, `nodehmm`, `hidden-markov-model`)**
-- All last published 7–10 years ago. No TypeScript support. Effectively abandoned.
-- **Recommendation: AVOID.**
-
-#### Changepoint Detection
-
-**`BayesianChangePointJS`**
-- npm: not published (GitHub only — `mathew-kurian/BayesianChangePointJS`)
-- Pure TypeScript/JavaScript implementation of Bayesian Online Changepoint Detection (BOCPD).
-- Browser and Node.js compatible. Generic TypeScript types.
-- Maintenance: 9 commits, no releases published, created 2020, no recent activity. Dormant.
-- **Recommendation: CONSIDER WITH CAUTION.** The code is readable and small enough to fork
-  or inline. BOCPD is algorithmically sound for this use case (online, probabilistic). But the
-  lack of releases or active maintenance means it should be reviewed and tested before use.
-
-**ED-PELT (no JS package)**
-- An efficient (O(N log N)) variant of PELT with nonparametric support, described in a 2016
-  paper by Andrey Akinshin. Reference implementations exist in C# and Go.
-- No npm package found. A GitHub Gist for PELT exists but is not packaged.
-- **Recommendation: IMPLEMENT IF NEEDED.** ED-PELT is described as straightforward to port.
-  For this application (200–6000 points, offline analysis), an in-house TypeScript port would
-  be feasible (~150–300 lines). PELT's penalty-based formulation makes it well-suited to
-  finding 3–10 regime changes in a session.
-
-**CUSUM (no JS package)**
-- Cumulative Sum algorithm for mean-shift detection. Simple and well understood.
-- No dedicated npm package found for browsers.
-- The sequential computation form is O(N) and trivial to implement from scratch (~20 lines).
-- Limitation: only detects mean shifts; does not handle variance changes or non-stationarity.
-- **Recommendation: IMPLEMENT FROM SCRATCH** for a simple single-changepoint detector
-  (e.g. detecting "when did the patient first stabilise?"). Not suitable as the only
-  changepoint method if multiple regime changes are expected.
-
-**`ruptures` (Python)**
-- The gold-standard Python library for offline changepoint detection (PELT, BOCPD, Binary
-  Segmentation, Window-based). No JS port exists.
-- **Recommendation: REFERENCE ONLY.** Use as algorithm reference when implementing in TS.
-  Not suitable for in-browser use.
-
-#### Dynamic Time Warping (DTW)
-
-**`dynamic-time-warping-ts`**
-- npm: `dynamic-time-warping-ts`
-- TypeScript-native fork of `GordonLesti/dynamic-time-warping`. Provides `getDistance()` and
-  `getPath()`.
-- Bundle size: small (pure JS algorithm, no dependencies, estimated <5 KB).
-- Maintenance: available since ~2021; limited commit history.
-- **Recommendation: USE** if session-to-session similarity is needed. The algorithm for
-  full-matrix DTW is O(N*M) and at N=M=200 (resampled sessions) is ~40,000 operations —
-  very fast in-browser.
-
-**`dynamic-time-warping` (GordonLesti)**
-- npm: `dynamic-time-warping`
-- Last published 9 years ago. No TypeScript.
-- **Recommendation: AVOID** in favour of the TypeScript fork above.
-
-**`dtw` (npm)**
-- Minimal, last published ~8 years ago. No TypeScript.
-- **Recommendation: AVOID.**
-
-**DTW complexity note**: For cross-session comparison (e.g. comparing 50 sessions), the full
-pairwise DTW matrix is O(S² * N²) which could be expensive. Consider limiting to comparing a
-session against a "representative" template or the previous session only.
-
----
-
-### R2. Session State Classification: Approaches Evaluated
-
-#### Option A: Rule-Based State Machine
-
-A deterministic finite state machine using threshold comparisons and local slope estimates.
-
-**How it would work:**
-1. Smooth the deviation series with Savitzky-Golay (window ~1–2 seconds).
-2. Compute the local slope over a rolling window (e.g. 1 second = ~20 points at 50ms sampling).
-3. Apply rules:
-   - `deviation < threshold` → FUSION
-   - `deviation < threshold + nearBand AND slope > 0` → LOSING_FUSION
-   - `deviation < threshold + nearBand` → NEAR_FUSION
-   - `slope < -slopeThreshold` → APPROACHING
-   - otherwise → DRIFTING
-
-**Strengths:**
-- Fully deterministic and inspectable.
-- No training data required.
-- ~50 lines of TypeScript.
-- Handles variable session lengths naturally.
-- The output is directly interpretable in clinical terms.
-
-**Weaknesses:**
-- Sensitive to threshold and window-size parameters.
-- Noise in the slope estimate can cause rapid state flickering (needs hysteresis or debounce).
-- Cannot model uncertainty (a point is always in exactly one state).
-
-**Feasibility for this app: Excellent.** This is the recommended starting point.
-
-#### Option B: Hidden Markov Model
-
-A 5-state Gaussian HMM trained on deviation + slope features via Baum-Welch EM.
-
-**How it would work:**
-1. Define 5 hidden states (DRIFTING, APPROACHING, NEAR_FUSION, FUSION, LOSING_FUSION).
-2. Observations: [smoothed_deviation, slope_estimate] (2D Gaussian emissions).
-3. Train transition matrix and emission parameters using Baum-Welch on labelled or
-   self-supervised data.
-4. Decode optimal state sequence using Viterbi.
-
-**Strengths:**
-- Probabilistic: naturally handles noisy transitions.
-- Captures temporal structure (transition probabilities encode how long states persist).
-- Well-studied in eye movement research (HMMs used for fixation/saccade classification since 2010s;
-  a 2019 paper in Behavior Research Methods used HMM for eye-tracking of moving objects).
-
-**Weaknesses:**
-- Requires either labelled training data or carefully initialised parameters to converge correctly.
-- Baum-Welch EM can converge to local optima — results depend on initialisation.
-- Harder to debug and explain to clinicians than a rule-based system.
-- No production-ready JS library available without TensorFlow.js overhead (see R1 above).
-- A custom implementation is tractable but not trivial (~300–400 lines of TypeScript for
-  a full Gaussian HMM with Viterbi).
-
-**Feasibility for this app: Medium.** Appropriate as a Phase 2 enhancement if the rule-based
-approach proves too fragile. The literature supports HMM use for oculomotor time series.
-
-#### Option C: Sliding Window Classifier
-
-For each time point, classify a sliding window (e.g. ±1 second) by:
-- Mean deviation in window vs threshold bands
-- Slope of linear regression within window
-- Variance within window (high variance = unstable/drifting)
-
-**Strengths:**
-- Simpler than HMM. No training required.
-- Can assign a continuous "state score" rather than a hard label.
-- Easy to tune by adjusting window size.
-
-**Weaknesses:**
-- Edge effects at session start/end.
-- Window size is a significant parameter: too short → noisy; too long → misses brief fusion events.
-- Does not model state transitions (two adjacent windows may independently classify as FUSION
-  even if they are not part of the same fusion episode).
-
-**Feasibility for this app: Good** as a complement to or simplification of the rule-based FSM.
-Less suited to counting fusion *events* (distinct episodes) because it doesn't explicitly model
-state continuity.
-
-#### Recommendation
-
-Implement the **rule-based state machine (Option A)** first, with Savitzky-Golay pre-smoothing
-and hysteresis on state transitions. This gives immediate clinical utility with minimal risk.
-Reserve HMM for Phase 2 if rule-based classification proves too unreliable on noisy real-world data.
-
----
-
-### R3. Changepoint Detection for Short Time Series
-
-#### Context
-
-Sessions of 200–6000 points at ~50ms sampling = 10s to 300s of data. We want to find 2–10
-structural breakpoints (e.g. "user settled after 45 seconds", "fatigue onset at 120 seconds").
-
-#### PELT (Pruned Exact Linear Time)
-
-- Finds the exact globally optimal set of changepoints under a penalised cost function.
-- Time complexity: O(N) average (amortised via pruning), O(N²) worst case.
-- Space complexity: O(N).
-- For N=6000 points, even worst-case is fast enough in-browser (milliseconds).
-- Penalty parameter (λ) controls the number of breakpoints: too small → too many changepoints;
-  too large → misses real ones. BIC/AIC penalty (λ = log(N)) is a reasonable default.
-- No JS implementation found; porting from the C# or Go ED-PELT reference should take ~1–2 days.
-- **Recommendation: IMPLEMENT (Phase 2).** Best algorithm for offline analysis of completed sessions.
-
-#### BOCPD (Bayesian Online Changepoint Detection)
-
-- Probabilistic; produces a posterior over change-point locations rather than point estimates.
-- Suited to streaming/online use (processes points one at a time), though can also run offline.
-- A dormant but functional JS/TS implementation exists (`BayesianChangePointJS` on GitHub).
-- Requires specifying a hazard function (expected run length between changepoints) and a
-  predictive model (conjugate prior, e.g. Gaussian with known variance).
-- **Recommendation: CONSIDER.** Useful if the app ever moves toward real-time session feedback
-  (BOCPD can run during a session). For offline analysis, PELT is preferable.
-
-#### CUSUM
-
-- Detects a single mean shift at a time.
-- O(N), trivial to implement in ~20 lines.
-- Not well-suited to multi-changepoint detection.
-- **Recommendation: IMPLEMENT FROM SCRATCH** for the specific task of finding "time-to-stable"
-  (first point at which the running mean deviation crossed the near-fusion threshold and stayed
-  there). A CUSUM-style test is sufficient for this single-changepoint task.
-
-#### Binary Segmentation (BinSeg)
-
-- Recursively applies a single-changepoint test to sub-segments.
-- O(N log N) time. Simpler to implement than PELT.
-- Less accurate than PELT (greedy, not globally optimal) but often adequate for 3–10 breakpoints.
-- **Recommendation: CONSIDER** as an easier alternative to PELT if implementation effort is
-  a constraint.
-
-#### Computational Cost Summary
-
-| Algorithm | Complexity | N=200 | N=6000 | JS Implementation |
-|-----------|-----------|-------|--------|-------------------|
-| CUSUM     | O(N)      | trivial | trivial | ~20 lines |
-| BinSeg    | O(N log N)| trivial | fast | ~100 lines |
-| PELT      | O(N) avg  | fast | fast | ~200 lines (port from C#/Go) |
-| BOCPD     | O(N)      | fast | fast | existing dormant JS library |
-| BOCPD (full posterior) | O(N²) | fast | ~1s | not practical for N=6000 |
-
----
-
-### R4. Clinical Scoring Systems Research
-
-#### Established Clinical Measures in Orthoptic Practice
-
-Published research does not use a per-session "quality score". Instead, the field uses a
-set of objective clinical measures assessed before and after multi-week therapy programmes:
-
-- **Near Point of Convergence (NPC)**: closest point at which both eyes can maintain
-  binocular fusion. Normal: ≤6 cm. Measured at each clinical visit.
-- **Positive Fusional Vergence (PFV)**: maximum convergence disparity before fusion breaks.
-  Normal: ≥15 prism dioptres. Sheard's criterion: PFV ≥ 2 × magnitude of heterophoria.
-- **Convergence Insufficiency Symptom Survey (CISS)**: 15-item questionnaire, 0–60 scale.
-  Symptomatic: ≥21 (adults), ≥16 (children). Most widely used patient-reported outcome.
-- **Objective vergence response parameters** (research settings, not routine clinical use):
-  latency, peak velocity, settling time, accuracy for step-disparity stimuli. These are measured
-  with laboratory eye-tracking equipment and analysed with custom algorithms.
-
-#### Key Research Finding: No Per-Session Score Exists
-
-The literature does not define a per-session performance score for vision therapy exercises.
-Existing studies aggregate outcomes over weeks (typically 4–16 weeks) and use clinical measures
-rather than in-session metrics. The closest analogue in the literature is **Binocular Fusion
-Maintenance (BFM)** — the ability to sustain fusion under binocular stress — which has been
-validated as a correlate of visual fatigue (Tyrrell et al., TVST, 2019). BFM is measured as
-duration of maintained fusion under increasing demand, not as a time-series quality score.
-
-#### Implication for This App
-
-The app's per-session metrics (fusion events, best streak, time-to-first-fusion) are novel
-contributions with no direct published equivalent. They should be treated as exploratory
-biomarkers, not as validated clinical outcome measures. The closest validated analogues are:
-- Best fusion streak ↔ Fusional vergence amplitude (both measure peak capability)
-- Fusion events ↔ NPC recovery (both measure repeatability of achieving fusion)
-- Time-to-first-fusion ↔ Vergence latency (both measure response speed)
-
-This mapping can be used to motivate the metrics clinically, even in the absence of
-direct validation.
-
----
-
-### R5. Session Quality Scoring: Alternatives to Fusion Time %
+### 4. Session Quality Score: Alternatives to Fusion Time %
 
 #### Why Fusion Time % Fails
 
-The core issue is that fusion-time-% combines two independent things: how often the user
-achieves fusion, and how long they spend attempting after achieving it. A patient who achieves
-fusion at 10 seconds and then continues for 4 more minutes gets penalised relative to one who
-achieves fusion at 10 seconds and stops immediately.
-
-#### Log-Scaled Metrics
-
-Applying `log(1 + x)` to duration-based metrics (fusion streak length, total fusion time)
-dampens the effect of extremely long streaks:
-- A 120s streak scores `log(121) ≈ 4.8`; a 60s streak scores `log(61) ≈ 4.1` — a 2× streak
-  yields only 17% more score, which is more clinically intuitive than a 2× ratio.
-- **Recommendation: USE** log scaling for any duration that can vary by orders of magnitude.
-  The formula already proposed in Section 7 above uses this correctly.
+Fusion-time-% combines two independent things: how often the user achieves fusion, and how long
+they spend attempting after achieving it. A patient who achieves fusion at 10 seconds and then
+continues for 4 more minutes gets penalised relative to one who achieves fusion at 10 seconds
+and stops immediately.
 
 #### Achievement-Based Component Scores
 
@@ -483,21 +195,15 @@ Break the composite score into independent sub-scores that clinicians can interp
 | Peak capability | `log(1 + bestStreak_s) / log(1 + 60)` | Best sustained fusion, normalised to 60s |
 | Stability penalty | `largeDeviationTime_s / sessionDuration` | Fraction of session with high deviation |
 
-Combining these into one number requires weights that are clinically arbitrary without
-validation data. **Recommendation: Display individual sub-scores rather than a single composite
-score** until clinical evidence for weighting is available.
+**Recommendation: Display individual sub-scores rather than a single composite score** until
+clinical evidence for weighting is available.
 
-#### Trajectory Score (Intra-Session Improvement)
+#### Log-Scaled Metrics
 
-A linear regression slope of deviation over time (in cm/minute) is a direct measure of
-within-session improvement:
-- Negative slope = patient is converging toward fusion during the session (good)
-- Positive slope = patient is diverging (fatiguing or deteriorating)
-- Near-zero slope = stable (good if at low deviation, concerning if at high deviation)
-
-This is already partially captured by the TrendChart component for cross-session trends. The
-same approach applies within a single session. `simple-statistics` provides `linearRegression()`
-and `linearRegressionLine()` directly.
+Applying `log(1 + x)` to duration-based metrics dampens the effect of extremely long streaks:
+- A 120s streak scores `log(121) ≈ 4.8`; a 60s streak scores `log(61) ≈ 4.1` — a 2× streak
+  yields only 17% more score, which is more clinically intuitive than a 2× ratio.
+- **Recommendation: USE** log scaling for any duration that can vary by orders of magnitude.
 
 #### Half-Session Comparison
 
@@ -506,64 +212,99 @@ Compare mean deviation in the first half vs second half of a session:
 - `secondHalfMean > firstHalfMean` → possible fatigue or loss of technique
 - The ratio `firstHalfMean / secondHalfMean` is dimensionless and comparable across sessions.
 
-**Recommendation: IMPLEMENT** as a simple, interpretable metric. No new library needed.
+**Recommendation: IMPLEMENT.** No new library needed.
 
-#### Absolute vs Composite Score
+#### Trajectory Score (Intra-Session Improvement)
 
-**Recommendation: Prefer absolute metrics over composite scores for this stage of the project.**
-A composite score requires clinically validated weights, which do not exist in the published
-literature for this type of exercise. Displaying 4–5 interpretable absolute metrics (best streak,
-fusion events, time-to-first-fusion, session slope, half-session ratio) gives clinicians
-more actionable information than a single opaque score.
+A linear regression slope of deviation over time (in cm/minute):
+- Negative slope = patient is converging toward fusion during the session (good)
+- Positive slope = patient is diverging (fatiguing or deteriorating)
+- Near-zero slope = stable (good if at low deviation, concerning if at high deviation)
 
----
+`simple-statistics.linearRegression()` provides this directly.
 
-### R6. Histogram Shape Analysis
+### 5. Changepoint Detection
+
+Identify structural breakpoints where behaviour changes significantly — when the user first
+"got it", when fatigue set in, regime changes mid-session.
+
+#### PELT (Pruned Exact Linear Time)
+
+- Finds the exact globally optimal set of changepoints under a penalised cost function.
+- Time complexity: O(N) average, O(N²) worst case. For N=6000, still fast in-browser.
+- Penalty parameter λ controls the number of breakpoints. BIC penalty (λ = log(N)) is a reasonable default.
+- No JS implementation found; port from C# or Go ED-PELT reference takes ~1–2 days (~200 lines).
+- **Recommendation: IMPLEMENT (Phase 2).** Best algorithm for offline analysis of completed sessions.
+
+#### BOCPD (Bayesian Online Changepoint Detection)
+
+- Probabilistic; produces a posterior over change-point locations.
+- Suited to streaming/online use; can also run offline.
+- Dormant JS/TS implementation: `BayesianChangePointJS` (GitHub only, `mathew-kurian/BayesianChangePointJS`).
+  Code is readable, ~9 commits, no releases, created 2020. Review before use.
+- **Recommendation: CONSIDER** if real-time session feedback is ever needed.
+
+#### CUSUM
+
+- Detects a single mean shift at a time. O(N), ~20 lines of TypeScript.
+- **Recommendation: IMPLEMENT FROM SCRATCH** for "time-to-stable" (first point where running
+  mean deviation crossed near-fusion threshold and stayed there).
+
+#### Binary Segmentation (BinSeg)
+
+- Recursively applies a single-changepoint test. O(N log N). Simpler than PELT, less accurate.
+- **Recommendation: CONSIDER** as an easier alternative to PELT if effort is a constraint.
+
+#### Computational Cost Summary
+
+| Algorithm | Complexity | N=200 | N=6000 | Implementation |
+|-----------|-----------|-------|--------|----------------|
+| CUSUM     | O(N)      | trivial | trivial | ~20 lines custom |
+| BinSeg    | O(N log N)| trivial | fast | ~100 lines custom |
+| PELT      | O(N) avg  | fast | fast | ~200 lines port from C#/Go |
+| BOCPD     | O(N)      | fast | fast | dormant JS library |
+
+### 6. Within-Session Trajectory Analysis
+
+- Is the patient improving *during* the session (negative slope of deviation over time)?
+- Do they maintain improvements or regress?
+- Is the first half better or worse than the second half? (fatigue indicator)
+- `simple-statistics.linearRegression()` provides this directly.
+
+### 7. Cross-Session Patterns
+
+- Time-of-day effects, day-after effects
+- Exercise sequence effects (does Brock String prime Pencil Push-up performance?)
+- Learning curves per exercise type
+
+### 8. Distribution Shape Analysis
 
 #### Bimodality Detection
 
-The deviation histogram (1 cm bins, typically 0–10 cm) may show bimodality when a patient
-oscillates between two states (e.g. a "fused" state near 0 cm and a "drifting" state at 3–5 cm).
-Detecting this is clinically meaningful: bimodality suggests the patient has a learnable fusion
-response, even if unstable.
+The deviation histogram may show bimodality when a patient oscillates between two states
+(e.g. fused at ~0 cm and drifting at 3–5 cm). Clinically meaningful: suggests a learnable
+fusion response even if unstable.
 
 **Bimodality Coefficient (Sarle's BC)**
 
-The bimodality coefficient is defined as:
 ```
 BC = (skewness² + 1) / (kurtosis + correction)
+correction = 3(n-1)² / ((n-2)(n-3))
 ```
-where `correction = 3(n-1)²/((n-2)(n-3))` accounts for sample-size bias.
 
-- BC > 5/9 ≈ 0.555 is the threshold for bimodality (compared against the uniform distribution).
-- Both `skewness` and `kurtosis` are available from `simple-statistics`.
-- The formula is trivial to implement from scratch (~10 lines) using these outputs.
-- **Limitation**: BC can misclassify some unimodal distributions as bimodal when skewness is high.
-  It is better suited as a screening heuristic than a definitive test.
-- **Recommendation: IMPLEMENT** from scratch using `simple-statistics` outputs. No additional
-  library needed.
+- BC > 5/9 ≈ 0.555 indicates bimodality.
+- Both `skewness` and `kurtosis` available from `simple-statistics`.
+- Trivial to implement (~10 lines). **Recommendation: IMPLEMENT.**
+- **Limitation:** Can misclassify some unimodal distributions when skewness is high. Use as
+  a screening heuristic, not a definitive test.
 
-**Hartigan's Dip Test**
+**Hartigan's Dip Test** — the gold-standard formal test for bimodality. No JS npm package
+found. R (`diptest`) and Python implementations exist. Requires O(N²) table lookups for p-values.
+**Recommendation: DEFER to Phase 3.** Use BC as first approximation.
 
-- Formally tests unimodality vs non-unimodality by measuring the maximum deviation between the
-  ECDF and the nearest unimodal distribution.
-- The gold-standard test for bimodality; well-known in statistics literature.
-- **JS/npm implementation**: No dedicated npm package found. Implementations exist in R (`diptest`)
-  and Python (`diptest` on PyPI). A JavaScript port was not found on npm. The algorithm can be
-  ported (the FORTRAN reference code is public domain), but it requires O(N²) table lookups for
-  p-values which adds complexity.
-- **Recommendation: DEFER.** Use BC as a first approximation. Hartigan's dip is appropriate
-  for a Phase 3 enhancement if bimodality analysis becomes a core feature.
-
-**Silverman's Bandwidth Test**
-
-- Uses kernel density estimation (KDE) with progressively narrower bandwidths; detects the minimum
-  bandwidth at which the KDE has k modes.
-- More powerful than BC but computationally heavier and requires bootstrap for p-values.
-- No JS npm implementation found. D3.js provides KDE primitives (Gaussian kernel) which could
-  be used to build this manually.
-- **Recommendation: AVOID** for now. Computationally intensive and no ready JS implementation.
-  BC + visual inspection of the histogram is sufficient for initial deployment.
+**Silverman's Bandwidth Test** — more powerful than BC but requires KDE and bootstrap for
+p-values. No JS implementation found. **Recommendation: AVOID** for now. BC + visual inspection
+of the histogram is sufficient.
 
 #### Distribution Entropy
 
@@ -571,116 +312,224 @@ Shannon entropy of the histogram bin probabilities:
 ```
 H = -Σ p_i * log2(p_i)   (where p_i = bin_count_i / total_count)
 ```
-- Maximum entropy (uniform distribution) = log2(num_bins), e.g. log2(10) = 3.32 bits for a 10-bin histogram.
-- Low entropy = concentrated distribution (patient consistently at one deviation level).
-- High entropy = spread distribution (patient's deviation is variable/chaotic).
-- A JavaScript implementation is trivial (~8 lines) using `simple-statistics`' histogram or
-  directly from bin counts. A GitHub Gist demonstrates the pattern:
-  `bins.reduce((H, p) => p > 0 ? H - p * Math.log2(p) : H, 0)`.
-- **Recommendation: IMPLEMENT** from scratch. No library needed. This is one of the most
-  informative and cheapest-to-compute histogram metrics.
+- Low entropy = concentrated (patient consistently at one deviation level).
+- High entropy = spread (patient's deviation is variable/chaotic).
+- ~8 lines of code. **Recommendation: IMPLEMENT.**
 
 #### Skewness Interpretation
 
-- Right-skewed (positive skewness): patient spends most time at high deviation with occasional
-  fusion events. Early-stage therapy or difficult exercise.
-- Left-skewed (negative skewness): patient mostly near fusion with occasional deviations.
-  Advanced / well-controlled performance.
-- Near-zero skewness with high kurtosis: patient has a consistent moderate deviation.
-- `simple-statistics.sampleSkewness()` and `sampleKurtosis()` implement the sample-corrected
-  versions directly.
-- **Recommendation: USE** as qualitative session descriptors alongside the histogram display.
+- **Right-skewed** (positive): mostly large deviation with occasional fusion. Early-stage therapy.
+- **Left-skewed** (negative): mostly near-fusion with occasional deviations. Advanced performance.
+- **Near-zero with high kurtosis**: consistent moderate deviation.
+- `simple-statistics.sampleSkewness()` and `sampleKurtosis()` available directly.
 
 #### Sample Size Considerations
 
-With 10–50 histogram bins and typical session sizes (200–6000 data points), there should be
-sufficient counts per bin for reliable bin-level statistics. However:
-- Very short sessions (< 30 seconds / ~600 points) may have sparse bins at extreme deviations.
-- Skewness and kurtosis are unreliable for < ~50 observations (excess kurtosis especially).
-- The bimodality coefficient is computed over the raw data points (not the bins), so sample
-  size for BC should be evaluated on the point count, not the bin count.
+Skewness and kurtosis are unreliable for < ~50 observations. The bimodality coefficient is
+computed over raw data points (not bins), so sample size for BC should be evaluated on the
+point count (200–6000 points in typical sessions — sufficient).
 
 ---
 
-### R7. Implementation Priority Summary
+## Open Questions
 
-| Feature | Approach | Effort | Phase |
-|---------|----------|--------|-------|
-| Skewness, kurtosis, entropy | `simple-statistics` + trivial formulas | Low | 1 |
-| Bimodality coefficient | 10 lines from `simple-statistics` | Low | 1 |
-| Half-session deviation ratio | Trivial split + mean | Low | 1 |
-| Session slope (trajectory) | `simple-statistics.linearRegression` | Low | 1 |
-| Fusion events, best streak, time-to-first | Already in ideas doc | Low | 1 |
-| Savitzky-Golay smoothing pre-processing | `ml-savitzky-golay` | Low | 1–2 |
-| Rule-based state machine | Custom TypeScript FSM | Medium | 2 |
-| CUSUM single-changepoint | ~20-line custom implementation | Low | 2 |
-| PELT multi-changepoint | Port from C#/Go ED-PELT | Medium-High | 2–3 |
-| DTW session similarity | `dynamic-time-warping-ts` | Low | 2–3 |
-| Gaussian HMM state classifier | Custom TypeScript (~300 lines) | High | 3 |
-| Hartigan's dip test | Port from FORTRAN/R | High | 3 |
+- ~~What is the minimum session length to produce meaningful stats?~~ **→ 10 seconds minimum**
+- ~~Should near-fusion time contribute positively to the session score?~~ **→ Yes, near-fusion time counts**
+- ~~How to handle sessions where fusion is never achieved?~~ **→ Track per-segment metrics; mean deviation, intra-segment slope, and STABLE vs DRIFTING ratio remain meaningful**
+- Is there a clinically established scoring system for orthoptic exercise sessions to reference? *(R3: no per-session score exists; `minValue` trend maps loosely to vergence amplitude)*
+- Are there published HMM or changepoint approaches for oculomotor assessment data? *(Larsson et al. 2019 — see R5)*
+- Should the flatness check threshold (0.05 cm) vary with the fusion threshold, or be fixed?
+- Can we detect "stuck at plateau" (patient at stable deviation, not improving) vs "recovering" (stable but trending down)?
 
 ---
 
-### R8. Libraries and Tools: Final Verdict
+## Research Findings
 
-| Library / Package | Recommendation | Reason |
-|-------------------|---------------|--------|
-| `simple-statistics` | **USE** | Small, zero-dep, TypeScript, covers Phase 1 needs |
-| `ml-savitzky-golay` | **USE** | Small, TypeScript, mljs ecosystem, actively maintained |
-| `jstat-esm` | **CONSIDER** | If distribution tests beyond `simple-statistics` are needed |
-| `dynamic-time-warping-ts` | **USE if DTW needed** | TypeScript, small, no deps |
-| `kalmanjs` | **CONSIDER** | For real-time smoothing only; dormant but stable |
-| `moving-averages` | **AVOID** | EMA is trivial to implement inline; no dep needed |
-| `dsp-collection` | **CONSIDER (Phase 3)** | Only if FFT/frequency analysis is needed |
-| `hidden-markov-model-tf` | **AVOID** | TensorFlow.js overhead is prohibitive for this use case |
-| `hmm`, `nodehmm` | **AVOID** | Abandoned, no TypeScript |
-| `BayesianChangePointJS` | **CONSIDER (Phase 2)** | Dormant; review code before use; BOCPD algorithm is sound |
-| `dynamic-time-warping` (legacy) | **AVOID** | Use TypeScript fork instead |
-| `ruptures` (Python) | **REFERENCE ONLY** | No browser port exists |
-| `@tensorflow/tfjs` | **AVOID** | 300–500 KB gzipped; not justified for analytics |
+### R1. JS/TS Library Survey
+
+#### Recommended Libraries
+
+**`simple-statistics`** — USE
+- Features: mean, median, std dev, variance, IQR, skewness, kurtosis, linear regression,
+  correlation, t-tests, chi-squared, Mann-Whitney U, Pearson r, KDE.
+- ~35 KB minified, ~10 KB gzipped, no dependencies, ships `.d.ts`.
+- First-choice library for all basic stats needs in this project.
+
+**`ml-savitzky-golay`** — USE for pre-processing
+- Savitzky-Golay smoothing: polynomial least-squares over a sliding window.
+- Preserves peaks and local features (important for detecting fusion events in noisy signal).
+- Maintained by mljs org (actively developed). TypeScript, small (<5 KB).
+- *Note:* Simple moving average is currently used instead — Savitzky-Golay was producing
+  negative values from positive data in early tests. Worth re-evaluating.
+
+**`dynamic-time-warping-ts`** — USE if session similarity is needed
+- TypeScript-native fork of `GordonLesti/dynamic-time-warping`. No dependencies, small.
+- For cross-session comparison at N=M=200 resampled points: ~40,000 operations — fast in-browser.
+- For full pairwise comparison of 50 sessions: O(S² × N²) — consider limiting to comparing
+  against a representative template or previous session only.
+
+**`jstat-esm`** — CONSIDER
+- Statistical distributions (beta, gamma, Weibull, Poisson, etc.), pdf, cdf, inverse CDF.
+- ~50 KB minified, tree-shakeable. More distributions than `simple-statistics`.
+- Only needed if distribution-based hypothesis tests are required in Phase 2+.
+
+**`kalmanjs`** — CONSIDER for real-time use only
+- 1D Kalman filter. Causal (past data only), introduces lag. Last published ~7 years ago, stable.
+- Less suitable than Savitzky-Golay for post-hoc analysis. Good for live session smoothing.
+
+#### Libraries Evaluated and Rejected
+
+**`moving-averages` (EMA/SMA)** — AVOID
+- EMA is ~5 lines to implement inline. Adding a package dependency is not justified.
+
+**`dsp-collection`** — CONSIDER only for Phase 3
+- IIR/FIR filters, FFT, window functions. TypeScript, recently active.
+- Only if frequency-domain analysis (detecting oscillatory deviation patterns) is needed.
+  Overkill for current use cases.
+
+**`hidden-markov-model-tf`** — AVOID
+- TensorFlow.js dependency (~300–500 KB gzipped). Prohibitive for an offline SPA.
+- A custom Baum-Welch + Viterbi implementation is ~300–400 lines TypeScript and avoids
+  the dependency entirely.
+
+**`hmm`, `nodehmm`, `hidden-markov-model`** — AVOID
+- All last published 7–10 years ago. No TypeScript support. Abandoned.
+
+**`BayesianChangePointJS`** — CONSIDER WITH CAUTION (Phase 2)
+- GitHub only (`mathew-kurian/BayesianChangePointJS`). Pure TypeScript BOCPD implementation.
+- 9 commits, no releases, no recent activity. Dormant but readable and small enough to fork.
+- Review code quality before committing to it.
+
+**`dynamic-time-warping` (GordonLesti)** — AVOID
+- Last published 9 years ago, no TypeScript. Use the TypeScript fork above instead.
+
+**`dtw` (npm)** — AVOID
+- Minimal, ~8 years old, no TypeScript.
+
+**`ruptures` (Python)** — REFERENCE ONLY
+- Gold-standard Python library for offline changepoint detection (PELT, BOCPD, BinSeg, Window).
+- No JS port exists. Use as algorithm reference when implementing in TypeScript.
+
+**`@tensorflow/tfjs`** — AVOID
+- 300–500 KB gzipped. Not justified for a 5-state HMM on 200–6000 points.
 
 ---
 
-### R9. Key Literature References
+### R2. Session State Classification Approaches
 
-- Horwood et al. (2014). "Clinical test responses to different orthoptic exercise regimes in
-  typical young adults." *Ophthalmic and Physiological Optics*, 34(2). DOI: 10.1111/opo.12109.
+#### Option A: Rule-Based FSM (Current Approach) — Recommended for Phase 1
+
+Deterministic, inspectable, ~50–200 lines TypeScript, no training data required.
+Handles variable session lengths naturally. Output is directly interpretable clinically.
+
+**Weaknesses:** Sensitive to threshold and window parameters. Rapid state flickering near
+thresholds → requires hysteresis. Cannot model uncertainty (a point is always in exactly one state).
+
+#### Option B: Hidden Markov Model — Recommended for Phase 2
+
+5-state Gaussian HMM trained on deviation + slope features via Baum-Welch EM, decoded with Viterbi.
+Probabilistic, captures temporal structure, handles noise naturally. Used in oculomotor research
+(Larsson et al. 2019, Behavior Research Methods).
+
+**Weaknesses:** Requires labelled or carefully initialised data. Baum-Welch can converge to
+local optima. Harder to explain to clinicians. No ready JS library without TensorFlow.js.
+Custom implementation: ~300–400 lines TypeScript.
+
+#### Option C: Sliding Window Classifier — Good complement to FSM
+
+For each time point, classify a sliding window by mean deviation, slope, and variance.
+Can assign continuous "state scores" rather than hard labels. Easy to tune.
+
+**Weaknesses:** Does not model state continuity — cannot count distinct fusion episodes.
+Edge effects at session start/end.
+
+---
+
+### R3. Clinical Scoring Systems
+
+Published research does not define a per-session performance score. The field uses:
+- **NPC** (Near Point of Convergence): normal ≤ 6 cm.
+- **PFV** (Positive Fusional Vergence): normal ≥ 15 prism dioptres. Sheard's criterion: PFV ≥ 2 × heterophoria.
+- **CISS** (Convergence Insufficiency Symptom Survey): 15-item, 0–60. Symptomatic: ≥ 21 (adults), ≥ 16 (children).
+
+These are measured pre/post multi-week therapy programmes, not per-session.
+
+**Closest published analogues to this app's metrics:**
+- Best fusion streak ↔ Fusional vergence amplitude (both measure peak capability)
+- Fusion events ↔ NPC recovery (both measure repeatability of achieving fusion)
+- Time-to-first-fusion ↔ Vergence latency (both measure response speed)
+
+The app's per-session metrics are novel contributions — exploratory biomarkers, not validated
+clinical outcome measures. This mapping can be used to motivate them clinically.
+
+---
+
+### R4. Implementation Priority
+
+| Feature | Effort | Phase |
+|---------|--------|-------|
+| Per-segment quality metrics (median, slope) | Done | 1 ✓ |
+| Flatness check in classification | Done | 1 ✓ |
+| Context-aware STABLE_DEVIATION duration filter | Done | 1 ✓ |
+| Skewness, kurtosis, entropy | Low | 1 |
+| Bimodality coefficient (Sarle's BC) | Low | 1 |
+| Half-session deviation ratio | Low | 1 |
+| Session slope (trajectory) | Low | 1 |
+| CUSUM single-changepoint ("time-to-stable") | Low | 2 |
+| PELT multi-changepoint | Medium | 2–3 |
+| DTW session similarity | Low | 2–3 |
+| Gaussian HMM state classifier | High | 3 |
+| Hartigan's Dip Test | High | 3 |
+
+---
+
+### R5. Key Literature References
+
+- **Tyrrell et al. (2019).** "Objective Evaluation of Visual Fatigue Using Binocular Fusion
+  Maintenance." *Translational Vision Science & Technology*, 8(6). DOI: 10.1167/tvst.8.6.4.
+  — BFM as fusion-maintenance duration metric; closest published analogue to per-session
+  fusion-streak scoring.
+
+- **Convergence Insufficiency Treatment Trial (CITT) studies (2008–2021).** Published in
+  *Archives of Ophthalmology* and *JAAPOS*. Define standard clinical thresholds:
+  NPC ≤ 6 cm, PFV ≥ 15 pd, CISS < 16 (children) / < 21 (adults).
+
+- **Larsson et al. (2019).** "A hidden Markov model for analyzing eye-tracking of moving
+  objects." *Behavior Research Methods*, 52, 2132–2145. DOI: 10.3758/s13428-019-01313-2.
+  — HMM for eye-tracking state classification; supports feasibility of HMM for Phase 2.
+
+- **Nyström & Holmqvist (2010).** "An adaptive algorithm for fixation, saccade, and glissade
+  detection in eyetracking data." *Behavior Research Methods*. — Segmented linear regression
+  for classifying eye movement states; applicable to deviation classification.
+
+- **Adams et al. (2007).** "Bayesian Online Changepoint Detection." *arXiv:0710.3742*.
+  — Reference paper for BOCPD algorithm.
+
+- **Akinshin, A. (2022).** "ED-PELT: Implementation of an efficient algorithm for changepoint
+  detection." https://aakinshin.net/posts/edpelt/ — Source for porting ED-PELT to TypeScript.
+
+- **Horwood et al. (2014).** "Clinical test responses to different orthoptic exercise regimes
+  in typical young adults." *Ophthalmic and Physiological Optics*, 34(2). DOI: 10.1111/opo.12109.
   — No per-session scoring; uses NPC, PFV, CISS as pre/post outcome measures.
 
-- Convergence Insufficiency Treatment Trial (CITT) studies (2008–2021). Published in *Archives of
-  Ophthalmology* and *JAAPOS*. Define standard clinical thresholds: NPC ≤6 cm, PFV ≥15 pd,
-  CISS <16 (children) / <21 (adults).
-
-- Tyrrell et al. (2019). "Objective Evaluation of Visual Fatigue Using Binocular Fusion
-  Maintenance." *Translational Vision Science & Technology*, 8(6). — BFM as fusion-maintenance
-  duration metric; closest published analogue to per-session fusion-streak scoring.
-
-- Nyström & Holmqvist (2010). "An adaptive algorithm for fixation, saccade, and glissade
-  detection in eyetracking data." *Behavior Research Methods*. — Segmented linear regression
-  approach to classifying eye movement states; applicable to deviation classification.
-
-- Larsson et al. (2019). "A hidden Markov model for analyzing eye-tracking of moving objects."
-  *Behavior Research Methods*, 52, 2132–2145. DOI: 10.3758/s13428-019-01313-2. — HMM for
-  eye-tracking state classification; supports feasibility of HMM for state machine in Phase 2.
-
-- Adams et al. (2007). "Bayesian Online Changepoint Detection." *arXiv:0710.3742*. — Reference
-  paper for BOCPD algorithm used by `BayesianChangePointJS`.
-
-- Akinshin, A. (2022). "ED-PELT: Implementation of an efficient algorithm for changepoint
-  detection." Blog post with C# reference implementation. —
-  https://aakinshin.net/posts/edpelt/ — Source for porting ED-PELT to TypeScript.
-
 ---
 
-## Research Tasks (Updated)
+## Research Tasks
 
 - [x] Survey existing clinical scoring systems for orthoptic exercise outcomes
-- [x] Evaluate JS/TS-compatible libraries for: HMM, changepoint detection, DTW, signal processing
+- [x] Evaluate JS/TS libraries for HMM, changepoint, DTW, signal processing
 - [x] Find published approaches to oculomotor time series classification
-- [ ] Prototype rule-based state machine classifier on sample data
-- [x] Evaluate whether `sessionScore` should be log-scaled or use a different formula
-- [x] Research whether bimodality detection is feasible with small bin counts
-- [ ] Implement Phase 1 metrics using `simple-statistics`
-- [ ] Implement Savitzky-Golay pre-smoothing for deviation series
+- [x] Implement rule-based state machine classifier
+- [x] Fix critical boundary refinement bugs (backward segments, overlaps)
+- [x] Add hysteresis to prevent threshold oscillation
+- [x] Reduce long slope window for faster response (5.0s → 2.5s)
+- [x] Decouple refinement bracket from slope window
+- [x] Implement flatness check to correctly classify flat regions
+- [x] Implement context-aware STABLE_DEVIATION duration filter
+- [x] Evaluate whether `sessionScore` should be log-scaled → Yes, use `log(1 + x)`
+- [x] Research bimodality detection feasibility → BC is sufficient for Phase 1; Hartigan's deferred
+- [ ] Implement Phase 1 stats metrics using `simple-statistics` (skewness, entropy, BC, half-session ratio)
+- [ ] Evaluate Savitzky-Golay vs current moving average (revisit negative-value issue)
 - [ ] Prototype CUSUM single-changepoint detection for "time-to-stable" metric
 - [ ] Evaluate `BayesianChangePointJS` code quality before committing to it
+- [ ] Test segmentation with synthetic noisy patterns: tremor, noise-only, single-point jump
