@@ -17,11 +17,32 @@ export function useSessionAnalysisState() {
       return { selectedSessionIds: [], zoomStart: 0, zoomEnd: 20 };
     }
 
+    // Helper for safe integer parsing with validation
+    const safeParseInt = (value: string | null, defaultValue: number): number => {
+      if (!value) return defaultValue;
+      const parsed = parseInt(value, 10);  // Add radix 10
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
     const params = new URLSearchParams(window.location.search);
-    const sessionIds = params.get('sessions')?.split(',').filter(id => id.length > 0) || [];
+
+    // Parse sessions with semicolon delimiter (safer than comma)
+    const sessionIds = (params.get('sessions') || '')
+      .split(';')
+      .filter(id => id.length > 0);
+
     const exerciseFilter = params.get('exercise') || undefined;
-    const zoomStart = parseInt(params.get('zoomStart') || '0');
-    const zoomEnd = parseInt(params.get('zoomEnd') || '20');
+
+    // Parse zoom values with safe parsing
+    let zoomStart = safeParseInt(params.get('zoomStart'), 0);
+    let zoomEnd = safeParseInt(params.get('zoomEnd'), 20);
+
+    // Validate zoom range: ensure zoomStart <= zoomEnd
+    if (zoomStart > zoomEnd) {
+      zoomStart = 0;
+      zoomEnd = 20;
+    }
+
     const drilledDownSessionId = params.get('detail') || undefined;
 
     return { selectedSessionIds: sessionIds, exerciseFilter, zoomStart, zoomEnd, drilledDownSessionId };
@@ -33,7 +54,7 @@ export function useSessionAnalysisState() {
 
     const params = new URLSearchParams();
     if (state.selectedSessionIds.length > 0) {
-      params.set('sessions', state.selectedSessionIds.join(','));
+      params.set('sessions', state.selectedSessionIds.join(';'));
     }
     if (state.exerciseFilter) {
       params.set('exercise', state.exerciseFilter);
