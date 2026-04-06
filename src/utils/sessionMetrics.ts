@@ -772,6 +772,66 @@ export function calculateLongestFusionStreak(segments: StateSegment[]): number {
     .reduce((max, s) => Math.max(max, s.duration), 0);
 }
 
+export function computeSessionAggregateMetrics(
+  stateSegments: StateSegment[],
+  timeSeries: TimeSeries[]
+): {
+  bestStableDeviation: number;
+  nearBestStableTime: number;
+  qualityPercent: number;
+  driftingPercent: number;
+  approachingPercent: number;
+} {
+  // 1. Find bestStableDeviation from quality states
+  let bestMeanDev = Infinity;
+  for (const seg of stateSegments) {
+    if ((seg.state === 'FUSION' || seg.state === 'NEAR_FUSION' || seg.state === 'STABLE_DEVIATION') && seg.metrics) {
+      bestMeanDev = Math.min(bestMeanDev, seg.metrics.meanDeviation);
+    }
+  }
+
+  // Fallback if no quality segments exist
+  if (!isFinite(bestMeanDev)) {
+    bestMeanDev = Math.max(...timeSeries.map(p => Math.sqrt(p.x * p.x + p.y * p.y)));
+  }
+
+  // 2. Find session max deviation
+  const sessionMaxDev = Math.max(...timeSeries.map(p => Math.sqrt(p.x * p.x + p.y * p.y)));
+
+  // 3. Compute threshold using band percent constant
+  const nearBestThreshold = bestMeanDev + (NEAR_BEST_THRESHOLD_BAND_PERCENT / 100) * (sessionMaxDev - bestMeanDev);
+
+  // 4. Filter to quality segments and sum durations
+  let nearBestTotalTime = 0;
+  for (const seg of stateSegments) {
+    const isQuality = (seg.state === 'FUSION' || seg.state === 'NEAR_FUSION' || seg.state === 'STABLE_DEVIATION');
+    if (isQuality && seg.metrics && seg.metrics.meanDeviation <= nearBestThreshold) {
+      nearBestTotalTime += seg.duration;
+    }
+  }
+
+  // 5. Compute percentages
+  const sessionDuration = timeSeries.length > 1
+    ? (timeSeries[timeSeries.length - 1].t - timeSeries[0].t) / 1000
+    : 1;
+
+  const qualityPercent = (nearBestTotalTime / sessionDuration) * 100;
+
+  let driftingTime = 0, approachingTime = 0;
+  for (const seg of stateSegments) {
+    if (seg.state === 'DRIFTING') driftingTime += seg.duration;
+    if (seg.state === 'APPROACHING') approachingTime += seg.duration;
+  }
+
+  return {
+    bestStableDeviation: bestMeanDev,
+    nearBestStableTime: nearBestTotalTime,
+    qualityPercent,
+    driftingPercent: (driftingTime / sessionDuration) * 100,
+    approachingPercent: (approachingTime / sessionDuration) * 100,
+  };
+}
+
 export function computeSessionMetrics(
   session: Session,
   thresholds: { deviation: number; rotation: number },
