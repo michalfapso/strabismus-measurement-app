@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { SessionMetrics } from '../types/analysis';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { css } from '@emotion/react';
+import { THEME } from '../theme';
 
 interface ProgressGraphsProps {
   sessions: SessionMetrics[];
@@ -16,9 +17,6 @@ interface ProgressGraphsProps {
  * - Graph 3: qualityPercent + driftingPercent + approachingPercent (%)
  */
 export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: ProgressGraphsProps) {
-  const [zoomStart, setZoomStart] = useState(0);
-  const [zoomEnd, setZoomEnd] = useState(sessions.length);
-
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
     if (!exerciseFilter) return sessions;
@@ -53,7 +51,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Best Stable Deviation (cm)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData}>
+          <LineChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="sessionIndex" />
             <YAxis />
@@ -61,7 +59,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <Line
               type="monotone"
               dataKey="bestStableDeviation"
-              stroke="#8884d8"
+              stroke={THEME.metricDeviation}
               isAnimationActive={false}
             />
           </LineChart>
@@ -71,7 +69,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData}>
+          <LineChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="sessionIndex" />
             <YAxis />
@@ -79,7 +77,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <Line
               type="monotone"
               dataKey="nearBestStableTime"
-              stroke="#82ca9d"
+              stroke={THEME.stateNearFusion}
               isAnimationActive={false}
             />
           </LineChart>
@@ -89,14 +87,14 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={graphData}>
+          <AreaChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="sessionIndex" />
             <YAxis />
             <Tooltip />
-            <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke="#8884d8" fill="#8884d8" />
-            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
-            <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke="#ffc658" fill="#ffc658" />
+            <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} />
+            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} />
+            <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke={THEME.stateApproaching} fill={THEME.stateApproaching} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -112,7 +110,7 @@ const styles = {
     padding: 20px;
   `,
   graphContainer: css`
-    border: 1px solid #e0e0e0;
+    border: 1px solid ${THEME.borderPrimary};
     border-radius: 4px;
     padding: 12px;
   `,
