@@ -63,24 +63,19 @@ Current system:
 **Add to `SessionMetrics`:**
 ```typescript
 export interface SessionMetrics {
-  // ... existing fields ...
+  // ... existing fields (including longestFusionStreak, fusionEventCount,
+  //     fusionTimePercent, fusionAchieved — all unchanged, always computed) ...
 
-  // Segment-derived metrics (always computed)
-  bestStableDeviation: number;      // min meanDeviation of quality segments
+  // Segment-derived metrics (new, always computed for all users)
+  bestStableDeviation: number;      // min meanDeviation across quality segments
   nearBestStableTime: number;       // total duration of quality segments (seconds)
   qualityPercent: number;           // % of session in quality segments
   driftingPercent: number;          // % of session in DRIFTING
   approachingPercent: number;       // % of session in APPROACHING
-
-  // Fusion-specific metrics (computed only when fusionAchievedRate >= 30%)
-  longestFusionStreak: number;      // existing, keep
-  fusionEventCount: number;         // existing, keep
-  fusionTimePercent: number;        // existing, keep
-  fusionAchieved: boolean;          // existing, keep
-
-  // ... rest unchanged ...
 }
 ```
+
+Note: `longestFusionStreak`, `fusionEventCount`, `fusionTimePercent`, `fusionAchieved` remain in `SessionMetrics` and are always computed per-session. The 30% threshold applies only to whether `analysisInsights.ts` includes fusion trends in the returned `ProgressInsight` — not to whether the fields exist in `SessionMetrics`.
 
 ---
 
@@ -160,22 +155,26 @@ Call this during `calculateSessionMetrics()` and merge the result into the retur
 
 ### `src/utils/analysisInsights.ts`
 
-**Strategy**: All users always use segment-derived metrics. Fusion-specific metrics only when `fusionAchievedRate >= 30%`.
+**Strategy**: All users always get segment-derived metric trends computed. Additionally, fusion-specific trends are computed when `fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT`.
 
 #### `calculateProgressInsight()`
 
-**Current**: Trends `longestFusionStreak` unconditionally.
+**Current**: Trends `longestFusionStreak` unconditionally. Returns `minValueTrend`.
 
-**New**: Always compute segment-derived trends. Additionally, compute fusion-specific trends if `fusionRate >= 30%`.
-- Compute `fusionRate = (fusionAchievedCount / totalSessions) * 100`
+**New**:
+- Compute `fusionAchievedRate = (fusionAchievedCount / totalSessions) * 100`
 - Always compute trends on `bestStableDeviation`, `nearBestStableTime`, and `qualityPercent`
-- If `fusionRate >= 30%`: additionally compute fusion metric trends (`longestFusionStreak`, `fusionEventCount`)
+- If `fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT`: additionally compute trends on `longestFusionStreak` and `fusionEventCount`
+- Remove `minValueTrend` (metric no longer exists)
 
-**Output structure** (extend `ProgressInsight`):
+**Output structure** (replaces current `ProgressInsight`):
 ```typescript
 export interface ProgressInsight {
   metric: 'deviation' | 'rotation';
-  fusionRate: number;  // % of sessions where fusion was achieved
+  fusionAchievedRate: number;  // % of sessions where fusion was achieved
+  fusionAchievedCount: number;
+  totalSessions: number;
+  aggregateHistogram: HistogramBin[];
 
   // Segment-derived trends (always computed, all users)
   bestStableDeviationTrend: {
@@ -194,7 +193,7 @@ export interface ProgressInsight {
     significance: { p: number; significant: boolean };
   };
 
-  // Fusion trends (computed only if fusionRate >= 30%)
+  // Fusion trends (only present if fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT)
   fusionStreakTrend?: {
     slope: number;
     direction: 'improving' | 'declining' | 'stable';
@@ -205,8 +204,6 @@ export interface ProgressInsight {
     direction: 'improving' | 'declining' | 'stable';
     significance: { p: number; significant: boolean };
   };
-
-  // ... existing fields ...
 }
 ```
 
@@ -225,9 +222,9 @@ Compute as `median(bestStableDeviation)` and `median(nearBestStableTime)` for se
 
 #### `calculateSessionQualityInsight()`
 
-**Current**: Uses `minValue` as fallback for low-fusion sessions.
+**Current**: Uses `longestFusionStreak` for outlier detection when fusion rate is high; falls back to `minValue` when fusion rate is low.
 
-**New**: Use `bestStableDeviation` instead for outlier detection (Z-score based, as before).
+**New**: Use `bestStableDeviation` as the primary outlier detection metric for all users unconditionally. Remove the `fusionRate >= 30%` branching logic. `bestStableDeviation` is always computed and is a better outlier signal than the noisy single-point `minValue`.
 
 #### `calculateMilestoneInsight()`
 
@@ -317,7 +314,7 @@ interface ProgressGraphsProps {
 | Scenario | Behavior |
 |----------|----------|
 | No FUSION/NEAR_FUSION/STABLE_DEVIATION segments | `bestStableDeviation` = `sessionMaxDeviation` (worst case) |
-| All quality segments exceed nearBestThreshold | `nearBestStableTime` = 0 (no segments qualify) |
+| Only DRIFTING/APPROACHING segments in session | `bestStableDeviation` = `sessionMaxDeviation` as fallback; `nearBestStableTime` = 0 |
 | Very short session (< 1s) | Metrics compute as normal, graphs show zero/minimal values |
 | Empty timeSeries | Return default values: `bestStableDeviation = 0`, durations = 0, percents = 0 |
 | Single session | Graphs show single point, no trend visible (expected) |
@@ -347,7 +344,7 @@ interface ProgressGraphsProps {
 
 ### Integration Tests: `src/components/__tests__/ProgressGraphs.test.tsx`
 
-- [ ] Renders four stacked graphs
+- [ ] Renders three stacked graphs
 - [ ] Hover tooltip shows data from all graphs
 - [ ] Click drill-down calls `onDrillDown` with correct sessionId
 - [ ] Exercise filter updates graph data
@@ -384,7 +381,7 @@ interface ProgressGraphsProps {
 
 ## Success Criteria
 
-- [ ] All four graphs render correctly with real session data
+- [ ] All three graphs render correctly with real session data
 - [ ] Hover tooltip shows consistent, correct values across graphs
 - [ ] Non-fusion users' sessions show meaningful progress trends on `bestStableDeviation` and `nearBestStableTime`
 - [ ] Fusion users' sessions show both fusion metrics (when rate >= 30%) and segment metrics
