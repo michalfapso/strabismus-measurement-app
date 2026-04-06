@@ -35,6 +35,39 @@ interface ProgressGraphsProps {
   exerciseFilter?: string;
 }
 
+function useTouchZoom(onZoom: (factor: number) => void) {
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setTouchStart(distance);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStart !== null) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = touchStart / distance;
+      if (factor > 0.9 && factor < 1.1) {
+        onZoom(factor);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchStart(null);
+  };
+
+  return { handleTouchStart, handleTouchMove, handleTouchEnd };
+}
+
 function useZoomPan(dataLength: number) {
   const [zoomStart, setZoomStart] = useState(0);
   const [zoomEnd, setZoomEnd] = useState(Math.min(DEFAULT_ZOOM_WINDOW, dataLength));
@@ -143,6 +176,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   // Initialize zoom/pan hook
   const { zoomStart, zoomEnd, handleZoom, handlePan } = useZoomPan(graphData.length);
 
+  // Initialize touch zoom hook
+  const touchHandlers = useTouchZoom((factor) => {
+    handleZoom(factor > 1 ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR);
+  });
+
   // Responsive graph height
   const graphHeight = window.innerWidth < 768 ? 180 : 250;
 
@@ -156,7 +194,12 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   }
 
   return (
-    <div css={styles.container}>
+    <div
+      css={styles.container}
+      onTouchStart={touchHandlers.handleTouchStart}
+      onTouchMove={touchHandlers.handleTouchMove}
+      onTouchEnd={touchHandlers.handleTouchEnd}
+    >
       <div css={styles.controls}>
         <button onClick={() => handlePan('left')}>← Pan Left</button>
         <button onClick={() => handleZoom(ZOOM_OUT_FACTOR)}>🔍- Zoom Out</button>
