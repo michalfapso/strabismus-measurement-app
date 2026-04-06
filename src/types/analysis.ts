@@ -63,15 +63,21 @@ export interface SessionMetrics {
   sessionDuration: number;
   histogram: HistogramBin[];
 
-  // Sub-scores
+  // Segment-derived metrics (new, always computed)
+  bestStableDeviation: number;      // min meanDeviation across quality segments
+  nearBestStableTime: number;       // total duration of quality segments (seconds)
+  qualityPercent: number;           // % of session in quality segments
+  driftingPercent: number;          // % of session in DRIFTING
+  approachingPercent: number;       // % of session in APPROACHING
+
+  // Sub-scores (existing, keep)
   timeToFirstFusion: number | null;
   fusionEventCount: number;
   longestFusionStreak: number;
-  minValue: number;
   largeDeviationTimePercent: number;
   trajectoryRatio: number | null;
 
-  // Supporting
+  // Supporting (existing, keep)
   fusionTime: number;
   fusionTimePercent: number;
   fusionAchieved: boolean;
@@ -79,7 +85,7 @@ export interface SessionMetrics {
   nearFusionTimePercent: number;
   largeDeviationTime: number;
 
-  // FSM
+  // FSM (existing, keep)
   stateSegments: StateSegment[];
 }
 

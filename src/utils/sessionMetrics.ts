@@ -3,6 +3,8 @@ import { SessionMetrics, StateSegment, SessionState, SegmentMetrics } from '../t
 import { calculateSessionHistogram } from './histogram';
 import { smoothSeries, calculateSlope } from './smoothing';
 
+const NEAR_BEST_THRESHOLD_BAND_PERCENT = 10;  // band width as % of (max - min) deviation
+
 export function getMetricValue(point: TimeSeries, metric: 'deviation' | 'rotation'): number {
   if (metric === 'deviation') {
     return Math.sqrt(point.x * point.x + point.y * point.y);

@@ -1,6 +1,8 @@
 import { SessionMetrics, ProgressInsight, ExerciseInsight, SessionQualityInsight, MilestoneInsight, RecommendationInsight } from '../types/analysis';
 import { linearRegressionSlope, regressionPValue, computeZScore, mean, median, stdDev, trendDirection } from './stats';
 
+const FUSION_RATE_THRESHOLD_PERCENT = 30;  // switch to fusion metrics when fusionRate >= 30%
+
 /**
  * Calculate ProgressInsight from SessionMetrics array
  */
