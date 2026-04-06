@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SessionMetrics } from '../types/analysis';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { css } from '@emotion/react';
@@ -8,6 +8,39 @@ interface ProgressGraphsProps {
   sessions: SessionMetrics[];
   onDrillDown?: (sessionId: string) => void;
   exerciseFilter?: string;
+}
+
+function useZoomPan(dataLength: number) {
+  const [zoomStart, setZoomStart] = useState(0);
+  const [zoomEnd, setZoomEnd] = useState(Math.min(20, dataLength));
+
+  const handleZoom = (factor: number) => {
+    const center = (zoomStart + zoomEnd) / 2;
+    const span = zoomEnd - zoomStart;
+    const newSpan = Math.max(2, span / factor);
+    const newStart = Math.max(0, Math.floor(center - newSpan / 2));
+    const newEnd = Math.min(dataLength, Math.ceil(newStart + newSpan));
+    setZoomStart(newStart);
+    setZoomEnd(newEnd);
+  };
+
+  const handlePan = (direction: 'left' | 'right') => {
+    const span = zoomEnd - zoomStart;
+    const shift = Math.floor(span * 0.2);
+    if (direction === 'left') {
+      const newStart = Math.max(0, zoomStart - shift);
+      const newEnd = Math.min(dataLength, newStart + span);
+      setZoomStart(newStart);
+      setZoomEnd(newEnd);
+    } else {
+      const newEnd = Math.min(dataLength, zoomEnd + shift);
+      const newStart = Math.max(0, newEnd - span);
+      setZoomStart(newStart);
+      setZoomEnd(newEnd);
+    }
+  };
+
+  return { zoomStart, zoomEnd, handleZoom, handlePan };
 }
 
 interface ProgressGraphsTooltipPayload {
@@ -82,16 +115,33 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     }));
   }, [filteredSessions]);
 
+  // Initialize zoom/pan hook
+  const { zoomStart, zoomEnd, handleZoom, handlePan } = useZoomPan(graphData.length);
+
+  // Filter data based on zoom
+  const visibleData = useMemo(() => {
+    return graphData.slice(Math.floor(zoomStart), Math.ceil(zoomEnd));
+  }, [graphData, zoomStart, zoomEnd]);
+
   if (graphData.length === 0) {
     return <div>No sessions to display</div>;
   }
 
   return (
     <div css={styles.container}>
+      <div css={styles.controls}>
+        <button onClick={() => handlePan('left')}>← Pan Left</button>
+        <button onClick={() => handleZoom(1.2)}>🔍- Zoom Out</button>
+        <button onClick={() => handleZoom(0.8)}>🔍+ Zoom In</button>
+        <button onClick={() => handlePan('right')}>Pan Right →</button>
+        <span css={styles.zoomInfo}>
+          Showing sessions {Math.floor(zoomStart) + 1} - {Math.ceil(zoomEnd)} of {graphData.length}
+        </span>
+      </div>
       <div css={styles.graphContainer}>
         <h3>Best Stable Deviation (cm)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -114,7 +164,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -137,7 +187,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <AreaChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -162,6 +212,30 @@ const styles = {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
+  `,
+  controls: css`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    button {
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+
+      &:hover {
+        background: #f5f5f5;
+      }
+    }
+  `,
+  zoomInfo: css`
+    font-size: 12px;
+    color: #666;
+    margin-left: auto;
   `,
   graphContainer: css`
     border: 1px solid ${THEME.borderPrimary};
