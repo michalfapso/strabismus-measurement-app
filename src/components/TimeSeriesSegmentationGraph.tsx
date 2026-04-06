@@ -25,6 +25,7 @@ interface MetricDataset {
   metric: MetricType;
   rawValues: number[];
   smoothedValues: number[];
+  smoothedValuesLong: number[];  // Longer window smoothing (for debug visualization)
   segments: StateSegment[];
   timeAxis: number[]; // seconds from session start
   min: number;
@@ -132,7 +133,7 @@ function prepareMetricDataset(
   const { timeSeries } = session;
 
   if (timeSeries.length === 0) {
-    return { metric, rawValues: [], smoothedValues: [], segments: [], timeAxis: [], min: 0, max: 0 };
+    return { metric, rawValues: [], smoothedValues: [], smoothedValuesLong: [], segments: [], timeAxis: [], min: 0, max: 0 };
   }
 
   const t0 = timeSeries[0].t;
@@ -140,11 +141,20 @@ function prepareMetricDataset(
   const rawValues = timeSeries.map((p) => getMetricValue(p, metric));
 
   let smoothedValues: number[];
+  let smoothedValuesLong: number[];
   try {
-    const windowSize = Math.min(11, rawValues.length % 2 === 0 ? rawValues.length - 1 : rawValues.length);
-    smoothedValues = windowSize >= 3 ? smoothSeries(rawValues, windowSize) : [...rawValues];
+    const windowSizeShort = Math.min(11, rawValues.length % 2 === 0 ? rawValues.length - 1 : rawValues.length);
+    smoothedValues = windowSizeShort >= 3 ? smoothSeries(rawValues, windowSizeShort) : [...rawValues];
   } catch {
     smoothedValues = [...rawValues];
+  }
+
+  // Compute longer-window smoothing for visualization (longer window than short)
+  try {
+    const windowSizeLong = Math.min(51, rawValues.length % 2 === 0 ? Math.max(3, rawValues.length - 1) : Math.max(3, rawValues.length));
+    smoothedValuesLong = windowSizeLong >= 3 ? smoothSeries(rawValues, windowSizeLong) : [...rawValues];
+  } catch {
+    smoothedValuesLong = [...rawValues];
   }
 
   // classifyStates only supports 'deviation' | 'rotation' — for x/y we use deviation-style logic
@@ -166,7 +176,7 @@ function prepareMetricDataset(
   const min = Math.min(...rawValues);
   const max = Math.max(...rawValues);
 
-  return { metric, rawValues, smoothedValues, segments, timeAxis, min, max };
+  return { metric, rawValues, smoothedValues, smoothedValuesLong, segments, timeAxis, min, max };
 }
 
 const SLOPE_THRESHOLD = 0.1;
@@ -266,6 +276,14 @@ function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, thres
 
   const smoothedPoints = timeAxis
     .map((t, i) => `${xScale(t).toFixed(1)},${yScale(smoothedValues[i]).toFixed(1)}`)
+    .join(' ');
+
+  const longSmoothPoints = timeAxis
+    .map((t, i) => {
+      const x = xScale(t);
+      const y = yScale(data.smoothedValuesLong[i]);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
     .join(' ');
 
   // Grid lines
@@ -419,8 +437,18 @@ function MetricGraph({ data, totalDuration, svgWidth, isLast, hoveredTime, thres
         fill="none"
         stroke={color}
         strokeWidth={1.5}
-        strokeDasharray="4,4"
+        strokeDasharray="2,2"
         opacity={0.7}
+      />
+
+      {/* Long-window smoothed line (dotted, 40% opacity) */}
+      <polyline
+        points={longSmoothPoints}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeDasharray="5,5"
+        opacity={0.4}
       />
 
       {/* Raw line (solid) */}
@@ -609,7 +637,8 @@ function HoverPopup({ datasets, time, position, containerWidth }: HoverPopupProp
       </div>
       {datasets.map((ds) => {
         const raw = interpolateAtTime(ds.timeAxis, ds.rawValues, time);
-        const smoothed = interpolateAtTime(ds.timeAxis, ds.smoothedValues, time);
+        const smoothedShort = interpolateAtTime(ds.timeAxis, ds.smoothedValues, time);
+        const smoothedLong = interpolateAtTime(ds.timeAxis, ds.smoothedValuesLong, time);
         const state = segmentAtTime(ds.segments, time);
         const color = METRIC_COLORS[ds.metric];
 
@@ -622,8 +651,11 @@ function HoverPopup({ datasets, time, position, containerWidth }: HoverPopupProp
               <span css={css`color: ${THEME.textSecondary};`}>raw: </span>
               {raw !== null ? raw.toFixed(3) : '—'}
               <br />
-              <span css={css`color: ${THEME.textSecondary};`}>smooth: </span>
-              {smoothed !== null ? smoothed.toFixed(3) : '—'}
+              <span css={css`color: ${THEME.textSecondary};`}>smooth_short: </span>
+              {smoothedShort !== null ? smoothedShort.toFixed(3) : '—'}
+              <br />
+              <span css={css`color: ${THEME.textSecondary};`}>smooth_long: </span>
+              {smoothedLong !== null ? smoothedLong.toFixed(3) : '—'}
               <br />
               {state && (
                 <>
@@ -679,7 +711,13 @@ function SegmentationLegend() {
         <svg width="24" height="10" css={css`flex-shrink: 0;`}>
           <line x1="0" y1="5" x2="24" y2="5" stroke="rgba(180,180,180,0.8)" strokeWidth="1.5" strokeDasharray="4,4" />
         </svg>
-        <span css={css`font-size: 10px; color: ${THEME.textSecondary};`}>Smoothed</span>
+        <span css={css`font-size: 10px; color: ${THEME.textSecondary};`}>Smoothed (short)</span>
+      </div>
+      <div css={css`display: flex; align-items: center; gap: 5px;`}>
+        <svg width="24" height="10" css={css`flex-shrink: 0;`}>
+          <line x1="0" y1="5" x2="24" y2="5" stroke="rgba(180,180,180,0.8)" strokeWidth="1.5" strokeDasharray="5,5" opacity={0.4} />
+        </svg>
+        <span css={css`font-size: 10px; color: ${THEME.textSecondary};`}>Smoothed (long)</span>
       </div>
     </div>
   );

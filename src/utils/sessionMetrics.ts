@@ -104,16 +104,32 @@ export function calculateLargeDeviationTimePercent(
 
 // Slope detection windows in seconds — sampling-rate independent
 const SHORT_SLOPE_WINDOW_S = 0.5;    // seconds; converted to points at runtime
-const LONG_SLOPE_WINDOW_S  = 5.0;    // seconds; converted to points at runtime
+const LONG_SLOPE_WINDOW_S  = 2.5;    // seconds; reduced from 5.0 to respond faster to state changes
+
+// Boundary refinement bracket: search range for precise boundary location (independent of slope windows)
+// Should be larger than the longest segment we want to detect accurately
+const REFINEMENT_BRACKET_S = 2.5;    // seconds; half-bracket for searching boundary transitions
 
 // Slope thresholds (cm/s) — compared against slopes already converted to cm/s
 const SHORT_SLOPE_THRESHOLD = 1.0;   // Detects rapid changes ≥ 1 cm/s
-const LONG_SLOPE_THRESHOLD  = 0.02;  // Detects slow, sustained changes ≥ 0.02 cm/s
+
+// Hysteresis thresholds for DRIFTING/APPROACHING (prevents oscillation around threshold)
+// Higher threshold to ENTER a drift state, lower threshold to STAY/EXIT
+const LONG_SLOPE_THRESHOLD_ENTER = 0.15;  // Must exceed this to enter DRIFTING/APPROACHING
+const LONG_SLOPE_THRESHOLD_STAY  = 0.08;  // Can drop below this to exit DRIFTING/APPROACHING
 
 // Existing constants (unchanged)
 const NEAR_FUSION_WIDTH = 1;         // cm
 const MIN_SEGMENT_DURATION = 0.25;   // seconds
 const DEFAULT_SG_WINDOW = 11;        // smoothing window (separate from slope windows)
+
+// Context-aware minimum duration for STABLE_DEVIATION segments:
+// A brief stable plateau between two segments moving in the same direction (drift→stable→drift
+// or approach→stable→approach) is noise unless it lasted long enough to be meaningful.
+// A stable plateau between opposing directions (drift→stable→approach or vice versa) is a
+// clinically meaningful turning point and can be recognised at a lower threshold.
+const STABLE_DEVIATION_MIN_SAME_DIRECTION_S = 3.0;   // seconds
+const STABLE_DEVIATION_MIN_TURNING_POINT_S  = 1.5;   // seconds
 
 function computeSamplingRate(timeSeries: TimeSeries[]): number {
   if (timeSeries.length < 2) return 20; // default fallback
@@ -134,8 +150,7 @@ function refineEnter(
   // Find where segment ENTERS a DRIFTING/APPROACHING state
   // Scan backward from T_detected to find where slope stopped being below threshold
   // This marks the entry point into the drifting/approaching phase
-  const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = Math.max(0, T_detected - halfLongWindowS);
+  const searchStart = Math.max(0, T_detected - REFINEMENT_BRACKET_S);
   const searchEnd = T_detected;
   const t0 = timeSeries[0].t;
 
@@ -164,8 +179,7 @@ function refineExit(
   // Find where segment EXITS a DRIFTING/APPROACHING state
   // Scan backward from T_detected to find where slope stopped exceeding threshold
   // This marks the exit point from the drifting/approaching phase
-  const halfLongWindowS = LONG_SLOPE_WINDOW_S / 2;
-  const searchStart = Math.max(0, T_detected - halfLongWindowS);
+  const searchStart = Math.max(0, T_detected - REFINEMENT_BRACKET_S);
   const searchEnd = T_detected;
   const t0 = timeSeries[0].t;
 
@@ -298,28 +312,86 @@ export function classifyStates(
   const shortSlopes = shortSlopesRaw.map(s => s * pointsPerSecond);
   const longSlopes  = longSlopesRaw.map(s => s * pointsPerSecond);
 
-  const classifications: SessionState[] = valuesToClassify.map((value, i) => {
+  // Compute local flatness: standard deviation of raw values in ±0.25s windows
+  // This detects genuinely flat regions that slope-based classification cannot handle
+  const flatnessWindowPoints = Math.max(1, Math.round(0.25 * pointsPerSecond));
+  const flatnessStdDev: number[] = rawValues.map((_, i) => {
+    const start = Math.max(0, i - flatnessWindowPoints);
+    const end = Math.min(rawValues.length - 1, i + flatnessWindowPoints);
+    const windowValues = rawValues.slice(start, end + 1);
+
+    if (windowValues.length === 1) return 0;  // Single point, no variance
+
+    const mean = windowValues.reduce((a, b) => a + b, 0) / windowValues.length;
+    const variance = windowValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / windowValues.length;
+    return Math.sqrt(variance);
+  });
+
+  const FLATNESS_THRESHOLD_CM = 0.05;  // Regions with stddev < 0.05 cm are considered flat
+
+  // Use hysteresis to prevent oscillation around thresholds
+  const classifications: SessionState[] = [];
+  let prevState: SessionState = 'STABLE_DEVIATION';  // Initial state assumption
+
+  for (let i = 0; i < valuesToClassify.length; i++) {
+    const value = valuesToClassify[i];
     const shortSlope = shortSlopes[i] ?? 0;
     const longSlope = longSlopes[i] ?? 0;
+    const localFlatness = flatnessStdDev[i] ?? 0;
 
-    if (value < threshold) return 'FUSION';
-    if (value < threshold + NEAR_FUSION_WIDTH) return 'NEAR_FUSION';
+    if (value < threshold) {
+      classifications.push('FUSION');
+      prevState = 'FUSION';
+    } else if (value < threshold + NEAR_FUSION_WIDTH) {
+      classifications.push('NEAR_FUSION');
+      prevState = 'NEAR_FUSION';
+    } else {
+      // For APPROACHING/DRIFTING/STABLE, first check if the region is genuinely flat
 
-    // Either fast approach OR slow, steady approach
-    if (shortSlope < -SHORT_SLOPE_THRESHOLD || longSlope < -LONG_SLOPE_THRESHOLD)
-      return 'APPROACHING';
+      // If raw values are not changing much (stddev < 0.05 cm), classify as STABLE
+      // This handles step changes between flat levels and quantization artifacts
+      // that slope-based detection cannot recognize because slopes are ~0
+      if (localFlatness < FLATNESS_THRESHOLD_CM) {
+        classifications.push('STABLE_DEVIATION');
+        prevState = 'STABLE_DEVIATION';
+        continue;
+      }
 
-    // Either fast drift OR slow, steady drift
-    if (shortSlope > SHORT_SLOPE_THRESHOLD || longSlope > LONG_SLOPE_THRESHOLD)
-      return 'DRIFTING';
+      // Otherwise, use slope-based classification with hysteresis
 
-    return 'STABLE_DEVIATION';
-  });
+      // APPROACHING: Either fast approach OR slow approach (with hysteresis on long slope)
+      const isApproachingShort = shortSlope < -SHORT_SLOPE_THRESHOLD;
+      const isApproachingLongEnter = longSlope < -LONG_SLOPE_THRESHOLD_ENTER;
+      const isApproachingLongStay = prevState === 'APPROACHING' && longSlope < -LONG_SLOPE_THRESHOLD_STAY;
+
+      if (isApproachingShort || isApproachingLongEnter || isApproachingLongStay) {
+        classifications.push('APPROACHING');
+        prevState = 'APPROACHING';
+        continue;
+      }
+
+      // DRIFTING: Either fast drift OR slow drift (with hysteresis on long slope)
+      const isDriftingShort = shortSlope > SHORT_SLOPE_THRESHOLD;
+      const isDriftingLongEnter = longSlope > LONG_SLOPE_THRESHOLD_ENTER;
+      const isDriftingLongStay = prevState === 'DRIFTING' && longSlope > LONG_SLOPE_THRESHOLD_STAY;
+
+      if (isDriftingShort || isDriftingLongEnter || isDriftingLongStay) {
+        classifications.push('DRIFTING');
+        prevState = 'DRIFTING';
+      } else {
+        classifications.push('STABLE_DEVIATION');
+        prevState = 'STABLE_DEVIATION';
+      }
+    }
+  }
 
   // Log detailed classification info
   console.log(`\n=== classifyStates: metric=${metric}, threshold=${threshold} ===`);
-  console.log(`Total points: ${rawValues.length}, thresholds: NEAR_FUSION_WIDTH=${NEAR_FUSION_WIDTH}, SHORT_SLOPE_THRESHOLD=${SHORT_SLOPE_THRESHOLD}, LONG_SLOPE_THRESHOLD=${LONG_SLOPE_THRESHOLD}`);
+  console.log(`Total points: ${rawValues.length}, thresholds: NEAR_FUSION_WIDTH=${NEAR_FUSION_WIDTH}, SHORT_SLOPE_THRESHOLD=${SHORT_SLOPE_THRESHOLD}`);
+  console.log(`Hysteresis (LONG_SLOPE): ENTER=${LONG_SLOPE_THRESHOLD_ENTER}, STAY=${LONG_SLOPE_THRESHOLD_STAY}`);
+  console.log(`Flatness detection: FLATNESS_THRESHOLD=${FLATNESS_THRESHOLD_CM} cm (window=${flatnessWindowPoints} points ≈ 0.25s)`);
   console.log(`Raw values range: [${Math.min(...rawValues).toFixed(3)}, ${Math.max(...rawValues).toFixed(3)}]`);
+  console.log(`Flatness (stddev) range: [${Math.min(...flatnessStdDev).toFixed(4)}, ${Math.max(...flatnessStdDev).toFixed(4)}] cm`);
 
   // Check for any undefined classifications
   const unclassifiedIndices = classifications
@@ -336,7 +408,8 @@ export function classifyStates(
   const sampleIndicesList = [0, 10, 20, 30, 40, Math.floor(classifications.length / 2), classifications.length - 2, classifications.length - 1];
   const uniqueSampleIndices = Array.from(new Set(sampleIndicesList.filter(idx => idx < classifications.length)));
   uniqueSampleIndices.forEach(idx => {
-    console.log(`  [${idx}] value=${valuesToClassify[idx].toFixed(3)}, shortSlope=${(shortSlopes[idx] ?? 0).toFixed(3)}, longSlope=${(longSlopes[idx] ?? 0).toFixed(3)}, state=${classifications[idx]}`);
+    const isFlatness = flatnessStdDev[idx] < FLATNESS_THRESHOLD_CM ? ' [FLATNESS]' : '';
+    console.log(`  [${idx}] value=${valuesToClassify[idx].toFixed(3)}, flat=${(flatnessStdDev[idx] ?? 0).toFixed(4)}, shortSlope=${(shortSlopes[idx] ?? 0).toFixed(3)}, longSlope=${(longSlopes[idx] ?? 0).toFixed(3)}, state=${classifications[idx]}${isFlatness}`);
   });
 
   // FIRST PASS: Create all candidate segments (including short ones)
@@ -364,8 +437,95 @@ export function classifyStates(
     }
   }
 
-  // SECOND PASS: Identify which segments to keep
+  // Log point-by-point classifications around segment boundaries
+  console.log(`\n=== Point-by-point classifications (with slopes) ===`);
+  const transitionIndices = new Set<number>();
+  for (let i = 0; i < classifications.length; i++) {
+    if (i === 0 || classifications[i] !== classifications[i - 1]) {
+      transitionIndices.add(i);
+      if (i > 0) transitionIndices.add(i - 1);
+    }
+  }
+
+  // Also add context around transitions
+  const detailedIndices = new Set<number>();
+  transitionIndices.forEach(idx => {
+    for (let j = Math.max(0, idx - 2); j <= Math.min(classifications.length - 1, idx + 2); j++) {
+      detailedIndices.add(j);
+    }
+  });
+
+  Array.from(detailedIndices).sort((a, b) => a - b).forEach(idx => {
+    const isTransition = transitionIndices.has(idx);
+    const marker = isTransition ? ' ◄──TRANSITION' : '';
+    const t = (timeSeries[idx].t - timeSeries[0].t) / 1000;
+    console.log(`  [${idx.toString().padEnd(4)}] t=${t.toFixed(3)}s value=${valuesToClassify[idx].toFixed(3)} shortSlope=${(shortSlopes[idx] ?? 0).toFixed(4)} longSlope=${(longSlopes[idx] ?? 0).toFixed(4)} → ${classifications[idx]}${marker}`);
+  });
+
+  console.log('candidateSegments (with slope details):');
+  candidateSegments.forEach((seg, idx) => {
+    const firstIdx = seg.startIdx;
+    const lastIdx = seg.endIdx;
+    const midIdx = Math.floor((firstIdx + lastIdx) / 2);
+
+    const details = {
+      index: idx,
+      state: seg.state,
+      duration: seg.duration.toFixed(2),
+      range: `[${firstIdx}..${lastIdx}]`,
+      firstPoint: {
+        shortSlope: (shortSlopes[firstIdx] ?? 0).toFixed(3),
+        longSlope: (longSlopes[firstIdx] ?? 0).toFixed(3),
+      },
+      midPoint: {
+        shortSlope: (shortSlopes[midIdx] ?? 0).toFixed(3),
+        longSlope: (longSlopes[midIdx] ?? 0).toFixed(3),
+      },
+      lastPoint: {
+        shortSlope: (shortSlopes[lastIdx] ?? 0).toFixed(3),
+        longSlope: (longSlopes[lastIdx] ?? 0).toFixed(3),
+      },
+    };
+    console.log(`  [${details.index}] ${details.state} (${details.duration}s, indices ${details.range}):`, details);
+  });
+
+  // SECOND PASS: Identify which segments to keep (basic duration filter)
   const keepSegment = candidateSegments.map(seg => seg.duration >= MIN_SEGMENT_DURATION);
+
+  // SECOND PASS (b): Context-aware filter for STABLE_DEVIATION segments.
+  // A short stable plateau between two same-direction segments (DRIFTING+DRIFTING or
+  // APPROACHING+APPROACHING) is likely a smoothing artefact and needs a higher minimum
+  // duration. Between opposing directions (DRIFTING+APPROACHING or vice versa) it is a
+  // genuine turning point and is kept at a lower threshold.
+  for (let i = 0; i < candidateSegments.length; i++) {
+    if (!keepSegment[i]) continue;
+    if (candidateSegments[i].state !== 'STABLE_DEVIATION') continue;
+
+    // Find nearest kept neighbours on each side
+    let leftState: SessionState | null = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (keepSegment[j]) { leftState = candidateSegments[j].state; break; }
+    }
+    let rightState: SessionState | null = null;
+    for (let j = i + 1; j < candidateSegments.length; j++) {
+      if (keepSegment[j]) { rightState = candidateSegments[j].state; break; }
+    }
+
+    const bothDrifting   = leftState === 'DRIFTING'   && rightState === 'DRIFTING';
+    const bothApproaching = leftState === 'APPROACHING' && rightState === 'APPROACHING';
+    const oneEach = (leftState === 'DRIFTING' && rightState === 'APPROACHING')
+                 || (leftState === 'APPROACHING' && rightState === 'DRIFTING');
+
+    const dur = candidateSegments[i].duration;
+
+    if ((bothDrifting || bothApproaching) && dur < STABLE_DEVIATION_MIN_SAME_DIRECTION_S) {
+      keepSegment[i] = false;
+      console.log(`  [context-filter] Dropping STABLE_DEVIATION [${i}] (${dur.toFixed(2)}s): surrounded by ${leftState}+${rightState}, needs ≥${STABLE_DEVIATION_MIN_SAME_DIRECTION_S}s`);
+    } else if (oneEach && dur < STABLE_DEVIATION_MIN_TURNING_POINT_S) {
+      keepSegment[i] = false;
+      console.log(`  [context-filter] Dropping STABLE_DEVIATION [${i}] (${dur.toFixed(2)}s): turning point ${leftState}→${rightState}, needs ≥${STABLE_DEVIATION_MIN_TURNING_POINT_S}s`);
+    }
+  }
 
   // THIRD PASS: Stretch neighboring segments to fill gaps from filtered segments
   let stretchedSegments: StateSegment[] = [];
@@ -545,6 +705,34 @@ export function classifyStates(
   });
   console.log(`\nAfter stretching to fill gaps: ${stretchedSegments.length} segments`);
   console.log(`\nAfter validation and degenerate segment fixes: ${validSegments.length} segments`);
+
+  // Detailed segment info with boundary identification
+  console.log(`\n=== FINAL SEGMENTATION DETAILS ===`);
+  validSegments.forEach((seg, idx) => {
+    const startIdx = timeSeries.findIndex(p => (p.t - timeSeries[0].t) / 1000 >= seg.startTime);
+    const endIdx = Math.max(startIdx,
+      timeSeries.length - 1 - timeSeries.slice().reverse().findIndex(p => (p.t - timeSeries[0].t) / 1000 <= seg.endTime)
+    );
+
+    const startValue = startIdx >= 0 && startIdx < timeSeries.length
+      ? getMetricValue(timeSeries[startIdx], metric).toFixed(2)
+      : 'N/A';
+    const endValue = endIdx >= 0 && endIdx < timeSeries.length
+      ? getMetricValue(timeSeries[endIdx], metric).toFixed(2)
+      : 'N/A';
+
+    console.log(`Segment ${idx}: ${seg.state}`);
+    console.log(`  Time: ${seg.startTime.toFixed(2)}s - ${seg.endTime.toFixed(2)}s (duration ${seg.duration.toFixed(2)}s)`);
+    console.log(`  Indices: ${startIdx} - ${endIdx}`);
+    console.log(`  Value at start: ${startValue} cm, at end: ${endValue} cm`);
+    if (seg.metrics) {
+      console.log(`  Metrics: min=${seg.metrics.minDeviation.toFixed(2)}, ` +
+        `max=${seg.metrics.maxDeviation.toFixed(2)}, ` +
+        `mean=${seg.metrics.meanDeviation.toFixed(2)}, ` +
+        `slope=${seg.metrics.intraSegmentSlope.toFixed(3)} cm/s`);
+    }
+  });
+
   validSegments.forEach((seg, idx) => {
     console.log(`  Segment ${idx}: ${seg.state} (${seg.startTime.toFixed(3)}s-${seg.endTime.toFixed(3)}s, duration=${seg.duration.toFixed(3)}s)`);
   });
