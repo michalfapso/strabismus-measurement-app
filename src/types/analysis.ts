@@ -134,7 +134,7 @@ export interface SessionQualityInsight {
     exerciseTag: string;
     longestFusionStreak: number;
     fusionEventCount: number;
-    minValue: number;
+    bestStableDeviation: number;
     zScore: number;
     direction: 'unusually_good' | 'unusually_poor';
   }>;

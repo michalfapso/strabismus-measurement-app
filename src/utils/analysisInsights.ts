@@ -149,20 +149,15 @@ export function calculateSessionQualityInsight(
   }
 
   const metric = metrics[0].metric;
-  const streaks = metrics.map(m => m.longestFusionStreak);
-  const bestStableDeviations = metrics.map(m => m.bestStableDeviation);
+  const bestStableDevValues = metrics.map(m => m.bestStableDeviation);
 
-  // Use streak for outlier detection if fusion achieved in >30% of sessions
-  const fusionRate = (metrics.filter(m => m.fusionAchieved).length / metrics.length) * 100;
-  const outlierValues = fusionRate >= 30 ? streaks : bestStableDeviations;
-  const outlierMean = mean(outlierValues);
-  const outlierStd = stdDev(outlierValues);
+  const outlierMean = mean(bestStableDevValues);
+  const outlierStd = stdDev(bestStableDevValues);
 
   const outliers = metrics
     .map(m => {
-      const value = fusionRate >= 30 ? m.longestFusionStreak : m.bestStableDeviation;
-      const z = computeZScore(value, outlierMean, outlierStd);
-      return { m, value, z };
+      const z = computeZScore(m.bestStableDeviation, outlierMean, outlierStd);
+      return { m, z };
     })
     .filter(({ z }) => Math.abs(z) > 2)
     .map(({ m, z }) => ({
@@ -171,12 +166,15 @@ export function calculateSessionQualityInsight(
       exerciseTag: m.exerciseTag,
       longestFusionStreak: m.longestFusionStreak,
       fusionEventCount: m.fusionEventCount,
-      minValue: m.bestStableDeviation,
+      bestStableDeviation: m.bestStableDeviation,
       zScore: z,
-      direction: z > 0 ? 'unusually_good' as const : 'unusually_poor' as const,
+      direction: z > 0 ? ('unusually_good' as const) : ('unusually_poor' as const),
     }));
 
-  const streakRange = { min: Math.min(...streaks), max: Math.max(...streaks) };
+  const streakRange = {
+    min: Math.min(...bestStableDevValues),
+    max: Math.max(...bestStableDevValues)
+  };
   const streakSpread = streakRange.max - streakRange.min;
   const variability: 'low' | 'moderate' | 'high' =
     streakSpread < 5 ? 'low' : streakSpread < 20 ? 'moderate' : 'high';
