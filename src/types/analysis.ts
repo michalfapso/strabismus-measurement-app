@@ -89,27 +89,27 @@ export interface SessionMetrics {
   stateSegments: StateSegment[];
 }
 
+export interface TrendInfo {
+  slope: number;
+  direction: 'improving' | 'declining' | 'stable';
+  significance: { p: number; significant: boolean };
+}
+
 export interface ProgressInsight {
   metric: 'deviation' | 'rotation';
-  fusionStreakTrend: {
-    slope: number;
-    direction: 'improving' | 'declining' | 'stable';
-    significance: { p: number; significant: boolean };
-  };
-  minValueTrend: {
-    slope: number;
-    direction: 'improving' | 'declining' | 'stable';
-    significance: { p: number; significant: boolean };
-    startValue: number;
-    currentValue: number;
-  };
-  fusionAchievedRate: number;
+  fusionAchievedRate: number;  // % of sessions where fusion was achieved
   fusionAchievedCount: number;
   totalSessions: number;
   aggregateHistogram: HistogramBin[];
-  baselineFusionAchievedRate?: number;
-  baselineMedianStreak?: number;
-  improvementRate?: number;
+
+  // Segment-derived trends (always computed, all users)
+  bestStableDeviationTrend: TrendInfo;
+  nearBestStableTimeTrend: TrendInfo;
+  qualityPercentTrend: TrendInfo;
+
+  // Fusion trends (only present if fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT)
+  fusionStreakTrend?: TrendInfo;
+  fusionEventCountTrend?: TrendInfo;
 }
 
 export interface ExerciseInsight {
@@ -118,7 +118,8 @@ export interface ExerciseInsight {
   sessionCount: number;
   medianLongestStreak: number;
   medianFusionEventCount: number;
-  medianMinValue: number;
+  medianBestStableDeviation: number;
+  medianNearBestStableTime: number;
   fusionAchievedRate: number;
   trendDirection: 'improving' | 'declining' | 'stable';
   trendSlope: number;

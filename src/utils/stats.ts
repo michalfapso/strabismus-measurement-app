@@ -174,15 +174,16 @@ export function consistencyScore(values: number[], baselineMedian: number): numb
  * Uses domain-specific thresholds from the spec:
  * - streak: stable if |slope| < 0.5 s/week or p >= 0.05
  * - minValue: stable if |slope| < 0.05 cm/week or p >= 0.05
+ * - stream: stable if |slope| < 0.5 or p >= 0.05 (generic streaming metrics)
  */
 export function trendDirection(
   slope: number,
   p: number,
-  type: 'streak' | 'minValue'
+  type: 'streak' | 'minValue' | 'stream'
 ): 'improving' | 'declining' | 'stable' {
-  const stableThreshold = type === 'streak' ? 0.5 : 0.05;
+  const stableThreshold = type === 'streak' ? 0.5 : type === 'minValue' ? 0.05 : 0.5;
   if (p >= 0.05 || Math.abs(slope) < stableThreshold) return 'stable';
-  if (type === 'streak') {
+  if (type === 'streak' || type === 'stream') {
     return slope > 0 ? 'improving' : 'declining';
   } else {
     // For minValue: negative slope = improving (getting closer to 0)

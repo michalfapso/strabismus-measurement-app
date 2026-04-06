@@ -66,11 +66,11 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
             </>
           )}
           <tr>
-            <td>Min {metrics.metric} reached</td>
+            <td>Best stable {metrics.metric}</td>
             <td>
               {metrics.metric === 'deviation'
-                ? `${metrics.minValue.toFixed(2)}cm`
-                : `${metrics.minValue.toFixed(1)}°`}
+                ? `${metrics.bestStableDeviation.toFixed(2)}cm`
+                : `${metrics.bestStableDeviation.toFixed(1)}°`}
             </td>
           </tr>
           <tr>

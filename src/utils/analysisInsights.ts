@@ -16,41 +16,75 @@ export function calculateProgressInsight(
   // Sort by date for time-series
   const sorted = [...metrics].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Fusion streak trend: (session index, longestFusionStreak)
-  const streakPoints: [number, number][] = sorted.map((m, i) => [i, m.longestFusionStreak]);
-  const streakSlope = linearRegressionSlope(streakPoints) / (sorted.length / 52); // convert to per-week
-  const streakP = regressionPValue(streakPoints);
+  // Compute fusion rate
+  const fusionAchievedCount = sorted.filter(m => m.fusionAchieved).length;
+  const fusionAchievedRate = (fusionAchievedCount / sorted.length) * 100;
 
-  // Min value trend: (session index, minValue)
-  const minValuePoints: [number, number][] = sorted.map((m, i) => [i, m.minValue]);
-  const minValueSlope = linearRegressionSlope(minValuePoints) / (sorted.length / 52); // per-week
-  const minValueP = regressionPValue(minValuePoints);
+  // Segment-derived trends (always computed)
+  // bestStableDeviation trend
+  const bestStableDevPoints: [number, number][] = sorted.map((m, i) => [i, m.bestStableDeviation]);
+  const bestStableDevSlope = linearRegressionSlope(bestStableDevPoints) / (sorted.length / 52);
+  const bestStableDevP = regressionPValue(bestStableDevPoints);
 
-  const fusionCount = sorted.filter(m => m.fusionAchieved).length;
-  const fusionRate = (fusionCount / sorted.length) * 100;
+  // nearBestStableTime trend
+  const nearBestTimePoints: [number, number][] = sorted.map((m, i) => [i, m.nearBestStableTime]);
+  const nearBestTimeSlope = linearRegressionSlope(nearBestTimePoints) / (sorted.length / 52);
+  const nearBestTimeP = regressionPValue(nearBestTimePoints);
+
+  // qualityPercent trend
+  const qualityPercentPoints: [number, number][] = sorted.map((m, i) => [i, m.qualityPercent]);
+  const qualityPercentSlope = linearRegressionSlope(qualityPercentPoints) / (sorted.length / 52);
+  const qualityPercentP = regressionPValue(qualityPercentPoints);
 
   // Aggregate histogram
   const aggregateHistogram = sorted[0]?.histogram || [];
 
-  return {
+  const progressInsight: ProgressInsight = {
     metric,
-    fusionStreakTrend: {
+    fusionAchievedRate,
+    fusionAchievedCount,
+    totalSessions: sorted.length,
+    aggregateHistogram,
+    bestStableDeviationTrend: {
+      slope: bestStableDevSlope,
+      direction: trendDirection(bestStableDevSlope, bestStableDevP, 'stream'),
+      significance: { p: bestStableDevP, significant: bestStableDevP < 0.05 },
+    },
+    nearBestStableTimeTrend: {
+      slope: nearBestTimeSlope,
+      direction: trendDirection(nearBestTimeSlope, nearBestTimeP, 'stream'),
+      significance: { p: nearBestTimeP, significant: nearBestTimeP < 0.05 },
+    },
+    qualityPercentTrend: {
+      slope: qualityPercentSlope,
+      direction: trendDirection(qualityPercentSlope, qualityPercentP, 'stream'),
+      significance: { p: qualityPercentP, significant: qualityPercentP < 0.05 },
+    },
+  };
+
+  // Fusion trends (only if fusionAchievedRate >= threshold)
+  if (fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT) {
+    const streakPoints: [number, number][] = sorted.map((m, i) => [i, m.longestFusionStreak]);
+    const streakSlope = linearRegressionSlope(streakPoints) / (sorted.length / 52);
+    const streakP = regressionPValue(streakPoints);
+
+    const eventPoints: [number, number][] = sorted.map((m, i) => [i, m.fusionEventCount]);
+    const eventSlope = linearRegressionSlope(eventPoints) / (sorted.length / 52);
+    const eventP = regressionPValue(eventPoints);
+
+    progressInsight.fusionStreakTrend = {
       slope: streakSlope,
       direction: trendDirection(streakSlope, streakP, 'streak'),
       significance: { p: streakP, significant: streakP < 0.05 },
-    },
-    minValueTrend: {
-      slope: minValueSlope,
-      direction: trendDirection(minValueSlope, minValueP, 'minValue'),
-      significance: { p: minValueP, significant: minValueP < 0.05 },
-      startValue: sorted[0]?.minValue || 0,
-      currentValue: sorted[sorted.length - 1]?.minValue || 0,
-    },
-    fusionAchievedRate: fusionRate,
-    fusionAchievedCount: fusionCount,
-    totalSessions: sorted.length,
-    aggregateHistogram,
-  };
+    };
+    progressInsight.fusionEventCountTrend = {
+      slope: eventSlope,
+      direction: trendDirection(eventSlope, eventP, 'stream'),
+      significance: { p: eventP, significant: eventP < 0.05 },
+    };
+  }
+
+  return progressInsight;
 }
 
 /**
@@ -73,7 +107,8 @@ export function calculateExerciseInsights(
 
     const streaks = sorted.map(m => m.longestFusionStreak);
     const events = sorted.map(m => m.fusionEventCount);
-    const minValues = sorted.map(m => m.minValue);
+    const bestStableDeviations = sorted.map(m => m.bestStableDeviation);
+    const nearBestStableTimes = sorted.map(m => m.nearBestStableTime);
 
     const streakPoints: [number, number][] = sorted.map((m, i) => [i, m.longestFusionStreak]);
     const trendSlope = linearRegressionSlope(streakPoints) / (sorted.length / 52);
@@ -81,13 +116,17 @@ export function calculateExerciseInsights(
 
     const fusionRate = (sorted.filter(m => m.fusionAchieved).length / sorted.length) * 100;
 
+    const medianBestStableDeviation = median(bestStableDeviations);
+    const medianNearBestStableTime = median(nearBestStableTimes);
+
     return {
       exerciseTag,
       metric,
       sessionCount: sorted.length,
       medianLongestStreak: median(streaks),
       medianFusionEventCount: median(events),
-      medianMinValue: median(minValues),
+      medianBestStableDeviation,
+      medianNearBestStableTime,
       fusionAchievedRate: fusionRate,
       trendDirection: trendDirection(trendSlope, trendP, 'streak'),
       trendSlope,
@@ -111,17 +150,17 @@ export function calculateSessionQualityInsight(
 
   const metric = metrics[0].metric;
   const streaks = metrics.map(m => m.longestFusionStreak);
-  const minValues = metrics.map(m => m.minValue);
+  const bestStableDeviations = metrics.map(m => m.bestStableDeviation);
 
   // Use streak for outlier detection if fusion achieved in >30% of sessions
   const fusionRate = (metrics.filter(m => m.fusionAchieved).length / metrics.length) * 100;
-  const outlierValues = fusionRate >= 30 ? streaks : minValues;
+  const outlierValues = fusionRate >= 30 ? streaks : bestStableDeviations;
   const outlierMean = mean(outlierValues);
   const outlierStd = stdDev(outlierValues);
 
   const outliers = metrics
     .map(m => {
-      const value = fusionRate >= 30 ? m.longestFusionStreak : m.minValue;
+      const value = fusionRate >= 30 ? m.longestFusionStreak : m.bestStableDeviation;
       const z = computeZScore(value, outlierMean, outlierStd);
       return { m, value, z };
     })
@@ -132,7 +171,7 @@ export function calculateSessionQualityInsight(
       exerciseTag: m.exerciseTag,
       longestFusionStreak: m.longestFusionStreak,
       fusionEventCount: m.fusionEventCount,
-      minValue: m.minValue,
+      minValue: m.bestStableDeviation,
       zScore: z,
       direction: z > 0 ? 'unusually_good' as const : 'unusually_poor' as const,
     }));
@@ -184,9 +223,9 @@ export function calculateMilestoneInsight(
     }
   }
 
-  // Min value progress
-  const startValue = sorted[0]?.minValue || 0;
-  const currentValue = sorted[sorted.length - 1]?.minValue || 0;
+  // Best stable deviation progress
+  const startValue = sorted[0]?.bestStableDeviation || 0;
+  const currentValue = sorted[sorted.length - 1]?.bestStableDeviation || 0;
   const progress = Math.max(0, Math.min(100, ((startValue - currentValue) / (startValue - threshold)) * 100));
 
   // Readiness indicators

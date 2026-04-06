@@ -119,26 +119,39 @@ function ProgressSection({ insight }: { insight: ProgressInsight }) {
     <div css={subSectionStyle}>
       <h4 css={subSectionTitleStyle}>A — Progress</h4>
       <p css={labelStyle}>
-        Fusion streak trend:{' '}
-        <strong css={css`color: ${THEME.textPrimary};`}>{insight.fusionStreakTrend.direction}</strong>{' '}
-        (slope: {insight.fusionStreakTrend.slope.toFixed(2)} s/week,{' '}
-        p={insight.fusionStreakTrend.significance.p.toFixed(3)}
-        {insight.fusionStreakTrend.significance.significant ? ' *' : ''})
+        Best stable deviation trend:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.bestStableDeviationTrend.direction}</strong>{' '}
+        (slope: {insight.bestStableDeviationTrend.slope.toFixed(3)}/week,{' '}
+        p={insight.bestStableDeviationTrend.significance.p.toFixed(3)}
+        {insight.bestStableDeviationTrend.significance.significant ? ' *' : ''})
         <br />
-        Min value trend:{' '}
-        <strong css={css`color: ${THEME.textPrimary};`}>{insight.minValueTrend.direction}</strong>{' '}
-        (slope: {insight.minValueTrend.slope.toFixed(3)}/week,{' '}
-        p={insight.minValueTrend.significance.p.toFixed(3)}
-        {insight.minValueTrend.significance.significant ? ' *' : ''})
+        Near best stable time trend:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.nearBestStableTimeTrend.direction}</strong>{' '}
+        (slope: {insight.nearBestStableTimeTrend.slope.toFixed(2)} s/week,{' '}
+        p={insight.nearBestStableTimeTrend.significance.p.toFixed(3)}
+        {insight.nearBestStableTimeTrend.significance.significant ? ' *' : ''})
         <br />
-        Start value: {insight.minValueTrend.startValue.toFixed(2)}{' '}
-        → Current: {insight.minValueTrend.currentValue.toFixed(2)}
+        Quality percent trend:{' '}
+        <strong css={css`color: ${THEME.textPrimary};`}>{insight.qualityPercentTrend.direction}</strong>{' '}
+        (slope: {insight.qualityPercentTrend.slope.toFixed(2)}%/week,{' '}
+        p={insight.qualityPercentTrend.significance.p.toFixed(3)}
+        {insight.qualityPercentTrend.significance.significant ? ' *' : ''})
         <br />
         Fusion achieved in{' '}
         <strong css={css`color: ${THEME.textPrimary};`}>
           {insight.fusionAchievedCount}/{insight.totalSessions}
         </strong>{' '}
         sessions ({insight.fusionAchievedRate.toFixed(0)}%)
+        {insight.fusionStreakTrend && (
+          <>
+            <br />
+            Fusion streak trend:{' '}
+            <strong css={css`color: ${THEME.textPrimary};`}>{insight.fusionStreakTrend.direction}</strong>{' '}
+            (slope: {insight.fusionStreakTrend.slope.toFixed(2)} s/week,{' '}
+            p={insight.fusionStreakTrend.significance.p.toFixed(3)}
+            {insight.fusionStreakTrend.significance.significant ? ' *' : ''})
+          </>
+        )}
       </p>
     </div>
   );
