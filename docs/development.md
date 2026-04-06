@@ -61,6 +61,101 @@ To inspect metrics for debugging: in browser DevTools, check `window.lastSegment
 
 **Before large changes:** Create plan doc in `docs/superpowers/plans/`, update relevant docs (architecture.md, styling.md, data-types.md) as you implement changes.
 
+## Segment-Derived Metrics
+
+As of April 2026, `SessionMetrics` includes computed aggregates derived from segment data:
+
+### New Fields on SessionMetrics
+- `bestStableDeviation` (number): Minimum mean deviation across FUSION, NEAR_FUSION, and STABLE_DEVIATION segments. For non-fusion users, this is their baseline stable level. For fusion users, this is near zero.
+- `nearBestStableTime` (number): Total duration (seconds) of quality segments within the "near-best band" (see below).
+- `qualityPercent` (number): Percentage of session time spent in quality states (0–100%).
+- `driftingPercent` (number): Percentage of session time in DRIFTING state (0–100%).
+- `approachingPercent` (number): Percentage of session time in APPROACHING state (0–100%).
+
+### Quality Band Calculation
+The "near-best band" is computed per-session using a relative threshold:
+```
+nearBestThreshold = bestStableDeviation + 0.1 × (sessionMaxDeviation - bestStableDeviation)
+```
+This ensures the band is contextual to the patient's session range. Quality segments are those in {FUSION, NEAR_FUSION, STABLE_DEVIATION} with meanDeviation ≤ nearBestThreshold.
+
+### Computation in calculateSessionMetrics()
+After `classifyStates()` produces state segments, `computeSessionAggregateMetrics()` computes these metrics. See `src/utils/sessionMetrics.ts` for implementation.
+
+## Multi-Session Progress Visualization
+
+### ProgressGraphs Component
+New component `src/components/ProgressGraphs.tsx` displays three stacked graphs:
+1. **Best Stable Deviation** (cm): Tracks improvement in the patient's stable baseline
+2. **Near-Best Stable Time** (seconds): Tracks duration sustained at or near the best level
+3. **Session Composition** (%): Stacked area showing qualityPercent, driftingPercent, approachingPercent
+
+### Features
+- **Synchronized zoom/pan**: All graphs zoom/pan together via `useZoomPan()` hook
+- **Shared tooltip**: Single tooltip shows all metrics for hovered session
+- **Touch gestures**: Two-finger pinch for zoom on mobile
+- **Datetime labels**: X-axis shows session datetime (YYYY-MM-DD hh:mm:ss)
+- **Exercise filtering**: Filter displayed sessions by exercise tag
+- **Drill-down**: Click a session to view detail in UnifiedSessionPanel
+- **State persistence**: Zoom range, filters, and drill-down state saved to URL via `useSessionAnalysisState()` hook
+
+### Integration
+ProgressGraphs is integrated into MultiSessionAnalysisView (multi-session analysis view). Back button in detail view returns to ProgressGraphs with state preserved.
+
+## Insight Function Updates
+
+### calculateProgressInsight()
+Always computes trends for segment-derived metrics:
+- `bestStableDeviationTrend`: Is the patient's stable baseline improving? (decreasing = improving)
+- `nearBestStableTimeTrend`: Are they sustaining their best level longer? (increasing = improving)
+- `qualityPercentTrend`: Is the fraction of stable time increasing? (increasing = improving)
+
+Additionally computes fusion trends when `fusionAchievedRate >= 30%`:
+- `fusionStreakTrend`: If fusion is reliable, is the longest streak improving?
+- `fusionEventCountTrend`: If fusion is reliable, how often are they achieving it?
+
+### calculateExerciseInsights()
+Now includes median fields for non-fusion comparison:
+- `medianBestStableDeviation`: Median stable level across all sessions of that exercise
+- `medianNearBestStableTime`: Median time sustained at that level
+
+### calculateSessionQualityInsight()
+Outlier detection now uses `bestStableDeviation` instead of `minValue` (more robust, segment-based).
+
+### calculateMilestoneInsight()
+New readiness indicator: `'best_stable_level_approaching'` tracks if the patient's stable baseline is converging toward the fusion threshold.
+
+## New Types
+
+### TrendInfo
+```typescript
+interface TrendInfo {
+  slope: number;
+  direction: 'improving' | 'declining' | 'stable';
+  significance: { p: number; significant: boolean };
+}
+```
+
+Represents a time-series trend with direction and statistical significance (p < 0.05).
+
+### SessionAnalysisState
+URL-persisted state for multi-session analysis view:
+```typescript
+interface SessionAnalysisState {
+  selectedSessionIds: string[];
+  exerciseFilter?: string;
+  zoomStart: number;
+  zoomEnd: number;
+  drilledDownSessionId?: string;
+}
+```
+Managed by `useSessionAnalysisState()` hook.
+
+## Constants
+
+- `NEAR_BEST_THRESHOLD_BAND_PERCENT = 10` (src/utils/sessionMetrics.ts)
+- `FUSION_RATE_THRESHOLD_PERCENT = 30` (src/utils/analysisInsights.ts)
+
 ## Known Issues & Technical Debt
 
 ### Pre-existing
