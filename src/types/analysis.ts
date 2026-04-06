@@ -162,8 +162,14 @@ export interface MilestoneInsight {
     targetThreshold: number;
     progressPercent: number;
   };
+  bestStableDeviationProgress?: {
+    startValue: number;
+    currentValue: number;
+    targetThreshold: number;
+    progressPercent: number;
+  };
   readinessIndicators: Array<{
-    type: 'sustained_fusion' | 'min_value_approaching_threshold' | 'high_fusion_rate';
+    type: 'sustained_fusion' | 'min_value_approaching_threshold' | 'high_fusion_rate' | 'best_stable_level_approaching';
     value: number;
     met: boolean;
   }>;

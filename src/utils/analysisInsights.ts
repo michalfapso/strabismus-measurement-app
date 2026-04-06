@@ -226,6 +226,28 @@ export function calculateMilestoneInsight(
   const currentValue = sorted[sorted.length - 1]?.bestStableDeviation || 0;
   const progress = Math.max(0, Math.min(100, ((startValue - currentValue) / (startValue - threshold)) * 100));
 
+  // Compute bestStableDeviationProgress
+  let bestStableDeviationProgress:
+    | {
+        startValue: number;
+        currentValue: number;
+        targetThreshold: number;
+        progressPercent: number;
+      }
+    | undefined;
+  if (startValue > threshold) {  // only compute if user is not already at threshold
+    const bestStableDevStart = sorted[0]?.bestStableDeviation || startValue;
+    const bestStableDevCurrent = sorted[sorted.length - 1]?.bestStableDeviation || startValue;
+    const bestStableDevChange = (bestStableDevStart - bestStableDevCurrent) / (bestStableDevStart - threshold) * 100;
+
+    bestStableDeviationProgress = {
+      startValue: bestStableDevStart,
+      currentValue: bestStableDevCurrent,
+      targetThreshold: threshold,
+      progressPercent: Math.max(0, Math.min(100, bestStableDevChange)),
+    };
+  }
+
   // Readiness indicators
   const readinessIndicators = [
     {
@@ -237,6 +259,11 @@ export function calculateMilestoneInsight(
       type: 'min_value_approaching_threshold' as const,
       value: progress,
       met: progress > 50,
+    },
+    {
+      type: 'best_stable_level_approaching' as const,
+      value: bestStableDeviationProgress?.progressPercent || 0,
+      met: (bestStableDeviationProgress?.progressPercent || 0) > 50,
     },
     {
       type: 'high_fusion_rate' as const,
@@ -254,6 +281,7 @@ export function calculateMilestoneInsight(
       targetThreshold: threshold,
       progressPercent: progress,
     },
+    bestStableDeviationProgress,
     readinessIndicators,
   };
 }
