@@ -854,6 +854,8 @@ export function computeSessionMetrics(
   const trajectoryRatio = calculateTrajectoryRatio(timeSeries, metric);
   const largeDeviationTimePercent = calculateLargeDeviationTimePercent(timeSeries, threshold, metric);
   const stateSegments = classifyStates(timeSeries, threshold, metric);
+  // Compute session-level aggregate metrics from segments
+  const aggregateMetrics = computeSessionAggregateMetrics(stateSegments, timeSeries);
   const fusionEventCount = calculateFusionEventCount(stateSegments);
   const longestFusionStreak = calculateLongestFusionStreak(stateSegments);
   const histogram = calculateSessionHistogram(session, metric);
@@ -865,10 +867,14 @@ export function computeSessionMetrics(
     metric,
     sessionDuration,
     histogram,
+    bestStableDeviation: aggregateMetrics.bestStableDeviation,
+    nearBestStableTime: aggregateMetrics.nearBestStableTime,
+    qualityPercent: aggregateMetrics.qualityPercent,
+    driftingPercent: aggregateMetrics.driftingPercent,
+    approachingPercent: aggregateMetrics.approachingPercent,
     timeToFirstFusion,
     fusionEventCount,
     longestFusionStreak,
-    minValue,
     largeDeviationTimePercent,
     trajectoryRatio,
     fusionTime: fusionMetrics.fusionTime,
