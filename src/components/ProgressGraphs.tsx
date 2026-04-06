@@ -4,6 +4,13 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 
+// Progress graph zoom/pan configuration
+const DEFAULT_ZOOM_WINDOW = 20;    // Initial visible sessions
+const PAN_PERCENTAGE = 0.2;        // 20% of span per pan
+const ZOOM_OUT_FACTOR = 1.2;       // Enlarge view by 20%
+const ZOOM_IN_FACTOR = 0.8;        // Shrink view by 20%
+const MIN_VISIBLE_SPAN = 2;        // Minimum sessions to show
+
 interface ProgressGraphsProps {
   sessions: SessionMetrics[];
   onDrillDown?: (sessionId: string) => void;
@@ -12,12 +19,12 @@ interface ProgressGraphsProps {
 
 function useZoomPan(dataLength: number) {
   const [zoomStart, setZoomStart] = useState(0);
-  const [zoomEnd, setZoomEnd] = useState(Math.min(20, dataLength));
+  const [zoomEnd, setZoomEnd] = useState(Math.min(DEFAULT_ZOOM_WINDOW, dataLength));
 
   const handleZoom = (factor: number) => {
     const center = (zoomStart + zoomEnd) / 2;
     const span = zoomEnd - zoomStart;
-    const newSpan = Math.max(2, span / factor);
+    const newSpan = Math.max(MIN_VISIBLE_SPAN, span / factor);
     const newStart = Math.max(0, Math.floor(center - newSpan / 2));
     const newEnd = Math.min(dataLength, Math.ceil(newStart + newSpan));
     setZoomStart(newStart);
@@ -26,7 +33,7 @@ function useZoomPan(dataLength: number) {
 
   const handlePan = (direction: 'left' | 'right') => {
     const span = zoomEnd - zoomStart;
-    const shift = Math.floor(span * 0.2);
+    const shift = Math.max(1, Math.floor(span * PAN_PERCENTAGE));
     if (direction === 'left') {
       const newStart = Math.max(0, zoomStart - shift);
       const newEnd = Math.min(dataLength, newStart + span);
@@ -131,8 +138,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     <div css={styles.container}>
       <div css={styles.controls}>
         <button onClick={() => handlePan('left')}>← Pan Left</button>
-        <button onClick={() => handleZoom(1.2)}>🔍- Zoom Out</button>
-        <button onClick={() => handleZoom(0.8)}>🔍+ Zoom In</button>
+        <button onClick={() => handleZoom(ZOOM_OUT_FACTOR)}>🔍- Zoom Out</button>
+        <button onClick={() => handleZoom(ZOOM_IN_FACTOR)}>🔍+ Zoom In</button>
         <button onClick={() => handlePan('right')}>Pan Right →</button>
         <span css={styles.zoomInfo}>
           Showing sessions {Math.floor(zoomStart) + 1} - {Math.ceil(zoomEnd)} of {graphData.length}
@@ -222,19 +229,19 @@ const styles = {
 
     button {
       padding: 6px 12px;
-      border: 1px solid #ccc;
+      border: 1px solid ${THEME.borderPrimary};
       border-radius: 4px;
-      background: white;
+      background: rgba(255, 255, 255, 0.05);
       cursor: pointer;
 
       &:hover {
-        background: #f5f5f5;
+        background: rgba(255, 255, 255, 0.1);
       }
     }
   `,
   zoomInfo: css`
     font-size: 12px;
-    color: #666;
+    color: ${THEME.textSecondary};
     margin-left: auto;
   `,
   graphContainer: css`
