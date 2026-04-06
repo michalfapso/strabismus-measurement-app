@@ -47,7 +47,7 @@ export function calculateProgressInsight(
     aggregateHistogram,
     bestStableDeviationTrend: {
       slope: bestStableDevSlope,
-      direction: trendDirection(bestStableDevSlope, bestStableDevP, 'stream'),
+      direction: trendDirection(bestStableDevSlope, bestStableDevP, 'minValue'),
       significance: { p: bestStableDevP, significant: bestStableDevP < 0.05 },
     },
     nearBestStableTimeTrend: {
