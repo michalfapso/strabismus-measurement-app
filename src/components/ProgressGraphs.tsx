@@ -10,9 +10,23 @@ interface ProgressGraphsProps {
   exerciseFilter?: string;
 }
 
+interface ProgressGraphsTooltipPayload {
+  sessionIndex: number;
+  sessionId: string;
+  date: string;
+  exerciseTag: string;
+  bestStableDeviation: number;
+  nearBestStableTime: number;
+  qualityPercent: number;
+  driftingPercent: number;
+  approachingPercent: number;
+}
+
 interface SharedTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: Array<{
+    payload: ProgressGraphsTooltipPayload;
+  }>;
   label?: any;
 }
 
@@ -81,11 +95,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
             />
-            <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
-            <Legend />
+            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Line
               type="monotone"
               dataKey="bestStableDeviation"
@@ -104,11 +118,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
             />
-            <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
-            <Legend />
+            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Line
               type="monotone"
               dataKey="nearBestStableTime"
@@ -127,11 +141,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
             />
-            <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft' }} />
+            <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
-            <Legend />
+            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Quality" />
             <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} name="Drifting" />
             <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke={THEME.stateApproaching} fill={THEME.stateApproaching} name="Approaching" />
@@ -155,11 +169,12 @@ const styles = {
     padding: 12px;
   `,
   tooltip: css`
-    background: white;
-    border: 1px solid #ccc;
+    background: rgba(0, 0, 0, 1);
+    border: 1px solid ${THEME.borderPrimary};
     border-radius: 4px;
     padding: 8px;
     font-size: 12px;
+    color: ${THEME.textPrimary};
 
     p {
       margin: 4px 0;
@@ -168,7 +183,7 @@ const styles = {
     hr {
       margin: 4px 0;
       border: none;
-      border-top: 1px solid #ddd;
+      border-top: 1px solid ${THEME.borderSecondary || '#444'};
     }
   `,
 };
