@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { SessionMetrics } from '../types/analysis';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 
@@ -8,6 +8,32 @@ interface ProgressGraphsProps {
   sessions: SessionMetrics[];
   onDrillDown?: (sessionId: string) => void;
   exerciseFilter?: string;
+}
+
+interface SharedTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
+}
+
+function SharedTooltip({ active, payload }: SharedTooltipProps) {
+  if (active && payload && payload.length > 0) {
+    const data = payload[0].payload;
+    return (
+      <div css={styles.tooltip}>
+        <p><strong>{data.date}</strong></p>
+        <p>Exercise: {data.exerciseTag}</p>
+        <p>Session #{data.sessionIndex + 1}</p>
+        <hr />
+        <p>Best Stable Deviation: {data.bestStableDeviation.toFixed(2)} cm</p>
+        <p>Near-Best Stable Time: {data.nearBestStableTime.toFixed(1)}s</p>
+        <p>Quality: {data.qualityPercent.toFixed(1)}%</p>
+        <p>Drifting: {data.driftingPercent.toFixed(1)}%</p>
+        <p>Approaching: {data.approachingPercent.toFixed(1)}%</p>
+      </div>
+    );
+  }
+  return null;
 }
 
 /**
@@ -51,15 +77,20 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Best Stable Deviation (cm)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <LineChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="sessionIndex" />
-            <YAxis />
-            <Tooltip />
+            <XAxis
+              dataKey="sessionIndex"
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+            />
+            <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={<SharedTooltip />} />
+            <Legend />
             <Line
               type="monotone"
               dataKey="bestStableDeviation"
               stroke={THEME.metricDeviation}
+              name="Best Stable Deviation"
               isAnimationActive={false}
             />
           </LineChart>
@@ -69,15 +100,20 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <LineChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="sessionIndex" />
-            <YAxis />
-            <Tooltip />
+            <XAxis
+              dataKey="sessionIndex"
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+            />
+            <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={<SharedTooltip />} />
+            <Legend />
             <Line
               type="monotone"
               dataKey="nearBestStableTime"
               stroke={THEME.stateNearFusion}
+              name="Near-Best Stable Time"
               isAnimationActive={false}
             />
           </LineChart>
@@ -87,14 +123,18 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
         <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={graphData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <AreaChart data={graphData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="sessionIndex" />
-            <YAxis />
-            <Tooltip />
-            <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} />
-            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} />
-            <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke={THEME.stateApproaching} fill={THEME.stateApproaching} />
+            <XAxis
+              dataKey="sessionIndex"
+              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10 }}
+            />
+            <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={<SharedTooltip />} />
+            <Legend />
+            <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Quality" />
+            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} name="Drifting" />
+            <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke={THEME.stateApproaching} fill={THEME.stateApproaching} name="Approaching" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -113,5 +153,22 @@ const styles = {
     border: 1px solid ${THEME.borderPrimary};
     border-radius: 4px;
     padding: 12px;
+  `,
+  tooltip: css`
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 12px;
+
+    p {
+      margin: 4px 0;
+    }
+
+    hr {
+      margin: 4px 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
   `,
 };
