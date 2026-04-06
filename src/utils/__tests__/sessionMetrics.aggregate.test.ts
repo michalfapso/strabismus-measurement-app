@@ -126,4 +126,64 @@ describe('computeSessionAggregateMetrics', () => {
     const sum = result.qualityPercent + result.driftingPercent + result.approachingPercent;
     expect(sum).toBeCloseTo(100, 1);
   });
+
+  // Edge case tests
+  it('should handle empty timeSeries', () => {
+    const segments: StateSegment[] = [];
+    const timeSeries: TimeSeries[] = [];
+
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+
+    expect(result.bestStableDeviation).toBe(-Infinity);
+    expect(result.nearBestStableTime).toBe(0);
+    expect(result.qualityPercent).toBe(0);
+  });
+
+  it('should handle single-point timeSeries', () => {
+    const segments: StateSegment[] = [
+      {
+        state: 'STABLE_DEVIATION',
+        startTime: 0,
+        endTime: 0,
+        duration: 0,
+        metrics: { meanDeviation: 1.0, medianDeviation: 1.0, minDeviation: 1.0, maxDeviation: 1.0, varianceWithinSegment: 0, stdDevWithinSegment: 0, intraSegmentSlope: 0 },
+      },
+    ];
+
+    const timeSeries: TimeSeries[] = [{ t: 0, x: 1.0, y: 0, r: 0 }];
+
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+
+    expect(result.bestStableDeviation).toBe(1.0);
+    expect(result.qualityPercent).toBeCloseTo(0, 1);
+  });
+
+  it('should prioritize FUSION over STABLE_DEVIATION', () => {
+    const segments: StateSegment[] = [
+      {
+        state: 'STABLE_DEVIATION',
+        startTime: 0,
+        endTime: 5,
+        duration: 5,
+        metrics: { meanDeviation: 2.0, medianDeviation: 2.0, minDeviation: 1.5, maxDeviation: 2.5, varianceWithinSegment: 0.1, stdDevWithinSegment: 0.32, intraSegmentSlope: 0 },
+      },
+      {
+        state: 'FUSION',
+        startTime: 5,
+        endTime: 7,
+        duration: 2,
+        metrics: { meanDeviation: 0.3, medianDeviation: 0.3, minDeviation: 0.1, maxDeviation: 0.5, varianceWithinSegment: 0.03, stdDevWithinSegment: 0.17, intraSegmentSlope: 0 },
+      },
+    ];
+
+    const timeSeries: TimeSeries[] = [
+      { t: 0, x: 2.0, y: 0, r: 0 },
+      { t: 7000, x: 5.0, y: 0, r: 0 },
+    ];
+
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+
+    expect(result.bestStableDeviation).toBe(0.3);
+    expect(result.nearBestStableTime).toBe(2);
+  });
 });
