@@ -168,7 +168,7 @@ export function calculateSessionQualityInsight(
       fusionEventCount: m.fusionEventCount,
       bestStableDeviation: m.bestStableDeviation,
       zScore: z,
-      direction: z > 0 ? ('unusually_good' as const) : ('unusually_poor' as const),
+      direction: z > 0 ? ('unusually_poor' as const) : ('unusually_good' as const),
     }));
 
   const streakRange = {
