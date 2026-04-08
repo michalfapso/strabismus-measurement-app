@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const SessionContext = createContext<{
   currentSession: Session | null;
+  completedSession: Session | null;
   startSession: (exerciseTag: string, ppi: number) => void;
   addTimeSeriesPoint: (point: TimeSeries) => void;
   endSession: () => Promise<void>;
@@ -17,6 +18,7 @@ export const SessionContext = createContext<{
   deleteSelectedSessions: (sessionIds: string[]) => Promise<void>;
 }>({
   currentSession: null,
+  completedSession: null,
   startSession: () => {},
   addTimeSeriesPoint: () => {},
   endSession: async () => {},
@@ -32,6 +34,7 @@ export const SessionContext = createContext<{
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [completedSession, setCompletedSession] = useState<Session | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [showResults, setShowResults] = useState<boolean>(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
@@ -44,23 +47,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ppi,
       timeSeries: [],
     };
+    console.log('[SessionContext] startSession:', session.sessionId, 'exercise:', exerciseTag);
     setCurrentSession(session);
   };
 
   const addTimeSeriesPoint = (point: TimeSeries) => {
-    if (!currentSession) return;
-    setCurrentSession({
-      ...currentSession,
-      timeSeries: [...currentSession.timeSeries, point],
+    console.log('[SessionContext] addTimeSeriesPoint called with:', point);
+    // Use functional update to always get the latest state
+    setCurrentSession(prevSession => {
+      if (!prevSession) {
+        console.log('[SessionContext] No active session, ignoring point');
+        return prevSession;
+      }
+      const newTimeSeries = [...prevSession.timeSeries, point];
+      console.log('[SessionContext] Total points now:', newTimeSeries.length);
+      return {
+        ...prevSession,
+        timeSeries: newTimeSeries,
+      };
     });
   };
 
   const endSession = async () => {
     if (!currentSession) return;
 
+    console.log('[SessionContext] endSession called');
+    console.log('[SessionContext] Total points recorded:', currentSession.timeSeries.length);
+    console.log('[SessionContext] Session duration:', currentSession.timeSeries.length > 1
+      ? ((currentSession.timeSeries[currentSession.timeSeries.length - 1].t - currentSession.timeSeries[0].t) / 1000).toFixed(2) + 's'
+      : '0s');
+    if (currentSession.timeSeries.length > 0) {
+      console.log('[SessionContext] First point:', currentSession.timeSeries[0]);
+      console.log('[SessionContext] Last point:', currentSession.timeSeries[currentSession.timeSeries.length - 1]);
+    }
+
     const { saveSession } = await import('../services/storage');
     await saveSession(currentSession);
     setSessions([currentSession, ...sessions]);
+    setCompletedSession(currentSession);
     setShowResults(true);
     setCurrentSession(null);
   };
@@ -96,6 +120,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <SessionContext.Provider
       value={{
         currentSession,
+        completedSession,
         startSession,
         addTimeSeriesPoint,
         endSession,

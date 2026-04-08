@@ -84,7 +84,7 @@ const hudStyle = css`
 
 function AppContent() {
   const { calibration, isLoading } = useCalibration();
-  const { currentSession, showResults, setShowResults } = useSession();
+  const { currentSession, completedSession, showResults, setShowResults } = useSession();
   const [showCalibration, setShowCalibration] = useState(false);
   const [canvasData, setCanvasData] = useState({ x: 0, y: 0, r: 0 });
   const [savedCanvasState, setSavedCanvasState] = useState<CanvasState | undefined>();
@@ -221,15 +221,20 @@ function AppContent() {
         {/* Collapsible controls panel */}
         {onMeasurementPage && (
           <div css={panelStyle}>
-            <DataCaptureControl />
+            <DataCaptureControl
+              currentCanvasPosition={canvasData}
+              onStartMeasurement={() => setShowResults(false)}
+            />
           </div>
         )}
 
         {/* Results panel after measurement */}
         <ResultsPanel
-          session={currentSession}
+          session={completedSession}
           visible={showResults}
-          onDismiss={() => setShowResults(false)}
+          onDismiss={() => {
+            setShowResults(false);
+          }}
         />
 
       </div>

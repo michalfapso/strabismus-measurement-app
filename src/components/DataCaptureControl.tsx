@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCalibration } from '../hooks/useCalibration';
 import { useSession } from '../hooks/useSession';
 import { useTimeSeries } from '../hooks/useTimeSeries';
@@ -62,17 +62,42 @@ const timerStyle = css`
   min-width: 100px;
 `;
 
-export function DataCaptureControl() {
+export function DataCaptureControl({ currentCanvasPosition, onStartMeasurement }: { currentCanvasPosition?: { x: number; y: number; r: number }, onStartMeasurement?: () => void }) {
   const { calibration } = useCalibration();
   const { currentSession, startSession, endSession, clearSession } = useSession();
-  const { startCapture, stopCapture, isCapturing } = useTimeSeries();
+  const { startCapture, stopCapture, updatePosition, isCapturing } = useTimeSeries();
   const [selectedExercise, setSelectedExercise] = useState<ExerciseType>('No Exercise/Control');
   const [elapsed, setElapsed] = useState(0);
+  const [sessionJustStarted, setSessionJustStarted] = useState(false);
+
+  // When a session is first created, start capturing with fresh context
+  useEffect(() => {
+    if (currentSession && sessionJustStarted) {
+      console.log('[DataCaptureControl] Session activated, starting capture with position:', currentCanvasPosition);
+      startCapture(currentCanvasPosition);
+      setSessionJustStarted(false);
+    }
+  }, [currentSession, sessionJustStarted, currentCanvasPosition, startCapture]);
+
+  // Update position whenever canvas data changes during active recording
+  useEffect(() => {
+    console.log('[DataCaptureControl] Canvas position changed:', currentCanvasPosition);
+    console.log('[DataCaptureControl] Session active?', !!currentSession);
+    if (currentSession && currentCanvasPosition) {
+      console.log('[DataCaptureControl] Updating position in recorder:', currentCanvasPosition);
+      updatePosition(currentCanvasPosition.x, currentCanvasPosition.y, currentCanvasPosition.r);
+    }
+  }, [currentCanvasPosition, currentSession, updatePosition]);
 
   const handleStart = () => {
+    console.log('[DataCaptureControl] handleStart called');
+    console.log('[DataCaptureControl] currentCanvasPosition:', currentCanvasPosition);
     if (calibration?.ppi) {
+      // Dismiss any previous results panel
+      onStartMeasurement?.();
+      console.log('[DataCaptureControl] Starting session with exercise:', selectedExercise);
       startSession(selectedExercise, calibration.ppi);
-      startCapture();
+      setSessionJustStarted(true);
       setElapsed(0);
     }
   };
