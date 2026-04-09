@@ -25,7 +25,7 @@ Pencil Push-ups, Brock String, Extreme Rotation, Convergence Jumps, Left/Right-T
 ## Typical User Flow
 1. **Calibration** (first use): set PPI via credit card or A4 paper → stored to localStorage
 2. **Record session**: select exercise → Start → manipulate cross → Stop → auto-saved to IndexedDB
-3. **Review**: History page → click session → UnifiedSessionPanel shows StatCards + TimeSeriesGraph + HistogramChart
+3. **Review**: History page → click session → SingleSessionView shows AnalysisMetricsBanner + SubScoresPanel + TimeSeriesSegmentationGraph + HistogramChart
 4. **Compare**: Shift+click multiple sessions → aggregate view adds TrendChart + mean/stddev overlays
 
 ## Reference Docs
