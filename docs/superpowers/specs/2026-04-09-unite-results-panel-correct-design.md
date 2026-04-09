@@ -1,0 +1,113 @@
+# Design: ResultsPanel wraps SingleSessionView
+
+**Date:** 2026-04-09
+
+## Problem
+
+The Stop & Save panel (ResultsPanel) currently displays a simple view (StatCards + PositionGraph + RotationGraph), while the History page single session view (SingleSessionView) displays a rich analysis view with TimeSeriesSegmentationGraph (showing smoothing lines and FSM state segmentation visualization) + HistogramChart. Users should see the same detailed analysis in both contexts.
+
+## Goal
+
+Make the Stop & Save panel (ResultsPanel) display the same rich analysis view as the History page single session view, including the TimeSeriesSegmentationGraph with segmentation visualization.
+
+## Solution
+
+**ResultsPanel becomes a thin container wrapper around SingleSessionView.**
+
+SingleSessionView is refactored to compute SessionMetrics internally, simplifying both ResultsPanel and HistoryPage.
+
+### Changes
+
+#### ResultsPanel
+- Simplify to: fixed-width container (800px) + close button header + SingleSessionView
+- Remove: PositionGraph, RotationGraph, SubScoresPanel imports (no longer needed)
+- Remove: metric computation logic (now handled by SingleSessionView)
+- Structure:
+  - Outer div: fixed position, 800px width (`min(800px, 100vw)`), flex column layout
+  - Header: close button (✕) only, flexShrink: 0 (fixed at top while content scrolls)
+  - Content: SingleSessionView wrapped in scrollable div (flex: 1, overflow: auto)
+
+#### SingleSessionView
+- Add internal metric computation using `useMemo`
+- Change props from `{session, metrics}` to `{session}` only
+- Internally calls:
+  - `getGlobalSettings()` to get thresholds and selectedMetrics
+  - `computeSessionMetrics(session, thresholds, primaryMetric)` in a useMemo
+- No other logic changes — rendering stays the same
+
+#### HistoryPage
+- No changes needed — already calls `getGlobalSettings()` and `computeSessionMetrics()`
+- Can be simplified later (out of scope for this task) to just pass `session` to SingleSessionView
+
+### Data Flow
+
+```
+Stop & Save Click
+  ↓
+App saves completed session
+  ↓
+ResultsPanel receives session, sets visible=true
+  ↓
+ResultsPanel renders:
+  ├─ Header: close button (fixed at top)
+  └─ Content (scrollable):
+      └─ SingleSessionView
+          ├─ Computes metrics from session
+          ├─ AnalysisMetricsBanner
+          ├─ SubScoresPanel
+          ├─ TimeSeriesSegmentationGraph (with smoothing lines + segmentation stripe)
+          └─ HistogramChart
+```
+
+### Layout Structure
+
+```
+ResultsPanel (800px fixed position, flex column)
+├─ Header (flexShrink: 0, fixed at top)
+│  └─ Close button (✕)
+└─ Content (flex: 1, overflow: auto, scrolls independently)
+   └─ SingleSessionView
+      ├─ Header (date, exerciseTag, duration)
+      ├─ AnalysisMetricsBanner
+      ├─ SubScoresPanel
+      ├─ TimeSeriesSegmentationGraph (per metric)
+      └─ HistogramChart (per metric)
+```
+
+### Key Design Decisions
+
+**1. Computation location (Option B: SingleSessionView computes internally)**
+- SingleSessionView already calls `getGlobalSettings()` internally (line 33)
+- Adding metric computation inside is natural encapsulation
+- Simplifies both ResultsPanel and HistoryPage (no duplication)
+- Tradeoff: Computation is less explicit to callers, but component is self-contained
+
+**2. Close button in ResultsPanel container only**
+- Avoids modifying SingleSessionView
+- Cleanly separates concerns: SingleSessionView handles analysis, ResultsPanel handles layout
+- Close button stays fixed at top via flexbox layout while content scrolls
+
+**3. Width: 800px responsive**
+- `min(800px, 100vw)` allows panel to be full-width on mobile if needed
+- All components already stack vertically, reflow naturally
+
+## Testing Scope
+
+- Verify ResultsPanel displays close button at top-right
+- Verify TimeSeriesSegmentationGraph renders with smoothing lines and segmentation stripe
+- Verify HistogramChart renders correctly
+- Verify close button dismisses panel
+- Verify History page single session view still works (unchanged)
+- Verify no regressions in metric computation or display
+
+## Success Criteria
+
+- ✓ ResultsPanel wraps SingleSessionView with minimal code
+- ✓ Stop & Save panel shows TimeSeriesSegmentationGraph (with segmentation visualization)
+- ✓ Stop & Save panel shows HistogramChart
+- ✓ Close button works and is positioned correctly
+- ✓ Content scrolls independently while header stays fixed
+- ✓ Panel is 800px wide (responsive to 100vw)
+- ✓ No changes to SingleSessionView's rendering logic
+- ✓ Metric computation moved inside SingleSessionView
+- ✓ All builds succeed, no regressions
