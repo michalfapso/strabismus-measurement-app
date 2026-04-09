@@ -7,9 +7,10 @@ import { Session } from '../types';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 import { getGlobalSettings } from '../utils/globalSettings';
+import { computeSessionMetrics } from '../utils/sessionMetrics';
+import { useMemo } from 'react';
 
 interface SingleSessionViewProps {
-  metrics: SessionMetrics;
   session: Session;
 }
 
@@ -29,9 +30,40 @@ const sectionCardStyle = css`
   background-color: ${THEME.panelBg};
 `;
 
-export default function SingleSessionView({ metrics, session }: SingleSessionViewProps) {
+export default function SingleSessionView({ session }: SingleSessionViewProps) {
   const settings = getGlobalSettings();
   const { selectedMetrics, thresholds } = settings;
+
+  const metrics = useMemo(() => {
+    try {
+      const primaryMetric = (settings.selectedMetrics.find(
+        m => m === 'deviation' || m === 'rotation'
+      ) ?? 'deviation') as 'deviation' | 'rotation';
+      const thresholds = {
+        deviation: settings.thresholds.deviation ?? 1.0,
+        rotation: settings.thresholds.rotation ?? 1.0,
+      };
+      return computeSessionMetrics(session, thresholds, primaryMetric);
+    } catch {
+      return null;
+    }
+  }, [session, settings]);
+
+  if (metrics === null) {
+    return (
+      <div css={css`
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        color: ${THEME.textSecondary};
+        padding: 16px;
+        text-align: center;
+      `}>
+        Unable to compute metrics (session may be too short)
+      </div>
+    );
+  }
 
   // Use first selected metric as representative for the banner
   const primaryMetric = selectedMetrics[0];

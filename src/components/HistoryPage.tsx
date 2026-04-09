@@ -11,7 +11,6 @@ import { UnifiedSessionPanel } from './UnifiedSessionPanel';
 import SingleSessionView from './SingleSessionView';
 import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
-import { computeSessionMetrics } from '../utils/sessionMetrics';
 import { getGlobalSettings } from '../utils/globalSettings';
 
 export interface HistoryPageProps {}
@@ -282,35 +281,7 @@ export function HistoryPage({}: HistoryPageProps) {
           )}
 
           {selectedCount === 1 && selectedSessions.length > 0 && (
-            (() => {
-              try {
-                const globalSettings = getGlobalSettings();
-                const primaryMetric = (globalSettings.selectedMetrics.find(
-                  m => m === 'deviation' || m === 'rotation'
-                ) ?? 'deviation') as 'deviation' | 'rotation';
-                const thresholds = {
-                  deviation: globalSettings.thresholds.deviation ?? 1.0,
-                  rotation: globalSettings.thresholds.rotation ?? 1.0,
-                };
-                const metrics = computeSessionMetrics(
-                  selectedSessions[0],
-                  thresholds,
-                  primaryMetric
-                );
-                return (
-                  <SingleSessionView
-                    metrics={metrics}
-                    session={selectedSessions[0]}
-                  />
-                );
-              } catch {
-                return (
-                  <div style={{ padding: '16px', color: '#999' }}>
-                    Unable to compute metrics (session may be too short)
-                  </div>
-                );
-              }
-            })()
+            <SingleSessionView session={selectedSessions[0]} />
           )}
 
           {selectedCount > 1 && (
