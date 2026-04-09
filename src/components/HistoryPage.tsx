@@ -11,7 +11,6 @@ import { UnifiedSessionPanel } from './UnifiedSessionPanel';
 import SingleSessionView from './SingleSessionView';
 import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
-import { getGlobalSettings } from '../utils/globalSettings';
 
 export interface HistoryPageProps {}
 
