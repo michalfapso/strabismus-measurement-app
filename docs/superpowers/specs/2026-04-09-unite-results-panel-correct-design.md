@@ -20,8 +20,8 @@ SingleSessionView is refactored to compute SessionMetrics internally, simplifyin
 
 #### ResultsPanel
 - Simplify to: fixed-width container (800px) + close button header + SingleSessionView
-- Remove: PositionGraph, RotationGraph, SubScoresPanel imports (no longer needed)
-- Remove: metric computation logic (now handled by SingleSessionView)
+- Remove all unused imports: `useSessionStats`, `prepareSessionGraphData`, `StatCards`, `PositionGraph`, `RotationGraph`, `SubScoresPanel`, `computeSessionMetrics`, `getAnalysisSettings`, `useState`, `useMemo`
+- Add import: `SingleSessionView`
 - Structure:
   - Outer div: fixed position, 800px width (`min(800px, 100vw)`), flex column layout
   - Header: close button (✕) only, flexShrink: 0 (fixed at top while content scrolls)
@@ -31,9 +31,10 @@ SingleSessionView is refactored to compute SessionMetrics internally, simplifyin
 - Add internal metric computation using `useMemo`
 - Change props from `{session, metrics}` to `{session}` only
 - Internally calls:
-  - `getGlobalSettings()` to get thresholds and selectedMetrics
+  - `getGlobalSettings()` to get thresholds and selectedMetrics (already done on line 33)
   - `computeSessionMetrics(session, thresholds, primaryMetric)` in a useMemo
-- No other logic changes — rendering stays the same
+- Add error handling: if `computeSessionMetrics` throws (session too short), render a fallback message: "Unable to compute metrics (session may be too short)" — matching existing HistoryPage behaviour
+- No other rendering logic changes
 
 #### HistoryPage
 - Simplify single-session view rendering to just pass `session` to SingleSessionView
@@ -110,8 +111,8 @@ return <SingleSessionView session={selectedSessions[0]} />;
 #### Documentation Updates
 
 **CLAUDE.md**
-- Verify "Typical User Flow" section (line 28) still accurately describes the analysis views
-- Should already be correct (TimeSeriesGraph → should be TimeSeriesSegmentationGraph for accurate terminology if needed)
+- Line 28 currently says: `UnifiedSessionPanel shows StatCards + TimeSeriesGraph + HistogramChart` — this is wrong on two counts: (1) the component is `SingleSessionView`, not `UnifiedSessionPanel`, and (2) the chart is `TimeSeriesSegmentationGraph`, not `TimeSeriesGraph`
+- Update line 28 to: `SingleSessionView shows AnalysisMetricsBanner + SubScoresPanel + TimeSeriesSegmentationGraph + HistogramChart`
 
 **docs/architecture.md**
 - Update SingleSessionView description: note that it now computes metrics internally from session prop
@@ -141,7 +142,7 @@ return <SingleSessionView session={selectedSessions[0]} />;
 - Verify TimeSeriesSegmentationGraph renders with smoothing lines and segmentation stripe
 - Verify HistogramChart renders correctly
 - Verify close button dismisses panel
-- Verify History page single session view still works (unchanged)
+- Verify History page single session view still works correctly after simplification
 - Verify no regressions in metric computation or display
 
 ## Success Criteria
