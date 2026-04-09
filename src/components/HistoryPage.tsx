@@ -7,7 +7,6 @@ import { DateFilterBar } from './DateFilterBar';
 import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
-import { UnifiedSessionPanel } from './UnifiedSessionPanel';
 import SingleSessionView from './SingleSessionView';
 import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
