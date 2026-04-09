@@ -36,8 +36,10 @@ SingleSessionView is refactored to compute SessionMetrics internally, simplifyin
 - No other logic changes — rendering stays the same
 
 #### HistoryPage
-- No changes needed — already calls `getGlobalSettings()` and `computeSessionMetrics()`
-- Can be simplified later (out of scope for this task) to just pass `session` to SingleSessionView
+- Simplify single-session view rendering to just pass `session` to SingleSessionView
+- Remove metric computation logic from HistoryPage (now handled by SingleSessionView)
+- Remove unused imports: `getGlobalSettings`, `computeSessionMetrics`
+- Keep structure: still renders SingleSessionView for single-session and MultiSessionAnalysisView for multi-session
 
 ### Data Flow
 
@@ -74,6 +76,48 @@ ResultsPanel (800px fixed position, flex column)
       └─ HistogramChart (per metric)
 ```
 
+### Code Changes Detail
+
+#### HistoryPage single-session rendering (lines 284-314)
+
+**Before:**
+```typescript
+const globalSettings = getGlobalSettings();
+const primaryMetric = (globalSettings.selectedMetrics.find(
+  m => m === 'deviation' || m === 'rotation'
+) ?? 'deviation') as 'deviation' | 'rotation';
+const thresholds = {
+  deviation: globalSettings.thresholds.deviation ?? 1.0,
+  rotation: globalSettings.thresholds.rotation ?? 1.0,
+};
+const metrics = computeSessionMetrics(
+  selectedSessions[0],
+  thresholds,
+  primaryMetric
+);
+return <SingleSessionView metrics={metrics} session={selectedSessions[0]} />;
+```
+
+**After:**
+```typescript
+return <SingleSessionView session={selectedSessions[0]} />;
+```
+
+**Removed imports:**
+- `getGlobalSettings` (no longer needed in HistoryPage)
+- `computeSessionMetrics` (no longer needed in HistoryPage)
+
+#### Documentation Updates
+
+**CLAUDE.md**
+- Verify "Typical User Flow" section (line 28) still accurately describes the analysis views
+- Should already be correct (TimeSeriesGraph → should be TimeSeriesSegmentationGraph for accurate terminology if needed)
+
+**docs/architecture.md**
+- Update SingleSessionView description: note that it now computes metrics internally from session prop
+- Remove any references to parent components computing metrics before passing to SingleSessionView
+- Clarify that ResultsPanel is a simple wrapper container
+
 ### Key Design Decisions
 
 **1. Computation location (Option B: SingleSessionView computes internally)**
@@ -108,6 +152,9 @@ ResultsPanel (800px fixed position, flex column)
 - ✓ Close button works and is positioned correctly
 - ✓ Content scrolls independently while header stays fixed
 - ✓ Panel is 800px wide (responsive to 100vw)
-- ✓ No changes to SingleSessionView's rendering logic
-- ✓ Metric computation moved inside SingleSessionView
+- ✓ SingleSessionView computes metrics internally
+- ✓ HistoryPage simplified: only passes `session` to SingleSessionView
+- ✓ HistoryPage imports cleaned up (getGlobalSettings, computeSessionMetrics removed)
+- ✓ docs/architecture.md updated to reflect new SingleSessionView behavior
+- ✓ CLAUDE.md verified/updated if needed
 - ✓ All builds succeed, no regressions
