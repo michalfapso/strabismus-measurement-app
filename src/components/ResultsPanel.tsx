@@ -1,4 +1,5 @@
 import { Session } from '../types';
+import { THEME } from '../theme';
 import SingleSessionView from './SingleSessionView';
 
 export interface ResultsPanelProps {
@@ -20,8 +21,8 @@ export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps)
         top: 0,
         bottom: 0,
         width: 'min(800px, 100vw)',
-        backgroundColor: 'rgba(10, 10, 10, 0.98)',
-        border: '1px solid rgba(0,255,0,0.3)',
+        backgroundColor: THEME.background,
+        border: `1px solid ${THEME.accentGreen}4d`,
         boxShadow: '-4px 0 20px rgba(0,0,0,0.7)',
         zIndex: 1001,
         display: 'flex',
@@ -36,7 +37,7 @@ export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps)
           flexShrink: 0,
           display: 'flex',
           justifyContent: 'flex-end',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          borderBottom: `1px solid ${THEME.borderPrimary}`,
         }}
       >
         <button
@@ -44,7 +45,7 @@ export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps)
           style={{
             background: 'none',
             border: 'none',
-            color: '#fff',
+            color: THEME.textPrimary,
             fontSize: '24px',
             cursor: 'pointer',
             padding: '0 4px',
