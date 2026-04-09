@@ -14,6 +14,12 @@ interface SingleSessionViewProps {
   session: Session;
 }
 
+const getPrimaryMetric = (settings: ReturnType<typeof getGlobalSettings>): 'deviation' | 'rotation' => {
+  return (settings.selectedMetrics.find(
+    m => m === 'deviation' || m === 'rotation'
+  ) ?? 'deviation') as 'deviation' | 'rotation';
+};
+
 const sectionTitleStyle = css`
   margin: 0 0 8px 0;
   font-size: 13px;
@@ -36,18 +42,18 @@ export default function SingleSessionView({ session }: SingleSessionViewProps) {
 
   const metrics = useMemo(() => {
     try {
-      const primaryMetric = (settings.selectedMetrics.find(
-        m => m === 'deviation' || m === 'rotation'
-      ) ?? 'deviation') as 'deviation' | 'rotation';
+      const freshSettings = getGlobalSettings();
+      const primaryMetric = getPrimaryMetric(freshSettings);
       const thresholds = {
-        deviation: settings.thresholds.deviation ?? 1.0,
-        rotation: settings.thresholds.rotation ?? 1.0,
+        deviation: freshSettings.thresholds.deviation ?? 1.0,
+        rotation: freshSettings.thresholds.rotation ?? 1.0,
       };
       return computeSessionMetrics(session, thresholds, primaryMetric);
-    } catch {
+    } catch (error) {
+      console.error('Failed to compute session metrics:', error);
       return null;
     }
-  }, [session, settings]);
+  }, [session]);
 
   if (metrics === null) {
     return (
@@ -64,9 +70,6 @@ export default function SingleSessionView({ session }: SingleSessionViewProps) {
       </div>
     );
   }
-
-  // Use first selected metric as representative for the banner
-  const primaryMetric = selectedMetrics[0];
 
   return (
     <div css={css`
@@ -93,7 +96,7 @@ export default function SingleSessionView({ session }: SingleSessionViewProps) {
       {/* Metric Settings Banner */}
       <AnalysisMetricsBanner
         mode={selectedMetrics.length === 1 ? 'single' : 'multi'}
-        metric={selectedMetrics.length === 1 ? selectedMetrics[0] : undefined}
+        metric={selectedMetrics.length === 1 ? getPrimaryMetric(settings) : undefined}
       />
 
       {/* Sub-scores */}
