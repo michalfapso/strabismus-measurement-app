@@ -35,6 +35,20 @@ TimeSeriesGraph + HistogramChart + TrendChart
 Single entry point for all analysis. Mode determined by `sessions.length === 1`.
 Sections (in order): Header + StatCards → TimeSeriesGraph → HistogramChart → TrendChart (aggregate only)
 
+### SingleSessionView
+- Displays rich analysis view for a single session
+- Props: `session` only (computes metrics internally)
+- Internally calls `getGlobalSettings()` and `computeSessionMetrics()` to derive SessionMetrics
+- Components: AnalysisMetricsBanner + SubScoresPanel + TimeSeriesSegmentationGraph (per metric) + HistogramChart (per metric)
+- Includes error handling: if metrics computation fails, displays "Unable to compute metrics (session may be too short)"
+
+### ResultsPanel
+- Fixed-width side panel (800px, responsive to `min(800px, 100vw)`) displayed after Stop & Save
+- Simple wrapper container around SingleSessionView
+- Structure: close button header (flexShrink: 0) + SingleSessionView in scrollable content area
+- Close button stays fixed at top while content scrolls independently
+- Passes only `session` prop to SingleSessionView
+
 ### Global Settings System (utils/globalSettings.ts)
 **Single source of truth for user preferences across the entire app.** Separate from view state — persists to localStorage key `"strabismus_global_settings"`.
 
