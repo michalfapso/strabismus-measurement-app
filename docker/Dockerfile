@@ -1,11 +1,11 @@
-# Claude Code CLI Sandbox Container
+# Claude Code CLI Sandbox Container with Playwright MCP
 # This Dockerfile creates an isolated environment for running Claude Code CLI
-# with the --dangerously-skip-permissions flag for automated workflows
+# with Playwright MCP support for automated browser interactions
 
 FROM node:20-bookworm-slim
 
 LABEL maintainer="Strabismus Measurement App"
-LABEL description="Docker sandbox for Claude Code CLI with automated permissions"
+LABEL description="Docker sandbox for Claude Code CLI with Playwright MCP"
 
 # Set working directory
 WORKDIR /workspace
@@ -43,46 +43,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright globally
-RUN npm install -g playwright
-
-# Install Playwright browser (Chromium only to minimize image size)
-RUN npx playwright install chromium
-
-# Create a non-root user for security
-#RUN addgroup -g 1001 claude && \
-#    adduser -D -u 1001 -G claude claude
-
-# Set environment variables for automated operations
-# These enable Claude Code CLI to run without permission prompts
-ENV CLAUDE_CODE_SKIP_PERMISSIONS=true
+# Set environment variables
 ENV NODE_ENV=production
 ENV HOME=/home/node
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=false
-ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/lib/node_modules/playwright/.browsers
 ENV TERM=xterm-256color
-
-# Create home directory for the non-root user
-#RUN mkdir -p /home/claude && \
-#    chown -R claude:claude /home/claude
-
-# Switch to non-root user
-USER node
-
-# Ensure ~/.local/bin is in PATH for claude binary
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 ENV PATH=$HOME/.local/bin:$PATH
 
-# Install Claude Code CLI using official installer
+# Create Playwright browsers directory with proper permissions (as root)
+RUN mkdir -p /opt/playwright-browsers && chmod 755 /opt/playwright-browsers
+
+# Install Playwright and Chromium browser as root (before user switch)
+# This ensures browser binaries are accessible to all users
+RUN npm install -g playwright && \
+    npx playwright install chromium && \
+    chmod -R 755 /opt/playwright-browsers && \
+    npm cache clean --force
+
+# Switch to non-root user for Claude Code operations
+USER node
+
+# Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
-#RUN claude plugin install superpowers@claude-plugins-official && \
-#    claude plugin install playwright@claude-plugins-official
 
 # Create project volume mount point
 VOLUME /workspace
 
-# Set the entrypoint to bash for proper terminal support
-# Users can override this to run specific commands
+# Set the entrypoint to bash
 ENTRYPOINT ["/bin/bash"]
 
 # Default command
-CMD ["-c", "echo 'Claude Code CLI Sandbox Container' && echo 'Run: claude <command> --dangerously-skip-permissions' && /bin/bash"]
+CMD ["-c", "echo 'Claude Code CLI Sandbox with Playwright MCP' && /bin/bash"]
