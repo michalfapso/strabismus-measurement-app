@@ -59,6 +59,7 @@ RUN mkdir -p /opt/playwright-browsers && chmod 755 /opt/playwright-browsers
 RUN npm install -g playwright && \
     npx playwright install chromium && \
     chmod -R 755 /opt/playwright-browsers && \
+    chown -R node:node /opt/playwright-browsers && \
     npm cache clean --force && \
     rm -rf /home/node/.npm
 
