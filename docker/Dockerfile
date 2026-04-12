@@ -10,7 +10,7 @@ LABEL description="Docker sandbox for Claude Code CLI with Playwright MCP"
 # Set working directory
 WORKDIR /workspace
 
-# Install system dependencies for Playwright and Claude Code
+# Install base dependencies for Playwright and Claude Code
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -22,25 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     ca-certificates \
     vim \
-    readline-common \
-    libreadline8 \
-    libx11-6 \
-    libxrender1 \
-    libxext6 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    dbus \
-    libgconf-2-4 \
-    libasound2 \
-    fonts-liberation \
-    libxss1 \
-    libxtst6 \
-    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
@@ -58,8 +39,11 @@ RUN mkdir -p /opt/playwright-browsers && chmod 755 /opt/playwright-browsers
 # This ensures browser binaries are accessible to all users
 RUN npm install -g playwright && \
     npx playwright install chromium && \
+    npx playwright install-deps chromium && \
     chmod -R 755 /opt/playwright-browsers && \
     chown -R node:node /opt/playwright-browsers && \
+    mkdir -p /opt/google/chrome && \
+    ln -sf /opt/playwright-browsers/chromium-1217/chrome-linux64/chrome /opt/google/chrome/chrome && \
     npm cache clean --force && \
     rm -rf /home/node/.npm
 
