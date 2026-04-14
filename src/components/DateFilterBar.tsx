@@ -29,6 +29,27 @@ export function DateFilterBar({ onDateChange, currentRange }: DateFilterBarProps
     onDateChange(from, to);
   };
 
+  const inputStyle = {
+    marginLeft: '8px',
+    padding: '6px 8px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    borderRadius: '3px',
+    color: '#fff',
+    fontSize: '12px',
+    width: '120px',
+  };
+
+  const presetButtonStyle = {
+    padding: '6px 10px',
+    fontSize: '12px',
+    backgroundColor: 'rgba(0,255,0,0.1)',
+    border: '1px solid #0a0',
+    borderRadius: '3px',
+    color: '#0f0',
+    cursor: 'pointer',
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -38,7 +59,6 @@ export function DateFilterBar({ onDateChange, currentRange }: DateFilterBarProps
       padding: '12px',
       backgroundColor: 'rgba(255,255,255,0.02)',
       borderRadius: '4px',
-      marginBottom: '12px',
     }}>
       <label style={{ fontSize: '12px', color: '#aaa' }}>
         From:
@@ -46,43 +66,27 @@ export function DateFilterBar({ onDateChange, currentRange }: DateFilterBarProps
           type="date"
           value={formatDateForInput(currentRange.from)}
           onChange={handleFromChange}
-          style={{
-            marginLeft: '8px',
-            padding: '6px 8px',
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '3px',
-            color: '#fff',
-            fontSize: '12px',
-            width: '120px',
-          }}
+          style={inputStyle}
         />
       </label>
 
-      <label style={{ fontSize: '12px', color: '#aaa' }}>
-        To:
-        <input
-          type="date"
-          value={formatDateForInput(currentRange.to)}
-          onChange={handleToChange}
-          style={{
-            marginLeft: '8px',
-            padding: '6px 8px',
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '3px',
-            color: '#fff',
-            fontSize: '12px',
-            width: '120px',
-          }}
-        />
-      </label>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <label style={{ fontSize: '12px', color: '#aaa' }}>
+          To:
+          <input
+            type="date"
+            value={formatDateForInput(currentRange.to)}
+            onChange={handleToChange}
+            style={inputStyle}
+          />
+        </label>
 
-      <div style={{ flex: 1 }} />
-
-      <button onClick={() => setPreset(7)} style={{ padding: '6px 10px', fontSize: '12px', backgroundColor: 'rgba(0,255,0,0.1)', border: '1px solid #0a0', borderRadius: '3px', color: '#0f0', cursor: 'pointer' }}>7d</button>
-      <button onClick={() => setPreset(30)} style={{ padding: '6px 10px', fontSize: '12px', backgroundColor: 'rgba(0,255,0,0.1)', border: '1px solid #0a0', borderRadius: '3px', color: '#0f0', cursor: 'pointer' }}>30d</button>
-      <button onClick={() => setPreset(null)} style={{ padding: '6px 10px', fontSize: '12px', backgroundColor: 'rgba(0,255,0,0.1)', border: '1px solid #0a0', borderRadius: '3px', color: '#0f0', cursor: 'pointer' }}>All</button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={() => setPreset(7)} style={presetButtonStyle}>7d</button>
+          <button onClick={() => setPreset(30)} style={presetButtonStyle}>30d</button>
+          <button onClick={() => setPreset(null)} style={presetButtonStyle}>All</button>
+        </div>
+      </div>
     </div>
   );
 }
