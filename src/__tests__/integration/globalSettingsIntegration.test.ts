@@ -354,7 +354,7 @@ describe('Global Settings Integration', () => {
     });
 
     it('settings save/load does not interfere with view state key', () => {
-      const viewState = JSON.stringify({ filters: { exerciseType: 'Brock String' } });
+      const viewState = JSON.stringify({ filters: { exerciseTypes: ['Brock String'] } });
       localStorage.setItem(VIEW_STATE_KEY, viewState);
 
       setGlobalSettings(makeSettings(['deviation'], { deviation: 1.0 }));

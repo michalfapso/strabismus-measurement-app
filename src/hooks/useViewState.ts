@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export interface ViewState {
   filters: {
     dateRange: [number, number];
-    exerciseType: string | null;
+    exerciseTypes: Set<string> | null;
   };
   selectedSessions: Set<string>;
   histogramMetrics: Set<'deviation' | 'x' | 'y' | 'rotation'>;
@@ -18,7 +18,7 @@ const STORAGE_KEY = 'strabismus_view_state';
 const DEFAULT_STATE: ViewState = {
   filters: {
     dateRange: [0, Infinity],
-    exerciseType: null,
+    exerciseTypes: null,
   },
   selectedSessions: new Set(),
   histogramMetrics: new Set(['deviation']),
@@ -32,7 +32,10 @@ const DEFAULT_STATE: ViewState = {
 
 // Serialized representation of defaults for deserialization
 const SERIALIZED_DEFAULTS = {
-  filters: DEFAULT_STATE.filters,
+  filters: {
+    dateRange: DEFAULT_STATE.filters.dateRange,
+    exerciseTypes: null,
+  },
   selectedSessions: Array.from(DEFAULT_STATE.selectedSessions),
   histogramMetrics: Array.from(DEFAULT_STATE.histogramMetrics),
   histogramDisplayModes: Array.from(DEFAULT_STATE.histogramDisplayModes),
@@ -57,7 +60,10 @@ function isValidTimeMode(val: unknown): val is 'absolute' | 'relative' {
 // Convert ViewState to JSON-serializable format
 function serialize(state: ViewState): string {
   return JSON.stringify({
-    filters: state.filters,
+    filters: {
+      dateRange: state.filters.dateRange,
+      exerciseTypes: state.filters.exerciseTypes ? Array.from(state.filters.exerciseTypes) : null,
+    },
     selectedSessions: Array.from(state.selectedSessions),
     histogramMetrics: Array.from(state.histogramMetrics),
     histogramDisplayModes: Array.from(state.histogramDisplayModes),
@@ -71,8 +77,14 @@ function serialize(state: ViewState): string {
 function deserialize(json: string): ViewState {
   try {
     const parsed = JSON.parse(json);
+    const exerciseTypes = parsed.filters?.exerciseTypes
+      ? new Set<string>(parsed.filters.exerciseTypes)
+      : SERIALIZED_DEFAULTS.filters.exerciseTypes;
     return {
-      filters: parsed.filters || SERIALIZED_DEFAULTS.filters,
+      filters: {
+        dateRange: parsed.filters?.dateRange || SERIALIZED_DEFAULTS.filters.dateRange,
+        exerciseTypes,
+      },
       selectedSessions: new Set(parsed.selectedSessions || SERIALIZED_DEFAULTS.selectedSessions),
       histogramMetrics: new Set(
         (parsed.histogramMetrics || SERIALIZED_DEFAULTS.histogramMetrics).filter(isValidMetric)

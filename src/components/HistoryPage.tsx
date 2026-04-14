@@ -63,13 +63,13 @@ export function HistoryPage({}: HistoryPageProps) {
   }, [state.filters.dateRange]);
 
   // Build selectedExerciseTypes set for ExerciseTypeFilterBar
-  // If exerciseType is null, show all types selected
+  // If exerciseTypes is null, show all types selected
   const selectedExerciseTypes = useMemo(() => {
-    if (state.filters.exerciseType === null) {
+    if (state.filters.exerciseTypes === null) {
       return new Set(distinctExerciseTypes);
     }
-    return new Set([state.filters.exerciseType]);
-  }, [state.filters.exerciseType, distinctExerciseTypes]);
+    return new Set(state.filters.exerciseTypes);
+  }, [state.filters.exerciseTypes, distinctExerciseTypes]);
 
   // Filter sessions based on date range AND exercise type
   const filteredSessions = useMemo(() => {
@@ -101,18 +101,15 @@ export function HistoryPage({}: HistoryPageProps) {
   };
 
   const handleExerciseTypeChange = (types: Set<string>) => {
-    // LIMITATION: useViewState only supports filtering by a single exerciseType at a time
-    // If the user selects multiple types, we select only the first one
-    // If all types are selected, we set exerciseType to null (show all)
-    // TODO: Consider extending useViewState.filters.exerciseType to support Set<string> for true multi-select
-
     if (types.size === distinctExerciseTypes.length) {
       // All types selected: show all exercises
-      updateFilters({ exerciseType: null });
+      updateFilters({ exerciseTypes: null });
     } else if (types.size > 0) {
-      // Single or multiple types: apply the first selected type
-      // Note: This silently ignores additional selections when count > 1
-      updateFilters({ exerciseType: Array.from(types)[0] });
+      // Selected types: filter to show only these exercises
+      updateFilters({ exerciseTypes: new Set(types) });
+    } else {
+      // No types selected: show none (filter to empty set)
+      updateFilters({ exerciseTypes: new Set() });
     }
   };
 

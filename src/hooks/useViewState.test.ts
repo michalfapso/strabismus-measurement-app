@@ -13,7 +13,7 @@ describe('useViewState', () => {
     const { result } = renderHook(() => useViewState());
 
     expect(result.current.state.filters.dateRange).toEqual([0, Infinity]);
-    expect(result.current.state.filters.exerciseType).toBeNull();
+    expect(result.current.state.filters.exerciseTypes).toBeNull();
     expect(result.current.state.selectedSessions).toEqual(new Set());
     expect(result.current.state.histogramMetrics).toEqual(new Set(['deviation']));
     expect(result.current.state.histogramDisplayModes).toEqual(new Set(['individual', 'meanStddev']));
@@ -24,7 +24,7 @@ describe('useViewState', () => {
 
   it('hydrates from localStorage on mount', () => {
     const mockState = {
-      filters: { dateRange: [1000, 2000], exerciseType: 'Pencil Push-ups' },
+      filters: { dateRange: [1000, 2000], exerciseTypes: ['Pencil Push-ups', 'Brock String'] },
       selectedSessions: ['session-1', 'session-2'],
       histogramMetrics: ['deviation', 'x'],
       histogramDisplayModes: ['meanStddev'],
@@ -37,7 +37,7 @@ describe('useViewState', () => {
     const { result } = renderHook(() => useViewState());
 
     expect(result.current.state.filters.dateRange).toEqual([1000, 2000]);
-    expect(result.current.state.filters.exerciseType).toBe('Pencil Push-ups');
+    expect(result.current.state.filters.exerciseTypes).toEqual(new Set(['Pencil Push-ups', 'Brock String']));
     expect(result.current.state.selectedSessions).toEqual(new Set(['session-1', 'session-2']));
     expect(result.current.state.histogramMetrics).toEqual(new Set(['deviation', 'x']));
     expect(result.current.state.histogramDisplayModes).toEqual(new Set(['meanStddev']));
@@ -51,7 +51,7 @@ describe('useViewState', () => {
     const { result } = renderHook(() => useViewState());
 
     act(() => {
-      result.current.updateFilters({ exerciseType: 'Brock String' });
+      result.current.updateFilters({ exerciseTypes: new Set(['Brock String']) });
     });
 
     // Should not save immediately
@@ -65,7 +65,7 @@ describe('useViewState', () => {
     const stored = localStorage.getItem('strabismus_view_state');
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored || '{}');
-    expect(parsed.filters.exerciseType).toBe('Brock String');
+    expect(parsed.filters.exerciseTypes).toContain('Brock String');
 
     vi.useRealTimers();
   });
@@ -76,7 +76,7 @@ describe('useViewState', () => {
     const { result } = renderHook(() => useViewState());
 
     expect(result.current.state).toEqual(expect.objectContaining({
-      filters: { dateRange: [0, Infinity], exerciseType: null },
+      filters: { dateRange: [0, Infinity], exerciseTypes: null },
     }));
   });
 
@@ -167,5 +167,77 @@ describe('useViewState', () => {
     });
 
     expect(result.current.state.timeSeriesTimeMode).toBe('relative');
+  });
+
+  describe('exerciseTypes multi-select filtering', () => {
+    it('stores multiple exercise types when less than all types are selected', () => {
+      const { result } = renderHook(() => useViewState());
+
+      act(() => {
+        result.current.updateFilters({ exerciseTypes: new Set(['Pencil Push-ups', 'Brock String']) });
+      });
+
+      expect(result.current.state.filters.exerciseTypes).toEqual(new Set(['Pencil Push-ups', 'Brock String']));
+    });
+
+    it('stores null when all exercise types are selected', () => {
+      const { result } = renderHook(() => useViewState());
+
+      act(() => {
+        result.current.updateFilters({ exerciseTypes: null });
+      });
+
+      expect(result.current.state.filters.exerciseTypes).toBeNull();
+    });
+
+    it('stores empty set when no exercise types are selected', () => {
+      const { result } = renderHook(() => useViewState());
+
+      act(() => {
+        result.current.updateFilters({ exerciseTypes: new Set() });
+      });
+
+      expect(result.current.state.filters.exerciseTypes).toEqual(new Set());
+    });
+
+    it('persists multiple exercise types to localStorage', async () => {
+      vi.useFakeTimers();
+      const { result } = renderHook(() => useViewState());
+
+      act(() => {
+        result.current.updateFilters({ exerciseTypes: new Set(['Pencil Push-ups', 'Brock String', 'Convergence Jumps']) });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      const stored = localStorage.getItem('strabismus_view_state');
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored || '{}');
+      expect(parsed.filters.exerciseTypes).toHaveLength(3);
+      expect(parsed.filters.exerciseTypes).toContain('Pencil Push-ups');
+      expect(parsed.filters.exerciseTypes).toContain('Brock String');
+      expect(parsed.filters.exerciseTypes).toContain('Convergence Jumps');
+
+      vi.useRealTimers();
+    });
+
+    it('hydrates multiple exercise types from localStorage', () => {
+      const mockState = {
+        filters: { dateRange: [1000, 2000], exerciseTypes: ['Pencil Push-ups', 'Brock String'] },
+        selectedSessions: [],
+        histogramMetrics: ['deviation'],
+        histogramDisplayModes: ['individual', 'meanStddev'],
+        timeSeriesMetrics: ['deviation'],
+        timeSeriesDisplayModes: ['individual'],
+        timeSeriesTimeMode: 'absolute' as const,
+      };
+      localStorage.setItem('strabismus_view_state', JSON.stringify(mockState));
+
+      const { result } = renderHook(() => useViewState());
+
+      expect(result.current.state.filters.exerciseTypes).toEqual(new Set(['Pencil Push-ups', 'Brock String']));
+    });
   });
 });
