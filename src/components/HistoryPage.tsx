@@ -249,7 +249,7 @@ export function HistoryPage({}: HistoryPageProps) {
                 selectedIds={state.selectedSessions}
                 onRowClick={handleRowClick}
               />
-              <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
                 <SelectionBar
                   selectedCount={selectedCount}
                   filteredSessionCount={filteredSessions.length}
