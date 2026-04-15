@@ -65,10 +65,12 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
               )}
             </>
           )}
-          <tr>
-            <td>Near-best stable time</td>
-            <td>{metrics.nearBestStableTime.toFixed(1)}s</td>
-          </tr>
+          {metrics.fusionAchieved && (
+            <tr>
+              <td>Near-best stable time</td>
+              <td>{metrics.nearBestStableTime.toFixed(1)}s</td>
+            </tr>
+          )}
           <tr>
             <td>Best stable {metrics.metric}</td>
             <td>
