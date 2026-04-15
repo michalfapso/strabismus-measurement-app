@@ -47,40 +47,7 @@ export function ExerciseTypeFilterBar({
         marginBottom: '12px',
       }}
     >
-      <button
-        onClick={handleSelectAll}
-        disabled={allSelected}
-        style={{
-          padding: '6px 10px',
-          fontSize: '12px',
-          backgroundColor: 'rgba(0, 255, 0, 0.1)',
-          border: '1px solid #0a0',
-          borderRadius: '3px',
-          color: '#0f0',
-          cursor: allSelected ? 'not-allowed' : 'pointer',
-          opacity: allSelected ? 0.5 : 1,
-        }}
-      >
-        All
-      </button>
-
-      <button
-        onClick={handleSelectNone}
-        disabled={noneSelected}
-        style={{
-          padding: '6px 10px',
-          fontSize: '12px',
-          backgroundColor: 'rgba(0, 255, 0, 0.1)',
-          border: '1px solid #0a0',
-          borderRadius: '3px',
-          color: '#0f0',
-          cursor: noneSelected ? 'not-allowed' : 'pointer',
-          opacity: noneSelected ? 0.5 : 1,
-        }}
-      >
-        None
-      </button>
-
+      {/* Checkboxes first (left) */}
       <div
         style={{
           display: 'flex',
@@ -114,6 +81,46 @@ export function ExerciseTypeFilterBar({
             {type}
           </label>
         ))}
+      </div>
+
+      {/* Spacer to push buttons to right */}
+      <div style={{ flex: 1 }} />
+
+      {/* All/None buttons (right) */}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <button
+          onClick={handleSelectAll}
+          disabled={allSelected}
+          style={{
+            padding: '6px 10px',
+            fontSize: '12px',
+            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            border: '1px solid #0a0',
+            borderRadius: '3px',
+            color: '#0f0',
+            cursor: allSelected ? 'not-allowed' : 'pointer',
+            opacity: allSelected ? 0.5 : 1,
+          }}
+        >
+          All
+        </button>
+
+        <button
+          onClick={handleSelectNone}
+          disabled={noneSelected}
+          style={{
+            padding: '6px 10px',
+            fontSize: '12px',
+            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            border: '1px solid #0a0',
+            borderRadius: '3px',
+            color: '#0f0',
+            cursor: noneSelected ? 'not-allowed' : 'pointer',
+            opacity: noneSelected ? 0.5 : 1,
+          }}
+        >
+          None
+        </button>
       </div>
     </div>
   );
