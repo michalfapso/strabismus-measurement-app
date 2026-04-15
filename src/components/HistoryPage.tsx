@@ -135,6 +135,15 @@ export function HistoryPage({}: HistoryPageProps) {
     }
   };
 
+  const handleSelectAll = () => {
+    const visibleIds = filteredSessions.map((s) => s.sessionId);
+    updateSelectedSessions(new Set(visibleIds));
+  };
+
+  const handleSelectNone = () => {
+    updateSelectedSessions(new Set());
+  };
+
   const handleRowClick = (id: string, ctrlKey: boolean, shiftKey: boolean, visibleIds: string[]) => {
     let nextSelection: Set<string>;
 
@@ -240,15 +249,16 @@ export function HistoryPage({}: HistoryPageProps) {
                 selectedIds={state.selectedSessions}
                 onRowClick={handleRowClick}
               />
-              {selectedCount > 0 && (
-                <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  <SelectionBar
-                    selectedCount={selectedCount}
-                    onExport={handleExport}
-                    onDelete={handleDelete}
-                  />
-                </div>
-              )}
+              <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <SelectionBar
+                  selectedCount={selectedCount}
+                  filteredSessionCount={filteredSessions.length}
+                  onSelectAll={handleSelectAll}
+                  onSelectNone={handleSelectNone}
+                  onExport={handleExport}
+                  onDelete={handleDelete}
+                />
+              </div>
             </>
           )}
         </div>
