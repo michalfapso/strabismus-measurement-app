@@ -49,7 +49,7 @@ describe('SubScoresPanel', () => {
     expect(container.textContent).toContain('45.3s');
   });
 
-  it('should NOT display near-best stable time when fusion is not achieved', () => {
+  it('should display near-best stable time regardless of fusion status', () => {
     const metrics = createMockMetrics({
       fusionAchieved: false,
       nearBestStableTime: 20.5,
@@ -57,6 +57,7 @@ describe('SubScoresPanel', () => {
 
     const { container } = render(<SubScoresPanel metrics={metrics} />);
 
-    expect(container.textContent).not.toContain('Near-best stable time');
+    expect(container.textContent).toContain('Near-best stable time');
+    expect(container.textContent).toContain('20.5s');
   });
 });
