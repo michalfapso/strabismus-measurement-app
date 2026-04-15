@@ -83,10 +83,7 @@ export function ExerciseTypeFilterBar({
         ))}
       </div>
 
-      {/* Spacer to push buttons to right */}
-      <div style={{ flex: 1 }} />
-
-      {/* All/None buttons (right) */}
+      {/* All/None buttons (beside checkboxes) */}
       <div style={{ display: 'flex', gap: '6px' }}>
         <button
           onClick={handleSelectAll}
@@ -122,6 +119,9 @@ export function ExerciseTypeFilterBar({
           None
         </button>
       </div>
+
+      {/* Spacer to fill remaining space */}
+      <div style={{ flex: 1 }} />
     </div>
   );
 }
