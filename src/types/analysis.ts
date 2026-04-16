@@ -76,6 +76,7 @@ export interface SessionMetrics {
   fusionAchievedCount: number;
   longestFusionStreak: number;
   longestQualityStreak: number;  // longest single segment within quality band (meanDeviation ≤ threshold)
+  qualityEpisodeCount: number;   // count of distinct quality episodes in session
   largeDeviationTimePercent: number;
   trajectoryRatio: number | null;
 

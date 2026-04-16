@@ -779,6 +779,7 @@ export function computeSessionAggregateMetrics(
   bestStableDeviation: number;
   nearBestStableTime: number;
   longestQualityStreak: number;
+  qualityEpisodeCount: number;
   qualityPercent: number;
   driftingPercent: number;
   approachingPercent: number;
@@ -802,14 +803,24 @@ export function computeSessionAggregateMetrics(
   // 3. Compute threshold using band percent constant
   const nearBestThreshold = bestMeanDev + (NEAR_BEST_THRESHOLD_BAND_PERCENT / 100) * (sessionMaxDev - bestMeanDev);
 
-  // 4. Filter to quality segments and sum durations / find longest
+  // 4. Filter to quality segments and sum durations / find longest / count episodes
   let nearBestTotalTime = 0;
   let longestQualityStreak = 0;
+  let qualityEpisodeCount = 0;
+  let inEpisode = false;
   for (const seg of stateSegments) {
     const isQuality = (seg.state === 'FUSION' || seg.state === 'NEAR_FUSION' || seg.state === 'STABLE_DEVIATION');
-    if (isQuality && seg.metrics && seg.metrics.meanDeviation <= nearBestThreshold) {
+    const isQualityBand = isQuality && seg.metrics && seg.metrics.meanDeviation <= nearBestThreshold;
+
+    if (isQualityBand) {
       nearBestTotalTime += seg.duration;
       longestQualityStreak = Math.max(longestQualityStreak, seg.duration);
+      if (!inEpisode) {
+        qualityEpisodeCount++;
+        inEpisode = true;
+      }
+    } else if (seg.metrics && seg.metrics.meanDeviation > nearBestThreshold) {
+      inEpisode = false;
     }
   }
 
@@ -830,6 +841,7 @@ export function computeSessionAggregateMetrics(
     bestStableDeviation: bestMeanDev,
     nearBestStableTime: nearBestTotalTime,
     longestQualityStreak,
+    qualityEpisodeCount,
     qualityPercent,
     driftingPercent: (driftingTime / sessionDuration) * 100,
     approachingPercent: (approachingTime / sessionDuration) * 100,
@@ -881,6 +893,7 @@ export function computeSessionMetrics(
     fusionAchievedCount: fusionMetrics.fusionAchieved ? 1 : 0,
     longestFusionStreak,
     longestQualityStreak: aggregateMetrics.longestQualityStreak,
+    qualityEpisodeCount: aggregateMetrics.qualityEpisodeCount,
     largeDeviationTimePercent,
     trajectoryRatio,
     fusionTime: fusionMetrics.fusionTime,

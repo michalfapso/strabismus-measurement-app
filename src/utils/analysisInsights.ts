@@ -84,6 +84,32 @@ export function calculateProgressInsight(
     };
   }
 
+  // Recovery Consistency: % of sessions where patient achieved recovery (qualityEpisodeCount > 1)
+  const sortedSessionMetrics = sorted;
+  const sessionsWithRecovery = sortedSessionMetrics.filter(
+    m => m.qualityEpisodeCount > 1
+  ).length;
+
+  const recoveryConsistency = sortedSessionMetrics.length > 0
+    ? (sessionsWithRecovery / sortedSessionMetrics.length) * 100
+    : 0;
+
+  // Trend: recovery consistency (binary: recovered or not per session)
+  const recoveryConsistencyPoints: [number, number][] = sortedSessionMetrics.map((m, i) => [
+    i,
+    m.qualityEpisodeCount > 1 ? 100 : 0  // binary: recovered (100) or not (0)
+  ]);
+
+  const recoveryConsistencySlope = linearRegressionSlope(recoveryConsistencyPoints) / (sortedSessionMetrics.length / 52);
+  const recoveryConsistencyP = regressionPValue(recoveryConsistencyPoints);
+
+  progressInsight.recoveryConsistency = recoveryConsistency;
+  progressInsight.recoveryConsistencyTrend = {
+    slope: recoveryConsistencySlope,
+    direction: trendDirection(recoveryConsistencySlope, recoveryConsistencyP, 'stream'),
+    significance: { p: recoveryConsistencyP, significant: recoveryConsistencyP < 0.05 },
+  };
+
   return progressInsight;
 }
 
