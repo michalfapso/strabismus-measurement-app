@@ -65,6 +65,12 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
               )}
             </>
           )}
+          {!metrics.fusionAchieved && metrics.longestQualityStreak > 0 && (
+            <tr>
+              <td>Longest quality streak</td>
+              <td>{metrics.longestQualityStreak.toFixed(1)}s</td>
+            </tr>
+          )}
           <tr>
             <td>Near-best stable time</td>
             <td>{metrics.nearBestStableTime.toFixed(1)}s</td>

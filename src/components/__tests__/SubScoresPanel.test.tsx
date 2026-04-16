@@ -21,7 +21,9 @@ function createMockMetrics(overrides?: Partial<SessionMetrics>): SessionMetrics 
     approachingPercent: 15.0,
     timeToFirstFusion: 10.5,
     fusionEventCount: 5,
+    fusionAchievedCount: 5,
     longestFusionStreak: 45.0,
+    longestQualityStreak: 45.0,
     largeDeviationTimePercent: 20.0,
     trajectoryRatio: 0.05,
     fusionTime: 120,
@@ -59,5 +61,60 @@ describe('SubScoresPanel', () => {
 
     expect(container.textContent).toContain('Near-best stable time');
     expect(container.textContent).toContain('20.5s');
+  });
+
+  it('should show longest fusion streak for fusion sessions', () => {
+    const metrics = createMockMetrics({
+      fusionAchieved: true,
+      longestFusionStreak: 45.2,
+      longestQualityStreak: 45.2,
+    });
+
+    const { container } = render(<SubScoresPanel metrics={metrics} />);
+
+    expect(container.textContent).toContain('Longest fusion streak');
+    expect(container.textContent).toContain('45.2s');
+    expect(container.textContent).not.toContain('Longest quality streak');
+  });
+
+  it('should show longest quality streak for non-fusion NEAR_FUSION session', () => {
+    const metrics = createMockMetrics({
+      fusionAchieved: false,
+      longestFusionStreak: 0,
+      longestQualityStreak: 32.5,
+    });
+
+    const { container } = render(<SubScoresPanel metrics={metrics} />);
+
+    expect(container.textContent).not.toContain('Longest fusion streak');
+    expect(container.textContent).toContain('Longest quality streak');
+    expect(container.textContent).toContain('32.5s');
+  });
+
+  it('should show longest quality streak for non-fusion STABLE_DEVIATION session', () => {
+    const metrics = createMockMetrics({
+      fusionAchieved: false,
+      longestFusionStreak: 0,
+      longestQualityStreak: 28.7,
+    });
+
+    const { container } = render(<SubScoresPanel metrics={metrics} />);
+
+    expect(container.textContent).not.toContain('Longest fusion streak');
+    expect(container.textContent).toContain('Longest quality streak');
+    expect(container.textContent).toContain('28.7s');
+  });
+
+  it('should not show longest quality streak for all-DRIFTING session', () => {
+    const metrics = createMockMetrics({
+      fusionAchieved: false,
+      longestFusionStreak: 0,
+      longestQualityStreak: 0,
+    });
+
+    const { container } = render(<SubScoresPanel metrics={metrics} />);
+
+    expect(container.textContent).not.toContain('Longest fusion streak');
+    expect(container.textContent).not.toContain('Longest quality streak');
   });
 });
