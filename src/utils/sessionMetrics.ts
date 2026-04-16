@@ -772,21 +772,13 @@ export function calculateLongestFusionStreak(segments: StateSegment[]): number {
     .reduce((max, s) => Math.max(max, s.duration), 0);
 }
 
-export function calculateLongestQualityStreak(segments: StateSegment[]): number {
-  const hasFusion = segments.some(s => s.state === 'FUSION');
-  const hasNearFusion = segments.some(s => s.state === 'NEAR_FUSION');
-  const targetState: SessionState = hasFusion ? 'FUSION' : hasNearFusion ? 'NEAR_FUSION' : 'STABLE_DEVIATION';
-  return segments
-    .filter(s => s.state === targetState)
-    .reduce((max, s) => Math.max(max, s.duration), 0);
-}
-
 export function computeSessionAggregateMetrics(
   stateSegments: StateSegment[],
   timeSeries: TimeSeries[]
 ): {
   bestStableDeviation: number;
   nearBestStableTime: number;
+  longestQualityStreak: number;
   qualityPercent: number;
   driftingPercent: number;
   approachingPercent: number;
@@ -810,12 +802,14 @@ export function computeSessionAggregateMetrics(
   // 3. Compute threshold using band percent constant
   const nearBestThreshold = bestMeanDev + (NEAR_BEST_THRESHOLD_BAND_PERCENT / 100) * (sessionMaxDev - bestMeanDev);
 
-  // 4. Filter to quality segments and sum durations
+  // 4. Filter to quality segments and sum durations / find longest
   let nearBestTotalTime = 0;
+  let longestQualityStreak = 0;
   for (const seg of stateSegments) {
     const isQuality = (seg.state === 'FUSION' || seg.state === 'NEAR_FUSION' || seg.state === 'STABLE_DEVIATION');
     if (isQuality && seg.metrics && seg.metrics.meanDeviation <= nearBestThreshold) {
       nearBestTotalTime += seg.duration;
+      longestQualityStreak = Math.max(longestQualityStreak, seg.duration);
     }
   }
 
@@ -835,6 +829,7 @@ export function computeSessionAggregateMetrics(
   return {
     bestStableDeviation: bestMeanDev,
     nearBestStableTime: nearBestTotalTime,
+    longestQualityStreak,
     qualityPercent,
     driftingPercent: (driftingTime / sessionDuration) * 100,
     approachingPercent: (approachingTime / sessionDuration) * 100,
@@ -867,7 +862,6 @@ export function computeSessionMetrics(
   const aggregateMetrics = computeSessionAggregateMetrics(stateSegments, timeSeries);
   const fusionEventCount = calculateFusionEventCount(stateSegments);
   const longestFusionStreak = calculateLongestFusionStreak(stateSegments);
-  const longestQualityStreak = calculateLongestQualityStreak(stateSegments);
   const histogram = calculateSessionHistogram(session, metric);
 
   return {
@@ -886,7 +880,7 @@ export function computeSessionMetrics(
     fusionEventCount,
     fusionAchievedCount: fusionMetrics.fusionAchieved ? 1 : 0,
     longestFusionStreak,
-    longestQualityStreak,
+    longestQualityStreak: aggregateMetrics.longestQualityStreak,
     largeDeviationTimePercent,
     trajectoryRatio,
     fusionTime: fusionMetrics.fusionTime,

@@ -15,7 +15,7 @@ function createMockMetrics(overrides?: Partial<SessionMetrics>): SessionMetrics 
     sessionDuration: 300,
     histogram: [] as HistogramBin[],
     bestStableDeviation: 0.5,
-    nearBestStableTime: 0,
+    nearBestStableTime: 45.0,
     qualityPercent: 40.0,
     driftingPercent: 20.0,
     approachingPercent: 15.0,

@@ -8,10 +8,16 @@ import {
   classifyStates,
   calculateFusionEventCount,
   calculateLongestFusionStreak,
-  calculateLongestQualityStreak,
+  computeSessionAggregateMetrics,
   computeSessionMetrics,
 } from '../sessionMetrics';
 import { TimeSeries, Session } from '../../types';
+import { StateSegment } from '../../types/analysis';
+
+// Helper function to build TimeSeries for testing
+function buildTimeSeries(points: [number, number][]): TimeSeries[] {
+  return points.map(([t, dev]) => ({ t: t * 1000, x: dev, y: 0, r: 0 }));
+}
 
 describe('getMetricValue', () => {
   it('computes deviation as sqrt(x^2 + y^2)', () => {
@@ -332,46 +338,6 @@ describe('Fusion Events & Streaks', () => {
       { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
     ];
     expect(calculateLongestFusionStreak(segments)).toBe(7);
-  });
-});
-
-describe('calculateLongestQualityStreak', () => {
-  it('returns longest FUSION duration when FUSION segments exist', () => {
-    const segments = [
-      { state: 'FUSION' as const, startTime: 0, endTime: 3, duration: 3 },
-      { state: 'NEAR_FUSION' as const, startTime: 3, endTime: 5, duration: 2 },
-      { state: 'FUSION' as const, startTime: 5, endTime: 12, duration: 7 },
-      { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
-    ];
-    expect(calculateLongestQualityStreak(segments)).toBe(7);
-  });
-
-  it('returns longest NEAR_FUSION duration when no FUSION but NEAR_FUSION exists', () => {
-    const segments = [
-      { state: 'NEAR_FUSION' as const, startTime: 0, endTime: 3, duration: 3 },
-      { state: 'NEAR_FUSION' as const, startTime: 3, endTime: 8, duration: 5 },
-      { state: 'STABLE_DEVIATION' as const, startTime: 8, endTime: 12, duration: 4 },
-      { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
-    ];
-    expect(calculateLongestQualityStreak(segments)).toBe(5);
-  });
-
-  it('returns longest STABLE_DEVIATION duration when only STABLE_DEVIATION quality segment exists', () => {
-    const segments = [
-      { state: 'STABLE_DEVIATION' as const, startTime: 0, endTime: 4, duration: 4 },
-      { state: 'STABLE_DEVIATION' as const, startTime: 4, endTime: 10, duration: 6 },
-      { state: 'DRIFTING' as const, startTime: 10, endTime: 15, duration: 5 },
-    ];
-    expect(calculateLongestQualityStreak(segments)).toBe(6);
-  });
-
-  it('returns 0 when all segments are DRIFTING', () => {
-    const segments = [
-      { state: 'DRIFTING' as const, startTime: 0, endTime: 5, duration: 5 },
-      { state: 'DRIFTING' as const, startTime: 5, endTime: 10, duration: 5 },
-      { state: 'DRIFTING' as const, startTime: 10, endTime: 15, duration: 5 },
-    ];
-    expect(calculateLongestQualityStreak(segments)).toBe(0);
   });
 });
 
@@ -743,5 +709,76 @@ describe('Real Data Integration Tests', () => {
       expect(s.metrics).toBeDefined();
       expect(s.metrics!.intraSegmentSlope).toBeGreaterThan(0);
     });
+  });
+});
+
+describe('computeSessionAggregateMetrics - longestQualityStreak', () => {
+  it('returns the longest segment within threshold band', () => {
+    // bestMeanDev = min(0.4, 0.4) = 0.4
+    // sessionMaxDev = sqrt(3² + 0²) = 3.0  (from timeSeries)
+    // nearBestThreshold = 0.4 + 0.1 * (3.0 - 0.4) = 0.66
+    // Both segments have meanDeviation 0.4 ≤ 0.66 → both inside band
+    // Expected: 5 (longest of [5, 3])
+    const segments: StateSegment[] = [
+      { state: 'STABLE_DEVIATION', startTime: 0, endTime: 5000, duration: 5,
+        metrics: { meanDeviation: 0.4, minDeviation: 0.3, maxDeviation: 0.5,
+          medianDeviation: 0.4, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+      { state: 'STABLE_DEVIATION', startTime: 5000, endTime: 8000, duration: 3,
+        metrics: { meanDeviation: 0.4, minDeviation: 0.3, maxDeviation: 0.5,
+          medianDeviation: 0.4, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+    ];
+    const timeSeries = buildTimeSeries([[0, 0.4], [5, 3.0], [8, 1.0]]);
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+    expect(result.longestQualityStreak).toBe(5);
+  });
+
+  it('excludes segments whose meanDeviation exceeds the threshold band', () => {
+    // bestMeanDev = min(0.5, 2.0) = 0.5  (meanDeviation of each segment)
+    // sessionMaxDev = sqrt(5² + 0²) = 5.0
+    // nearBestThreshold = 0.5 + 0.1 * (5.0 - 0.5) = 0.95
+    // seg1: meanDeviation 0.5 ≤ 0.95 → inside band, duration 3s
+    // seg2: meanDeviation 2.0 > 0.95 → outside band, duration 8s (excluded)
+    // Expected: 3
+    const segments: StateSegment[] = [
+      { state: 'STABLE_DEVIATION', startTime: 0, endTime: 3000, duration: 3,
+        metrics: { meanDeviation: 0.5, minDeviation: 0.3, maxDeviation: 0.7,
+          medianDeviation: 0.5, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+      { state: 'STABLE_DEVIATION', startTime: 3000, endTime: 11000, duration: 8,
+        metrics: { meanDeviation: 2.0, minDeviation: 1.5, maxDeviation: 2.5,
+          medianDeviation: 2.0, varianceWithinSegment: 0.1, stdDevWithinSegment: 0.3, intraSegmentSlope: 0 } },
+    ];
+    const timeSeries = buildTimeSeries([[0, 0.5], [5, 2.0], [11, 5.0]]);
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+    expect(result.longestQualityStreak).toBe(3);
+  });
+
+  it('returns 0 when no segments are within the band', () => {
+    const segments: StateSegment[] = [
+      { state: 'DRIFTING', startTime: 0, endTime: 5000, duration: 5, metrics: undefined },
+    ];
+    const timeSeries = buildTimeSeries([[0, 2.0], [5, 3.0]]);
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+    expect(result.longestQualityStreak).toBe(0);
+  });
+
+  it('longestQualityStreak is always ≤ nearBestStableTime', () => {
+    // 3 quality segments of different durations: 2s, 5s, 1s — all within band
+    // nearBestStableTime = 2 + 5 + 1 = 8; longestQualityStreak = 5
+    const segments: StateSegment[] = [
+      { state: 'STABLE_DEVIATION', startTime: 0, endTime: 2000, duration: 2,
+        metrics: { meanDeviation: 0.4, minDeviation: 0.3, maxDeviation: 0.5,
+          medianDeviation: 0.4, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+      { state: 'STABLE_DEVIATION', startTime: 2000, endTime: 7000, duration: 5,
+        metrics: { meanDeviation: 0.4, minDeviation: 0.3, maxDeviation: 0.5,
+          medianDeviation: 0.4, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+      { state: 'STABLE_DEVIATION', startTime: 7000, endTime: 8000, duration: 1,
+        metrics: { meanDeviation: 0.4, minDeviation: 0.3, maxDeviation: 0.5,
+          medianDeviation: 0.4, varianceWithinSegment: 0.01, stdDevWithinSegment: 0.1, intraSegmentSlope: 0 } },
+    ];
+    const timeSeries = buildTimeSeries([[0, 0.4], [4, 3.0], [8, 1.0]]);
+    const result = computeSessionAggregateMetrics(segments, timeSeries);
+    expect(result.nearBestStableTime).toBe(8);
+    expect(result.longestQualityStreak).toBe(5);
+    expect(result.longestQualityStreak).toBeLessThanOrEqual(result.nearBestStableTime);
   });
 });
