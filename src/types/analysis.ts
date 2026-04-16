@@ -114,8 +114,8 @@ export interface ProgressInsight {
   fusionEventCountTrend?: TrendInfo;
 
   // Recovery-related fields
-  recoveryConsistency: number;           // percentage 0-100
-  recoveryConsistencyTrend: TrendInfo;   // trend info with direction + significance
+  recoveryConsistency?: number;           // percentage 0-100
+  recoveryConsistencyTrend?: TrendInfo;   // trend info with direction + significance
 }
 
 export interface ExerciseInsight {
@@ -130,8 +130,8 @@ export interface ExerciseInsight {
   trendDirection: 'improving' | 'declining' | 'stable';
   trendSlope: number;
   improvementRate?: number;
-  medianRecoveryCycles: number;      // median qualityEpisodeCount for this exercise
-  recoveryCyclesTrend: TrendInfo;    // trend direction + significance
+  medianRecoveryCycles?: number;      // median qualityEpisodeCount for this exercise
+  recoveryCyclesTrend?: TrendInfo;    // trend direction + significance
 }
 
 export interface SessionQualityInsight {
