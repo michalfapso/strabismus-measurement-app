@@ -8,6 +8,7 @@ import {
   classifyStates,
   calculateFusionEventCount,
   calculateLongestFusionStreak,
+  calculateLongestQualityStreak,
   computeSessionMetrics,
 } from '../sessionMetrics';
 import { TimeSeries, Session } from '../../types';
@@ -331,6 +332,46 @@ describe('Fusion Events & Streaks', () => {
       { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
     ];
     expect(calculateLongestFusionStreak(segments)).toBe(7);
+  });
+});
+
+describe('calculateLongestQualityStreak', () => {
+  it('returns longest FUSION duration when FUSION segments exist', () => {
+    const segments = [
+      { state: 'FUSION' as const, startTime: 0, endTime: 3, duration: 3 },
+      { state: 'NEAR_FUSION' as const, startTime: 3, endTime: 5, duration: 2 },
+      { state: 'FUSION' as const, startTime: 5, endTime: 12, duration: 7 },
+      { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
+    ];
+    expect(calculateLongestQualityStreak(segments)).toBe(7);
+  });
+
+  it('returns longest NEAR_FUSION duration when no FUSION but NEAR_FUSION exists', () => {
+    const segments = [
+      { state: 'NEAR_FUSION' as const, startTime: 0, endTime: 3, duration: 3 },
+      { state: 'NEAR_FUSION' as const, startTime: 3, endTime: 8, duration: 5 },
+      { state: 'STABLE_DEVIATION' as const, startTime: 8, endTime: 12, duration: 4 },
+      { state: 'DRIFTING' as const, startTime: 12, endTime: 15, duration: 3 },
+    ];
+    expect(calculateLongestQualityStreak(segments)).toBe(5);
+  });
+
+  it('returns longest STABLE_DEVIATION duration when only STABLE_DEVIATION quality segment exists', () => {
+    const segments = [
+      { state: 'STABLE_DEVIATION' as const, startTime: 0, endTime: 4, duration: 4 },
+      { state: 'STABLE_DEVIATION' as const, startTime: 4, endTime: 10, duration: 6 },
+      { state: 'DRIFTING' as const, startTime: 10, endTime: 15, duration: 5 },
+    ];
+    expect(calculateLongestQualityStreak(segments)).toBe(6);
+  });
+
+  it('returns 0 when all segments are DRIFTING', () => {
+    const segments = [
+      { state: 'DRIFTING' as const, startTime: 0, endTime: 5, duration: 5 },
+      { state: 'DRIFTING' as const, startTime: 5, endTime: 10, duration: 5 },
+      { state: 'DRIFTING' as const, startTime: 10, endTime: 15, duration: 5 },
+    ];
+    expect(calculateLongestQualityStreak(segments)).toBe(0);
   });
 });
 

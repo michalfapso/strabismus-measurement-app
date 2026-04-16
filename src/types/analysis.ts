@@ -75,6 +75,7 @@ export interface SessionMetrics {
   fusionEventCount: number;
   fusionAchievedCount: number;
   longestFusionStreak: number;
+  longestQualityStreak: number;  // longest FUSION seg if present; else longest NEAR_FUSION; else longest STABLE_DEVIATION
   largeDeviationTimePercent: number;
   trajectoryRatio: number | null;
 

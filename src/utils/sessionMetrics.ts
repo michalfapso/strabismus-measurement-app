@@ -772,6 +772,15 @@ export function calculateLongestFusionStreak(segments: StateSegment[]): number {
     .reduce((max, s) => Math.max(max, s.duration), 0);
 }
 
+export function calculateLongestQualityStreak(segments: StateSegment[]): number {
+  const hasFusion = segments.some(s => s.state === 'FUSION');
+  const hasNearFusion = segments.some(s => s.state === 'NEAR_FUSION');
+  const targetState: SessionState = hasFusion ? 'FUSION' : hasNearFusion ? 'NEAR_FUSION' : 'STABLE_DEVIATION';
+  return segments
+    .filter(s => s.state === targetState)
+    .reduce((max, s) => Math.max(max, s.duration), 0);
+}
+
 export function computeSessionAggregateMetrics(
   stateSegments: StateSegment[],
   timeSeries: TimeSeries[]
@@ -858,6 +867,7 @@ export function computeSessionMetrics(
   const aggregateMetrics = computeSessionAggregateMetrics(stateSegments, timeSeries);
   const fusionEventCount = calculateFusionEventCount(stateSegments);
   const longestFusionStreak = calculateLongestFusionStreak(stateSegments);
+  const longestQualityStreak = calculateLongestQualityStreak(stateSegments);
   const histogram = calculateSessionHistogram(session, metric);
 
   return {
@@ -875,6 +885,7 @@ export function computeSessionMetrics(
     timeToFirstFusion,
     fusionEventCount,
     longestFusionStreak,
+    longestQualityStreak,
     largeDeviationTimePercent,
     trajectoryRatio,
     fusionTime: fusionMetrics.fusionTime,
