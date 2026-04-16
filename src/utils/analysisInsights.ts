@@ -126,8 +126,8 @@ export function calculateExerciseInsights(
     byExercise.get(m.exerciseTag)!.push(m);
   }
 
-  return Array.from(byExercise.entries()).map(([exerciseTag, exerciseMetrics]) => {
-    const sorted = [...exerciseMetrics].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return Array.from(byExercise.entries()).map(([exerciseTag, sessionMetricsForExercise]) => {
+    const sorted = [...sessionMetricsForExercise].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const metric = sorted[0]?.metric || 'deviation';
 
     const streaks = sorted.map(m => m.longestFusionStreak);
@@ -144,6 +144,33 @@ export function calculateExerciseInsights(
     const medianBestStableDeviation = median(bestStableDeviations);
     const medianNearBestStableTime = median(nearBestStableTimes);
 
+    // Median Recovery Cycles: median qualityEpisodeCount for this exercise
+    const recoveryCycles = sorted.map(m => m.qualityEpisodeCount);
+    let medianRecoveryCycles = median(recoveryCycles);
+
+    // Trend: recovery cycles for this exercise
+    const recoveryCyclePoints: [number, number][] = sorted.map((m, i) => [
+      i,
+      m.qualityEpisodeCount
+    ]);
+
+    let recoveryCyclesTrend: { slope: number; direction: 'improving' | 'declining' | 'stable'; significance: { p: number; significant: boolean } };
+
+    // Handle edge case: if no sessions for this exercise
+    if (sorted.length === 0) {
+      medianRecoveryCycles = 0;
+      recoveryCyclesTrend = { slope: 0, direction: 'stable', significance: { p: 1, significant: false } };
+    } else {
+      const recoveryCyclesSlope = linearRegressionSlope(recoveryCyclePoints) / (sorted.length / 52);
+      const recoveryCyclesP = regressionPValue(recoveryCyclePoints);
+
+      recoveryCyclesTrend = {
+        slope: recoveryCyclesSlope,
+        direction: trendDirection(recoveryCyclesSlope, recoveryCyclesP, 'stream'),
+        significance: { p: recoveryCyclesP, significant: recoveryCyclesP < 0.05 },
+      };
+    }
+
     return {
       exerciseTag,
       metric,
@@ -155,6 +182,8 @@ export function calculateExerciseInsights(
       fusionAchievedRate: fusionRate,
       trendDirection: trendDirection(trendSlope, trendP, 'streak'),
       trendSlope,
+      medianRecoveryCycles,
+      recoveryCyclesTrend,
     };
   });
 }
