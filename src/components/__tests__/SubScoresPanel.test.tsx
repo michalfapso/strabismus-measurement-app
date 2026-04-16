@@ -68,6 +68,7 @@ describe('SubScoresPanel', () => {
       fusionAchieved: true,
       longestFusionStreak: 45.2,
       longestQualityStreak: 45.2,
+      nearBestStableTime: 45.2,
     });
 
     const { container } = render(<SubScoresPanel metrics={metrics} />);
