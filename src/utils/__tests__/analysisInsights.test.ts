@@ -30,6 +30,8 @@ describe('calculateProgressInsight with segment metrics', () => {
         approachingPercent: 20,
         stateSegments: [],
         exerciseTag: 'test',
+        longestQualityStreak: 2.0,
+        qualityEpisodeCount: 1,
       },
       {
         sessionId: 's2',
@@ -56,6 +58,8 @@ describe('calculateProgressInsight with segment metrics', () => {
         approachingPercent: 20,
         stateSegments: [],
         exerciseTag: 'test',
+        longestQualityStreak: 2.0,
+        qualityEpisodeCount: 1,
       },
       {
         sessionId: 's3',
@@ -82,6 +86,8 @@ describe('calculateProgressInsight with segment metrics', () => {
         approachingPercent: 20,
         stateSegments: [],
         exerciseTag: 'test',
+        longestQualityStreak: 2.0,
+        qualityEpisodeCount: 1,
       },
     ];
 
