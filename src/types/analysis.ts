@@ -112,6 +112,10 @@ export interface ProgressInsight {
   // Fusion trends (only present if fusionAchievedRate >= FUSION_RATE_THRESHOLD_PERCENT)
   fusionStreakTrend?: TrendInfo;
   fusionEventCountTrend?: TrendInfo;
+
+  // Recovery-related fields
+  recoveryConsistency: number;           // percentage 0-100
+  recoveryConsistencyTrend: TrendInfo;   // trend info with direction + significance
 }
 
 export interface ExerciseInsight {
@@ -126,6 +130,8 @@ export interface ExerciseInsight {
   trendDirection: 'improving' | 'declining' | 'stable';
   trendSlope: number;
   improvementRate?: number;
+  medianRecoveryCycles: number;      // median qualityEpisodeCount for this exercise
+  recoveryCyclesTrend: TrendInfo;    // trend direction + significance
 }
 
 export interface SessionQualityInsight {
