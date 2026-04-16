@@ -73,6 +73,7 @@ export interface SessionMetrics {
   // Sub-scores (existing, keep)
   timeToFirstFusion: number | null;
   fusionEventCount: number;
+  fusionAchievedCount: number;
   longestFusionStreak: number;
   largeDeviationTimePercent: number;
   trajectoryRatio: number | null;

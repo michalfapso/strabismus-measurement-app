@@ -28,7 +28,13 @@ describe('ProgressGraphs', () => {
     nearFusionTime: 0,
     nearFusionTimePercent: 0,
     largeDeviationTime: 0,
-    stateSegments: [],
+    stateSegments: [
+      { state: 'FUSION', startTime: 0, endTime: 200, duration: 200 },
+      { state: 'NEAR_FUSION', startTime: 200, endTime: 350, duration: 150 },
+      { state: 'STABLE_DEVIATION', startTime: 350, endTime: 550, duration: 200 },
+      { state: 'APPROACHING', startTime: 550, endTime: 800, duration: 250 },
+      { state: 'DRIFTING', startTime: 800, endTime: 1000, duration: 200 },
+    ],
     ...overrides,
   });
 

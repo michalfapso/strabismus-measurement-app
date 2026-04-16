@@ -101,6 +101,33 @@ function useZoomPan(dataLength: number) {
   return { zoomStart, zoomEnd, handleZoom, handlePan };
 }
 
+function calculateStatePercentages(session: SessionMetrics) {
+  const stateTimings: Record<string, number> = {
+    FUSION: 0,
+    NEAR_FUSION: 0,
+    STABLE_DEVIATION: 0,
+    APPROACHING: 0,
+    DRIFTING: 0,
+  };
+
+  // Sum duration for each state
+  for (const seg of session.stateSegments) {
+    if (seg.state in stateTimings) {
+      stateTimings[seg.state] += seg.duration;
+    }
+  }
+
+  // Convert to percentages
+  const duration = session.sessionDuration || 1; // Avoid division by zero
+  return {
+    fusionPercent: (stateTimings.FUSION / duration) * 100,
+    nearFusionPercent: (stateTimings.NEAR_FUSION / duration) * 100,
+    stableDeviationPercent: (stateTimings.STABLE_DEVIATION / duration) * 100,
+    approachingPercent: (stateTimings.APPROACHING / duration) * 100,
+    driftingPercent: (stateTimings.DRIFTING / duration) * 100,
+  };
+}
+
 interface ProgressGraphsTooltipPayload {
   sessionIndex: number;
   sessionId: string;
@@ -108,9 +135,11 @@ interface ProgressGraphsTooltipPayload {
   exerciseTag: string;
   bestStableDeviation: number;
   nearBestStableTime: number;
-  qualityPercent: number;
-  driftingPercent: number;
+  fusionPercent: number;
+  nearFusionPercent: number;
+  stableDeviationPercent: number;
   approachingPercent: number;
+  driftingPercent: number;
 }
 
 interface SharedTooltipProps {
@@ -132,9 +161,11 @@ function SharedTooltip({ active, payload }: SharedTooltipProps) {
         <hr />
         <p>Best Stable Deviation: {data.bestStableDeviation.toFixed(2)} cm</p>
         <p>Near-Best Stable Time: {data.nearBestStableTime.toFixed(1)}s</p>
-        <p>Quality: {data.qualityPercent.toFixed(1)}%</p>
-        <p>Drifting: {data.driftingPercent.toFixed(1)}%</p>
+        <p>Fusion: {data.fusionPercent.toFixed(1)}%</p>
+        <p>Near Fusion: {data.nearFusionPercent.toFixed(1)}%</p>
+        <p>Stable Deviation: {data.stableDeviationPercent.toFixed(1)}%</p>
         <p>Approaching: {data.approachingPercent.toFixed(1)}%</p>
+        <p>Drifting: {data.driftingPercent.toFixed(1)}%</p>
       </div>
     );
   }
@@ -160,17 +191,18 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    return sorted.map((session, index) => ({
-      sessionIndex: index,
-      sessionId: session.sessionId,
-      date: session.date,
-      exerciseTag: session.exerciseTag,
-      bestStableDeviation: session.bestStableDeviation,
-      nearBestStableTime: session.nearBestStableTime,
-      qualityPercent: session.qualityPercent,
-      driftingPercent: session.driftingPercent,
-      approachingPercent: session.approachingPercent,
-    }));
+    return sorted.map((session, index) => {
+      const statePercentages = calculateStatePercentages(session);
+      return {
+        sessionIndex: index,
+        sessionId: session.sessionId,
+        date: session.date,
+        exerciseTag: session.exerciseTag,
+        bestStableDeviation: session.bestStableDeviation,
+        nearBestStableTime: session.nearBestStableTime,
+        ...statePercentages,  // Add all 5 state percentages
+      };
+    });
   }, [filteredSessions]);
 
   // Initialize zoom/pan hook
@@ -294,9 +326,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip content={<SharedTooltip />} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
-            <Area type="monotone" dataKey="qualityPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Quality" />
-            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} name="Drifting" />
+            <Area type="monotone" dataKey="fusionPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Fusion" />
+            <Area type="monotone" dataKey="nearFusionPercent" stackId="1" stroke={THEME.stateNearFusion} fill={THEME.stateNearFusion} name="Near Fusion" />
+            <Area type="monotone" dataKey="stableDeviationPercent" stackId="1" stroke={THEME.stateStableDeviation} fill={THEME.stateStableDeviation} name="Stable Deviation" />
             <Area type="monotone" dataKey="approachingPercent" stackId="1" stroke={THEME.stateApproaching} fill={THEME.stateApproaching} name="Approaching" />
+            <Area type="monotone" dataKey="driftingPercent" stackId="1" stroke={THEME.stateDrifting} fill={THEME.stateDrifting} name="Drifting" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
