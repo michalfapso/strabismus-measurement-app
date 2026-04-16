@@ -884,6 +884,7 @@ export function computeSessionMetrics(
     approachingPercent: aggregateMetrics.approachingPercent,
     timeToFirstFusion,
     fusionEventCount,
+    fusionAchievedCount: fusionMetrics.fusionAchieved ? 1 : 0,
     longestFusionStreak,
     longestQualityStreak,
     largeDeviationTimePercent,
