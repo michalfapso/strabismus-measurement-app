@@ -241,8 +241,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     >
       <div css={styles.controls}>
         <button onClick={() => handlePan('left')}>← Pan Left</button>
-        <button onClick={() => handleZoom(ZOOM_OUT_FACTOR)}>🔍- Zoom Out</button>
-        <button onClick={() => handleZoom(ZOOM_IN_FACTOR)}>🔍+ Zoom In</button>
+        <button onClick={() => handleZoom(ZOOM_IN_FACTOR)}>🔍- Zoom Out</button>
+        <button onClick={() => handleZoom(ZOOM_OUT_FACTOR)}>🔍+ Zoom In</button>
         <button onClick={() => handlePan('right')}>Pan Right →</button>
         <span css={styles.zoomInfo}>
           Showing sessions {Math.floor(zoomStart) + 1} - {Math.ceil(zoomEnd)} of {graphData.length}
@@ -375,13 +375,20 @@ const styles = {
 
     button {
       padding: 6px 12px;
-      border: 1px solid ${THEME.borderPrimary};
+      border: 1px solid ${THEME.accentGreen};
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.8);
+      color: ${THEME.accentGreen};
       cursor: pointer;
+      font-weight: 500;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(0, 255, 0, 0.1);
+        text-shadow: 0 0 8px ${THEME.accentGreen};
+      }
+
+      &:active {
+        background: rgba(0, 255, 0, 0.2);
       }
     }
 
