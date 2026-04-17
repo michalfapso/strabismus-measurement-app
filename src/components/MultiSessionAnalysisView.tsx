@@ -155,6 +155,16 @@ function ProgressSection({ insight }: { insight: ProgressInsight }) {
             {insight.fusionStreakTrend.significance.significant ? ' *' : ''})
           </>
         )}
+        {insight.recoveryConsistency !== undefined && insight.recoveryConsistencyTrend && (
+          <>
+            <br />
+            Recovery consistency:{' '}
+            <strong css={css`color: ${THEME.textPrimary};`}>{insight.recoveryConsistency.toFixed(0)}%</strong>{' '}
+            ({insight.recoveryConsistencyTrend.direction}, slope: {insight.recoveryConsistencyTrend.slope.toFixed(2)}%/week,{' '}
+            p={insight.recoveryConsistencyTrend.significance.p.toFixed(3)}
+            {insight.recoveryConsistencyTrend.significance.significant ? ' *' : ''})
+          </>
+        )}
       </p>
     </div>
   );
