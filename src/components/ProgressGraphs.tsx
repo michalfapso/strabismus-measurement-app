@@ -267,8 +267,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               height={80}
             />
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Tooltip content={<SharedTooltip />} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
+            <Tooltip content={<SharedTooltip />} />
             <Line
               type="monotone"
               dataKey="bestStableDeviation"
@@ -299,8 +299,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               height={80}
             />
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Tooltip content={<SharedTooltip />} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
+            <Tooltip content={<SharedTooltip />} />
             <Line
               type="monotone"
               dataKey="nearBestStableTime"
@@ -340,8 +340,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               height={80}
             />
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Tooltip content={<SharedTooltip />} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
+            <Tooltip content={<SharedTooltip />} />
             <Area type="monotone" dataKey="fusionPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Fusion" />
             <Area type="monotone" dataKey="nearFusionPercent" stackId="1" stroke={THEME.stateNearFusion} fill={THEME.stateNearFusion} name="Near Fusion" />
             <Area type="monotone" dataKey="stableDeviationPercent" stackId="1" stroke={THEME.stateStableDeviation} fill={THEME.stateStableDeviation} name="Stable Deviation" />
