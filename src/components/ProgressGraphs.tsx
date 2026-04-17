@@ -70,7 +70,7 @@ function useTouchZoom(onZoom: (factor: number) => void) {
 
 function useZoomPan(dataLength: number) {
   const [zoomStart, setZoomStart] = useState(0);
-  const [zoomEnd, setZoomEnd] = useState(Math.min(DEFAULT_ZOOM_WINDOW, dataLength));
+  const [zoomEnd, setZoomEnd] = useState(dataLength);
 
   const handleZoom = (factor: number) => {
     const center = (zoomStart + zoomEnd) / 2;

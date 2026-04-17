@@ -65,4 +65,19 @@ describe('ProgressGraphs', () => {
     // Should render but only with 1 session
     expect(container.textContent).toContain('Best Stable Deviation (cm)');
   });
+
+  it('should show all sessions by default when multiple sessions selected', () => {
+    // Create 26 sessions to match user's reported scenario
+    const sessions: SessionMetrics[] = Array.from({ length: 26 }, (_, i) =>
+      createMockSession({
+        sessionId: `s${i}`,
+        date: `2026-01-${String(i + 1).padStart(2, '0')}`
+      })
+    );
+
+    const { container } = render(<ProgressGraphs sessions={sessions} />);
+
+    // Should show all 26 sessions without requiring zoom/pan
+    expect(container.textContent).toContain('Showing sessions 1 - 26 of 26');
+  });
 });
