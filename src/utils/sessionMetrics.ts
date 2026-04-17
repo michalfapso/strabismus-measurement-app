@@ -303,8 +303,9 @@ export function classifyStates(
   const pointsPerSecond = computeSamplingRate(timeSeries);
 
   // Convert window seconds to points
-  const shortWindowPoints = Math.round(SHORT_SLOPE_WINDOW_S * pointsPerSecond);
-  const longWindowPoints  = Math.round(LONG_SLOPE_WINDOW_S  * pointsPerSecond);
+  // Ensure minimum window sizes for sparse data
+  const shortWindowPoints = Math.max(2, Math.round(SHORT_SLOPE_WINDOW_S * pointsPerSecond));
+  const longWindowPoints  = Math.max(2, Math.round(LONG_SLOPE_WINDOW_S  * pointsPerSecond));
 
   // Compute slopes at both timescales
   const shortSlopesRaw = calculateSlope(smoothed, shortWindowPoints);

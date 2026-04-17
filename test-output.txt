@@ -1,0 +1,13 @@
+
+> strabismus-measurement-app@1.0.0 test
+> vitest src/__tests__/integration/recoveryMetrics.integration.test.ts
+
+
+ RUN  v4.1.2 /workspace
+
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  04:57:16
+   Duration  2.10s (transform 162ms, setup 277ms, import 152ms, tests 38ms, environment 1.33s)
+

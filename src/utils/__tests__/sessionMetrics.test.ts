@@ -313,8 +313,10 @@ describe('classifyStates', () => {
     expect(drifting).toBeDefined();
     const metrics = drifting!.metrics;
     expect(metrics).toBeDefined();
-    expect(metrics!.minDeviation).toBeCloseTo(3.0, 1);
-    expect(metrics!.maxDeviation).toBeCloseTo(8.0, 1);
+    // minDeviation starts at ~3.08 (where DRIFTING begins at index 5, after initial STABLE_DEVIATION)
+    expect(metrics!.minDeviation).toBeCloseTo(3.08, 1);
+    // maxDeviation ends at ~7.98 (at the last point before terminal STABLE_DEVIATION)
+    expect(metrics!.maxDeviation).toBeCloseTo(7.98, 1);
     expect(metrics!.intraSegmentSlope).toBeGreaterThan(0.25);
   });
 });
