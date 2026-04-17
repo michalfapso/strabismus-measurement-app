@@ -135,6 +135,8 @@ interface ProgressGraphsTooltipPayload {
   exerciseTag: string;
   bestStableDeviation: number;
   nearBestStableTime: number;
+  longestQualityStreak: number;
+  qualityEpisodeCount: number;
   fusionPercent: number;
   nearFusionPercent: number;
   stableDeviationPercent: number;
@@ -161,6 +163,9 @@ function SharedTooltip({ active, payload }: SharedTooltipProps) {
         <hr />
         <p>Best Stable Deviation: {data.bestStableDeviation.toFixed(2)} cm</p>
         <p>Near-Best Stable Time: {data.nearBestStableTime.toFixed(1)}s</p>
+        <p>Longest Quality Streak: {data.longestQualityStreak.toFixed(1)}s</p>
+        <p>Quality Episode Count: {data.qualityEpisodeCount}</p>
+        <hr />
         <p>Fusion: {data.fusionPercent.toFixed(1)}%</p>
         <p>Near Fusion: {data.nearFusionPercent.toFixed(1)}%</p>
         <p>Stable Deviation: {data.stableDeviationPercent.toFixed(1)}%</p>
@@ -200,6 +205,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         exerciseTag: session.exerciseTag,
         bestStableDeviation: session.bestStableDeviation,
         nearBestStableTime: session.nearBestStableTime,
+        longestQualityStreak: session.longestQualityStreak,
+        qualityEpisodeCount: session.qualityEpisodeCount,
         ...statePercentages,  // Add all 5 state percentages
       };
     });
@@ -299,6 +306,15 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               dataKey="nearBestStableTime"
               stroke={THEME.stateNearFusion}
               name="Near-Best Stable Time"
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="longestQualityStreak"
+              stroke="#20b2aa"
+              strokeDasharray="5 5"
+              dot={false}
+              name="Longest Quality Streak"
               isAnimationActive={false}
             />
           </LineChart>
