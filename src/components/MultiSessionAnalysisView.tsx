@@ -182,6 +182,7 @@ function ExerciseEffectivenessSection({ insights }: { insights: ExerciseInsight[
             <th>Sessions</th>
             <th>Fusion Rate</th>
             <th>Median Streak</th>
+            <th>Recovery Cycles</th>
             <th>Trend</th>
           </tr>
         </thead>
@@ -195,6 +196,11 @@ function ExerciseEffectivenessSection({ insights }: { insights: ExerciseInsight[
                 <td>{insight.sessionCount}</td>
                 <td>{insight.fusionAchievedRate.toFixed(0)}%</td>
                 <td>{insight.medianLongestStreak.toFixed(1)}s</td>
+                <td>
+                  {insight.medianRecoveryCycles?.toFixed(1)} (
+                  {insight.recoveryCyclesTrend?.direction}
+                  )
+                </td>
                 <td>{insight.trendDirection}</td>
               </tr>
             ))}
