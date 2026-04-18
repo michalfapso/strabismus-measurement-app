@@ -1,23 +1,38 @@
+import { THEME } from '../theme';
+
 export interface SelectionBarProps {
+  /** Total count of all selected sessions (visible + hidden) */
   selectedCount: number;
-  filteredSessionCount: number;  // Total available sessions after filters
+  /** Total sessions visible under current filters */
+  filteredSessionCount: number;
+  /** Selected sessions that are currently visible (subset of selectedCount) */
+  visibleSelectedCount: number;
+  /** Selected sessions hidden by current filters */
+  hiddenCount: number;
+  /** Callback to select all filtered sessions */
   onSelectAll: () => void;
+  /** Callback to deselect all sessions */
   onSelectNone: () => void;
+  /** Callback to export selected sessions */
   onExport: () => void;
+  /** Callback to delete selected sessions */
   onDelete: () => void;
+  /** Disable all interactions when true */
   disabled?: boolean;
 }
 
 export function SelectionBar({
   selectedCount,
   filteredSessionCount,
+  visibleSelectedCount,
+  hiddenCount,
   onSelectAll,
   onSelectNone,
   onExport,
   onDelete,
   disabled = false,
 }: SelectionBarProps) {
-  const allSelected = selectedCount === filteredSessionCount && filteredSessionCount > 0;
+  const allSelected = visibleSelectedCount === filteredSessionCount && filteredSessionCount > 0;
   const noneSelected = selectedCount === 0;
   const selectAllEnabled = filteredSessionCount > 0 && !allSelected;
   const selectNoneEnabled = selectedCount > 0;
@@ -25,9 +40,9 @@ export function SelectionBar({
   const selectButtonBaseStyle = {
     padding: '6px 10px',
     fontSize: '12px',
-    color: '#00ff00',
-    backgroundColor: 'rgba(0, 255, 0, 0.1)',
-    border: '1px solid #00ff00',
+    color: THEME.accentGreen,
+    backgroundColor: `rgba(0, 255, 0, 0.1)`,
+    border: `1px solid ${THEME.accentGreen}`,
     borderRadius: '3px',
   };
 
@@ -47,7 +62,7 @@ export function SelectionBar({
       border: '1px solid rgba(0,255,0,0.2)',
       borderRadius: '4px',
       padding: '12px 16px',
-      color: '#fff',
+      color: THEME.textPrimary,
       minHeight: '48px',
     }}>
       {/* Selection control buttons (left) */}
@@ -81,7 +96,14 @@ export function SelectionBar({
 
       {/* Selection count (center) */}
       <div style={{ flex: 1 }}>
-        <strong>{selectedCount}</strong> {selectedCount === 1 ? 'session' : 'sessions'} selected
+        <div>
+          <strong>{selectedCount}</strong> {selectedCount === 1 ? 'session' : 'sessions'} selected
+        </div>
+        {hiddenCount > 0 && (
+          <div style={{ fontSize: '11px', color: THEME.textMuted, marginTop: '2px' }}>
+            {hiddenCount} of them {hiddenCount === 1 ? 'is' : 'are'} hidden by filter
+          </div>
+        )}
       </div>
 
       {/* Action buttons (right) */}
@@ -91,8 +113,8 @@ export function SelectionBar({
         disabled={selectedCount === 0 || disabled}
         style={{
           ...actionButtonBaseStyle,
-          color: '#00ff00',
-          border: '1px solid #00ff00',
+          color: THEME.accentGreen,
+          border: `1px solid ${THEME.accentGreen}`,
           cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
           opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
         }}
@@ -106,8 +128,8 @@ export function SelectionBar({
         disabled={selectedCount === 0 || disabled}
         style={{
           ...actionButtonBaseStyle,
-          color: '#ff6b6b',
-          border: '1px solid #ff6b6b',
+          color: THEME.stateDrifting,
+          border: `1px solid ${THEME.stateDrifting}`,
           cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
           opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
         }}
