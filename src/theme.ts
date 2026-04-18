@@ -19,6 +19,8 @@ export const THEME = {
 
   // Accents
   accentGreen: '#00ff00',
+  accentGreenLight: 'rgba(0, 255, 0, 0.1)',    // Light green for backgrounds
+  accentGreenBorder: 'rgba(0, 255, 0, 0.2)',   // Darker green for borders
   accentCyan: '#00FFFF',
   accentMagenta: '#FF00FF',
   accentOrange: '#FF9500',
