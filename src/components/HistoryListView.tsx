@@ -1,10 +1,12 @@
 import { Session } from '../types';
 import { getSessionDuration, getPositionRange } from '../services/stats';
+import { THEME } from '../theme';
 
 export interface HistoryListViewProps {
   sessions: Session[];
   selectedIds: Set<string>;
   onRowClick: (id: string, ctrlKey: boolean, shiftKey: boolean, visibleIds: string[]) => void;
+  checkboxMode?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -18,6 +20,7 @@ export function HistoryListView({
   sessions,
   selectedIds,
   onRowClick,
+  checkboxMode,
 }: HistoryListViewProps) {
   if (sessions.length === 0) {
     return (
@@ -72,6 +75,20 @@ export function HistoryListView({
               }
             }}
           >
+            {checkboxMode && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onRowClick(session.sessionId, true, false, visibleIds)}
+                style={{
+                  accentColor: THEME.accentGreen,
+                  cursor: 'pointer',
+                  marginRight: '8px',
+                }}
+                aria-label={`Select session ${session.sessionId}`}
+              />
+            )}
+
             {/* Exercise & Time */}
             <div style={{ minWidth: '140px' }}>
               <div style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>
