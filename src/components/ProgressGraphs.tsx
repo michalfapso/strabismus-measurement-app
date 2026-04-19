@@ -3,6 +3,7 @@ import { SessionMetrics } from '../types/analysis';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
+import { useSharedHover } from '../hooks/useSharedHover';
 
 // Progress graph zoom/pan configuration
 const DEFAULT_ZOOM_WINDOW = 20;    // Initial visible sessions
@@ -370,6 +371,9 @@ const styles = {
 export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: ProgressGraphsProps) {
   // Locked session state for click-to-lock tooltip
   const [lockedSession, setLockedSession] = useState<ProgressGraphsTooltipPayload | null>(null);
+
+  // Shared hover state across all charts
+  const { activeIndex, cursorX, cursorY, setHover, clearHover } = useSharedHover();
 
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
