@@ -173,7 +173,7 @@ function ProgressGraphsTooltipContent({
     <div
       css={styles.tooltip}
       style={{
-        borderColor: isLocked ? '#00ff00' : undefined,
+        borderColor: isLocked ? THEME.accentGreen : undefined,
         position: 'relative',
       }}
     >
@@ -195,17 +195,11 @@ function ProgressGraphsTooltipContent({
       {/* Locked state controls */}
       {isLocked && (
         <>
-          <div style={{ position: 'absolute', top: '4px', right: '4px' }}>
+          <div css={styles.closeButtonContainer}>
             <button
               onClick={onCloseLocked}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '16px',
-                padding: 0,
-              }}
+              aria-label="Close tooltip"
+              css={styles.closeButton}
             >
               ✕
             </button>
@@ -215,17 +209,8 @@ function ProgressGraphsTooltipContent({
               e.stopPropagation();
               onDrillDown?.(data.sessionId);
             }}
-            style={{
-              marginTop: '8px',
-              width: '100%',
-              padding: '5px 0',
-              background: 'rgba(0,255,0,0.15)',
-              border: '1px solid #00ff00',
-              borderRadius: '3px',
-              color: '#00ff00',
-              fontSize: '11px',
-              cursor: 'pointer',
-            }}
+            aria-label={`View session ${data.sessionIndex + 1} details`}
+            css={styles.viewSessionButton}
           >
             View Session →
           </button>
@@ -483,16 +468,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
       {/* Locked tooltip overlay */}
       {lockedSession && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 1000,
-            pointerEvents: 'auto',
-          }}
-        >
+        <div css={styles.lockedOverlay}>
           <ProgressGraphsTooltipContent
             isLocked={true}
             lockedSession={lockedSession}
@@ -592,5 +568,55 @@ const styles = {
       border: none;
       border-top: 1px solid ${THEME.borderSecondary || '#444'};
     }
+  `,
+  closeButtonContainer: css`
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  `,
+  closeButton: css`
+    background: none;
+    border: none;
+    color: ${THEME.textPrimary};
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+
+    &:hover {
+      opacity: 0.7;
+    }
+
+    &:active {
+      opacity: 0.5;
+    }
+  `,
+  viewSessionButton: css`
+    margin-top: 8px;
+    width: 100%;
+    padding: 5px 0;
+    background: ${THEME.accentGreenLight};
+    border: 1px solid ${THEME.accentGreen};
+    border-radius: 3px;
+    color: ${THEME.accentGreen};
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 500;
+
+    &:hover {
+      background: rgba(0, 255, 0, 0.25);
+      box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+    }
+
+    &:active {
+      background: rgba(0, 255, 0, 0.35);
+    }
+  `,
+  lockedOverlay: css`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    pointer-events: auto;
   `,
 };
