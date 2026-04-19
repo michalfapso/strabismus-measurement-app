@@ -358,6 +358,15 @@ const styles = {
     z-index: 1000;
     pointer-events: auto;
   `,
+  legendWrapper: css`
+    display: flex;
+    justify-content: center;
+    margin: 8px 0;
+
+    @media (max-width: 768px) {
+      margin: 4px 0;
+    }
+  `,
 };
 
 /**
@@ -495,6 +504,13 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
+
+        <div css={styles.legendWrapper}>
+          <svg width={300} height={30}>
+            {/* Recharts Legend will render here */}
+          </svg>
+        </div>
+
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
@@ -502,9 +518,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             onClick={handleChartClick}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            {/* XAxis removed from Graph 2 */}
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
+            <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
             <Tooltip
               active={!lockedSession}
               content={(props: any) => (
@@ -539,6 +554,13 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
+
+        <div css={styles.legendWrapper}>
+          <svg width={300} height={30}>
+            {/* Recharts Legend will render here */}
+          </svg>
+        </div>
+
         <ResponsiveContainer width="100%" height={graphHeight}>
           <AreaChart
             data={visibleData}
@@ -560,7 +582,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               height={80}
             />
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
+            <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
             <Tooltip
               active={!lockedSession}
               content={(props: any) => (
