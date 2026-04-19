@@ -137,6 +137,12 @@ interface ProgressGraphsTooltipPayload {
   driftingPercent: number;
 }
 
+interface LockedTooltipState {
+  sessionData: ProgressGraphsTooltipPayload;
+  visibleIndex: number | null;
+  globalIndex: number;
+}
+
 interface ProgressGraphsTooltipContentProps {
   active?: boolean;
   payload?: Array<{
@@ -147,6 +153,7 @@ interface ProgressGraphsTooltipContentProps {
   lockedSession?: ProgressGraphsTooltipPayload | null;
   onCloseLocked?: () => void;
   onDrillDown?: (sessionId: string) => void;
+  dataLocked?: string;
 }
 
 function ProgressGraphsTooltipContent({
@@ -156,6 +163,7 @@ function ProgressGraphsTooltipContent({
   lockedSession,
   onCloseLocked,
   onDrillDown,
+  dataLocked,
 }: ProgressGraphsTooltipContentProps) {
   // Get session data from payload (hover) or lockedSession (locked)
   const data = isLocked ? lockedSession : (active && payload && payload.length > 0 ? payload[0].payload : null);
@@ -165,6 +173,7 @@ function ProgressGraphsTooltipContent({
   return (
     <div
       css={styles.tooltip}
+      data-locked={dataLocked || (isLocked ? "true" : "false")}
       style={{
         borderColor: isLocked ? THEME.accentGreen : undefined,
         position: 'relative',
@@ -300,6 +309,10 @@ const styles = {
       border: none;
       border-top: 1px solid ${THEME.borderSecondary || '#444'};
     }
+
+    &[data-locked="true"] {
+      border: 2px solid ${THEME.accentGreen};
+    }
   `,
   closeButtonContainer: css`
     position: absolute;
@@ -380,7 +393,7 @@ const styles = {
  */
 export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: ProgressGraphsProps) {
   // Locked session state for click-to-lock tooltip
-  const [lockedSession, setLockedSession] = useState<ProgressGraphsTooltipPayload | null>(null);
+  const [lockedSession, setLockedSession] = useState<LockedTooltipState | null>(null);
 
   // Shared hover state across all charts
   const { activeIndex, cursorX, cursorY, setHover, clearHover } = useSharedHover();
@@ -435,19 +448,23 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       const sessionData = visibleData[state.activeTooltipIndex];
       if (sessionData) {
         setLockedSession({
-          sessionIndex: sessionData.sessionIndex,
-          sessionId: sessionData.sessionId,
-          date: sessionData.date,
-          exerciseTag: sessionData.exerciseTag,
-          bestStableDeviation: sessionData.bestStableDeviation,
-          nearBestStableTime: sessionData.nearBestStableTime,
-          longestQualityStreak: sessionData.longestQualityStreak,
-          qualityEpisodeCount: sessionData.qualityEpisodeCount,
-          fusionPercent: sessionData.fusionPercent,
-          nearFusionPercent: sessionData.nearFusionPercent,
-          stableDeviationPercent: sessionData.stableDeviationPercent,
-          approachingPercent: sessionData.approachingPercent,
-          driftingPercent: sessionData.driftingPercent,
+          sessionData: {
+            sessionIndex: sessionData.sessionIndex,
+            sessionId: sessionData.sessionId,
+            date: sessionData.date,
+            exerciseTag: sessionData.exerciseTag,
+            bestStableDeviation: sessionData.bestStableDeviation,
+            nearBestStableTime: sessionData.nearBestStableTime,
+            longestQualityStreak: sessionData.longestQualityStreak,
+            qualityEpisodeCount: sessionData.qualityEpisodeCount,
+            fusionPercent: sessionData.fusionPercent,
+            nearFusionPercent: sessionData.nearFusionPercent,
+            stableDeviationPercent: sessionData.stableDeviationPercent,
+            approachingPercent: sessionData.approachingPercent,
+            driftingPercent: sessionData.driftingPercent,
+          },
+          visibleIndex: state.activeTooltipIndex,
+          globalIndex: sessionData.sessionIndex,
         });
       }
     }
@@ -493,7 +510,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
                 <ProgressGraphsTooltipContent
                   {...props}
                   isLocked={!!lockedSession}
-                  lockedSession={lockedSession}
+                  lockedSession={lockedSession?.sessionData}
+                  dataLocked={lockedSession ? "true" : "false"}
                   onCloseLocked={() => setLockedSession(null)}
                   onDrillDown={onDrillDown}
                 />
@@ -536,7 +554,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
                 <ProgressGraphsTooltipContent
                   {...props}
                   isLocked={!!lockedSession}
-                  lockedSession={lockedSession}
+                  lockedSession={lockedSession?.sessionData}
+                  dataLocked={lockedSession ? "true" : "false"}
                   onCloseLocked={() => setLockedSession(null)}
                   onDrillDown={onDrillDown}
                 />
@@ -601,7 +620,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
                 <ProgressGraphsTooltipContent
                   {...props}
                   isLocked={!!lockedSession}
-                  lockedSession={lockedSession}
+                  lockedSession={lockedSession?.sessionData}
+                  dataLocked={lockedSession ? "true" : "false"}
                   onCloseLocked={() => setLockedSession(null)}
                   onDrillDown={onDrillDown}
                 />
@@ -640,7 +660,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <div css={styles.lockedOverlay}>
           <ProgressGraphsTooltipContent
             isLocked={true}
-            lockedSession={lockedSession}
+            lockedSession={lockedSession.sessionData}
+            dataLocked="true"
             onCloseLocked={() => setLockedSession(null)}
             onDrillDown={onDrillDown}
           />
