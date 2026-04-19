@@ -79,7 +79,10 @@ export function HistoryListView({
               <input
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => onRowClick(session.sessionId, true, false, visibleIds)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onRowClick(session.sessionId, true, false, visibleIds);
+                }}
                 style={{
                   accentColor: THEME.accentGreen,
                   cursor: 'pointer',
@@ -94,7 +97,7 @@ export function HistoryListView({
               <div style={{ fontSize: '13px', fontWeight: '500', color: '#fff' }}>
                 {session.exerciseTag}
               </div>
-              <div style={{ fontSize: '11px', color: '#888' }}>
+              <div style={{ fontSize: '11px', color: '#aaa' }}>
                 {new Date(session.timestamp).toLocaleString()}
               </div>
             </div>
