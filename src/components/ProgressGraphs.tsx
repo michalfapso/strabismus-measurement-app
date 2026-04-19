@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { SessionMetrics } from '../types/analysis';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { css } from '@emotion/react';
@@ -20,6 +20,24 @@ function formatDatetimeLabel(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+// Helper function: check if locked session is visible in current zoom window
+function isLockedSessionVisible(
+  lockedGlobalIndex: number,
+  zoomStart: number,
+  zoomEnd: number
+): boolean {
+  return lockedGlobalIndex >= Math.floor(zoomStart) && lockedGlobalIndex <= Math.ceil(zoomEnd);
+}
+
+// Helper function: find visible index of locked session in current data
+function getLockedSessionVisibleIndex(
+  lockedGlobalIndex: number,
+  visibleData: any[]
+): number | null {
+  const visibleIndex = visibleData.findIndex(d => d.sessionIndex === lockedGlobalIndex);
+  return visibleIndex >= 0 ? visibleIndex : null;
 }
 
 interface ProgressGraphsProps {
@@ -470,6 +488,31 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     }
   };
 
+  // Recalculate locked session visibility on zoom/pan
+  useEffect(() => {
+    if (lockedSession) {
+      const isVisible = isLockedSessionVisible(
+        lockedSession.globalIndex,
+        zoomStart,
+        zoomEnd
+      );
+      if (!isVisible) {
+        setLockedSession(null);
+      } else {
+        const newVisibleIndex = getLockedSessionVisibleIndex(
+          lockedSession.globalIndex,
+          visibleData
+        );
+        if (newVisibleIndex !== null) {
+          setLockedSession(prev => ({
+            ...prev!,
+            visibleIndex: newVisibleIndex,
+          }));
+        }
+      }
+    }
+  }, [zoomStart, zoomEnd, visibleData, lockedSession]);
+
   if (graphData.length === 0) {
     return <div>No sessions to display</div>;
   }
@@ -656,8 +699,14 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       )}
 
       {/* Locked tooltip overlay */}
-      {lockedSession && (
-        <div css={styles.lockedOverlay}>
+      {lockedSession && lockedSession.visibleIndex !== null && visibleData[lockedSession.visibleIndex] && (
+        <div
+          css={styles.sharedTooltipContainer}
+          style={{
+            left: `${cursorX ?? 0}px`,
+            top: `${cursorY ?? 0}px`,
+          }}
+        >
           <ProgressGraphsTooltipContent
             isLocked={true}
             lockedSession={lockedSession.sessionData}
