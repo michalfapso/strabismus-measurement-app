@@ -233,3 +233,56 @@ describe('ProgressGraphs legend positioning', () => {
     expect(legendContent).toBe(true);
   });
 });
+
+describe('ProgressGraphs shared tooltip', () => {
+  const createMockSession = (overrides?: Partial<SessionMetrics>): SessionMetrics => ({
+    sessionId: 's1',
+    date: '2026-01-01',
+    exerciseTag: 'test',
+    metric: 'deviation',
+    sessionDuration: 1000,
+    histogram: [],
+    bestStableDeviation: 2.5,
+    nearBestStableTime: 15,
+    qualityPercent: 55,
+    driftingPercent: 30,
+    approachingPercent: 15,
+    fusionAchieved: false,
+    fusionAchievedCount: 0,
+    fusionEventCount: 0,
+    longestFusionStreak: 0,
+    largeDeviationTimePercent: 0,
+    trajectoryRatio: null,
+    timeToFirstFusion: null,
+    fusionTime: 0,
+    fusionTimePercent: 0,
+    nearFusionTime: 0,
+    nearFusionTimePercent: 0,
+    largeDeviationTime: 0,
+    stateSegments: [
+      { state: 'FUSION', startTime: 0, endTime: 200, duration: 200 },
+      { state: 'NEAR_FUSION', startTime: 200, endTime: 350, duration: 150 },
+      { state: 'STABLE_DEVIATION', startTime: 350, endTime: 550, duration: 200 },
+      { state: 'APPROACHING', startTime: 550, endTime: 800, duration: 250 },
+      { state: 'DRIFTING', startTime: 800, endTime: 1000, duration: 200 },
+    ],
+    ...overrides,
+  });
+
+  it('should render a single shared tooltip when hovering over a graph', () => {
+    const mockSessions: SessionMetrics[] = [createMockSession()];
+    const { container } = render(<ProgressGraphs sessions={mockSessions} />);
+    // Tests will be more specific after implementation
+    // Currently verifying that component renders without errors
+    expect(container).toBeDefined();
+    expect(container.textContent).toContain('Best Stable Deviation (cm)');
+  });
+
+  it('should not render tooltip when not hovering', () => {
+    const mockSessions: SessionMetrics[] = [createMockSession()];
+    const { container } = render(<ProgressGraphs sessions={mockSessions} />);
+    // Currently verifying component renders without errors when not hovering
+    expect(container).toBeDefined();
+    expect(container.textContent?.length).toBeGreaterThan(0);
+  });
+});

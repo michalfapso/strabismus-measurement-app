@@ -351,6 +351,16 @@ const styles = {
     z-index: 1000;
     pointer-events: auto;
   `,
+  sharedTooltipContainer: css`
+    position: absolute;
+    pointer-events: auto;
+    z-index: 100;
+    transform: translateX(-50%);
+
+    @media (max-width: 768px) {
+      z-index: 100;
+    }
+  `,
   legendWrapper: css`
     display: flex;
     justify-content: center;
@@ -605,6 +615,25 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Container-level shared tooltip for hover state */}
+      {!lockedSession && activeIndex !== null && visibleData[activeIndex] && (
+        <div
+          css={styles.sharedTooltipContainer}
+          style={{
+            left: `${cursorX}px`,
+            top: `${cursorY}px`,
+          }}
+        >
+          <ProgressGraphsTooltipContent
+            payload={[{ payload: visibleData[activeIndex] }]}
+            active={true}
+            isLocked={false}
+            onCloseLocked={() => setLockedSession(null)}
+            onDrillDown={onDrillDown}
+          />
+        </div>
+      )}
 
       {/* Locked tooltip overlay */}
       {lockedSession && (
