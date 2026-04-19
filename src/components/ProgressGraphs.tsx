@@ -358,6 +358,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Tooltip
+              active={!lockedSession}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -404,6 +405,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Tooltip
+              active={!lockedSession}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -459,6 +461,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Tooltip
+              active={!lockedSession}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
