@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 
 interface SingleSessionViewProps {
   session: Session;
+  onBack?: () => void;
 }
 
 const getPrimaryMetric = (settings: ReturnType<typeof getGlobalSettings>): 'deviation' | 'rotation' => {
@@ -36,7 +37,7 @@ const sectionCardStyle = css`
   background-color: ${THEME.panelBg};
 `;
 
-export default function SingleSessionView({ session }: SingleSessionViewProps) {
+export default function SingleSessionView({ session, onBack }: SingleSessionViewProps) {
   const settings = getGlobalSettings();
   const { selectedMetrics, thresholds } = settings;
 
@@ -80,6 +81,26 @@ export default function SingleSessionView({ session }: SingleSessionViewProps) {
       overflow-y: auto;
       flex: 1;
     `}>
+      {/* Back Button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '4px',
+            padding: '8px 12px',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '500',
+            marginBottom: '12px',
+          }}
+        >
+          ← Back to Analysis
+        </button>
+      )}
+
       {/* Header */}
       <div css={css`
         padding-bottom: 12px;
