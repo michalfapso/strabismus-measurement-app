@@ -333,7 +333,7 @@ export function HistoryPage({}: HistoryPageProps) {
   );
 
   return (
-    <div css={styles.outerStyle}>
+    <div css={styles.outerStyle} data-component="HistoryPage">
       {/* Header */}
       <div css={styles.headerStyle}>
         <h1>Session History</h1>

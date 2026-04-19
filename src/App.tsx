@@ -14,7 +14,7 @@ import { CanvasState } from './types';
 import { css } from '@emotion/react';
 import { APP_BASE_URL } from './config';
 
-/* ── overlay container (top-right corner) ─────────────────────── */
+/* ── overlay container (top-right desktop, bottom-right mobile) ─────────────────────── */
 const overlayStyle = css`
   position: fixed;
   top: 16px;
@@ -25,6 +25,12 @@ const overlayStyle = css`
   align-items: flex-end;
   gap: 8px;
   pointer-events: none; /* let clicks fall through to canvas by default */
+
+  @media (max-width: 768px) {
+    top: auto;
+    bottom: 16px;
+    flex-direction: row;
+  }
 
   & > * {
     pointer-events: auto;

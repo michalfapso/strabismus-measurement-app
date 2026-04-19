@@ -243,12 +243,14 @@ export function SessionDrawer({
         className={isOpen ? 'open' : ''}
         onClick={onClose}
         aria-hidden="true"
+        data-component="SessionDrawerBackdrop"
       />
 
       {/* Drawer */}
       <div
         css={drawerStyle}
         className={isOpen ? 'open' : ''}
+        data-component="SessionDrawer"
         style={{
           transform: drawerTransform,
         }}
@@ -262,8 +264,9 @@ export function SessionDrawer({
           <button
             css={closeButtonStyle}
             onClick={(e) => {
+              console.log('Close button clicked, onClose:', typeof onClose);
               e.stopPropagation();
-              onClose();
+              onClose?.();
             }}
             aria-label="Close drawer"
             type="button"
