@@ -165,7 +165,7 @@ function ProgressGraphsTooltipContent({
   onDrillDown,
 }: ProgressGraphsTooltipContentProps) {
   // Get session data from payload (hover) or lockedSession (locked)
-  const data = isLocked ? lockedSession : (active && payload ? payload[0].payload : null);
+  const data = isLocked ? lockedSession : (active && payload && payload.length > 0 ? payload[0].payload : null);
 
   if (!data) return null;
 
