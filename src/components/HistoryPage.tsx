@@ -339,11 +339,11 @@ export function HistoryPage({}: HistoryPageProps) {
         <h1>Session History</h1>
         {!isMobile && (
           <>
-            <DateFilterBar currentRange={dateRange} onDateChange={handleDateChange} />
+            <DateFilterBar dateRange={dateRange} onDateChange={handleDateChange} />
             <ExerciseTypeFilterBar
-              distinctTypes={distinctExerciseTypes}
-              selectedTypes={selectedExerciseTypes}
-              onSelectedTypesChange={handleExerciseTypeChange}
+              distinctExerciseTypes={distinctExerciseTypes}
+              selectedExerciseTypes={selectedExerciseTypes}
+              onExerciseTypeChange={handleExerciseTypeChange}
             />
           </>
         )}
