@@ -471,12 +471,14 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
             {/* XAxis removed from Graph 1 */}
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Tooltip
-              active={!lockedSession}
+              active={!lockedSession && activeIndex !== null}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -512,12 +514,14 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
             <Tooltip
-              active={!lockedSession}
+              active={!lockedSession && activeIndex !== null}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -562,6 +566,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
             onClick={handleChartClick}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -580,7 +586,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
             <Tooltip
-              active={!lockedSession}
+              active={!lockedSession && activeIndex !== null}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
