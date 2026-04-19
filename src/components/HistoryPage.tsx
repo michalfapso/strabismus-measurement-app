@@ -1,5 +1,6 @@
 import { useContext, useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { css } from '@emotion/react';
 import { Session } from '../types';
 import { SessionContext } from '../context/SessionContext';
 import { useViewState } from '../hooks/useViewState';
@@ -7,9 +8,11 @@ import { DateFilterBar } from './DateFilterBar';
 import { ExerciseTypeFilterBar } from './ExerciseTypeFilterBar';
 import { HistoryListView } from './HistoryListView';
 import { SelectionBar } from './SelectionBar';
+import { SessionDrawer } from './SessionDrawer';
 import SingleSessionView from './SingleSessionView';
 import MultiSessionAnalysisView from './MultiSessionAnalysisView';
 import { downloadCSV } from '../services/export';
+import { THEME } from '../theme';
 
 export interface HistoryPageProps {}
 
@@ -18,6 +21,9 @@ export function HistoryPage({}: HistoryPageProps) {
   const location = useLocation();
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drillDownSessionId, setDrillDownSessionId] = useState<string | null>(null);
 
   const {
     state,
@@ -31,12 +37,27 @@ export function HistoryPage({}: HistoryPageProps) {
     localStorage.setItem('lastHistoryUrl', fullUrl);
   }, [location]);
 
+  // Resize listener for mobile/desktop responsiveness
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   // Load sessions on mount
   useEffect(() => {
     const loadSessions = async () => {
       try {
         const sessions = await loadHistoricalSessions();
         setAllSessions(sessions);
+
+        // Auto-select last 30 sessions on first load
+        if (state.selectedSessions.size === 0 && sessions.length > 0) {
+          const sorted = [...sessions].sort((a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          updateSelectedSessions(new Set(sorted.slice(0, 30).map(s => s.sessionId)));
+        }
       } catch (error) {
         console.error('Failed to load sessions:', error);
       } finally {
@@ -44,7 +65,7 @@ export function HistoryPage({}: HistoryPageProps) {
       }
     };
     loadSessions();
-  }, [loadHistoricalSessions]);
+  }, [loadHistoricalSessions, state.selectedSessions.size, updateSelectedSessions]);
 
   // Compute distinct exercise types from sessions
   const distinctExerciseTypes = useMemo(() => {
@@ -81,17 +102,18 @@ export function HistoryPage({}: HistoryPageProps) {
     });
   }, [allSessions, dateRange, selectedExerciseTypes]);
 
-  // Update selection when filters change
-  useEffect(() => {
-    const visibleIds = filteredSessions.map((s) => s.sessionId);
-    const filtered = new Set(
-      Array.from(state.selectedSessions).filter((id) => visibleIds.includes(id))
-    );
-    if (filtered.size !== state.selectedSessions.size ||
-        Array.from(filtered).some((id) => !state.selectedSessions.has(id))) {
-      updateSelectedSessions(filtered);
-    }
-  }, [filteredSessions, state.selectedSessions, updateSelectedSessions]);
+  // Compute hidden count: selected sessions not visible due to filters
+  const hiddenCount = useMemo(() => {
+    const visibleIds = new Set(filteredSessions.map(s => s.sessionId));
+    return Array.from(state.selectedSessions).filter(id => !visibleIds.has(id)).length;
+  }, [filteredSessions, state.selectedSessions]);
+
+  // Compute visible selected count
+  const visibleSelectedCount = useMemo(() => {
+    return filteredSessions.filter(s =>
+      state.selectedSessions.has(s.sessionId)
+    ).length;
+  }, [filteredSessions, state.selectedSessions]);
 
   const handleDateChange = (from: Date, to: Date) => {
     const [actualFrom, actualTo] = from <= to ? [from, to] : [to, from];
@@ -190,48 +212,144 @@ export function HistoryPage({}: HistoryPageProps) {
       .filter(s => s !== undefined) as Session[];
   }, [state.selectedSessions, allSessions]);
 
-  return (
+  // Styles
+  const styles = {
+    outerStyle: css`
+      position: fixed;
+      inset: 0;
+      background-color: rgba(10, 10, 10, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+
+      @media (max-width: 768px) {
+        padding: 0;
+      }
+    `,
+    headerStyle: css`
+      padding: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background-color: rgba(0, 0, 0, 0.3);
+      flex-shrink: 0;
+
+      h1 {
+        margin: 0 0 12px 0;
+        font-size: 20px;
+        color: #fff;
+      }
+
+      @media (max-width: 768px) {
+        padding: 8px 16px;
+
+        h1 {
+          font-size: 18px;
+          margin: 0 0 8px 0;
+        }
+      }
+    `,
+    leftPanelStyle: css`
+      width: fit-content;
+      min-width: 300px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+
+      @media (max-width: 768px) {
+        display: none;
+      }
+    `,
+    rightPanelStyle: css`
+      flex: 1;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      overflow: auto;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+
+      @media (max-width: 768px) {
+        border-left: none;
+      }
+    `,
+    mainContentStyle: css`
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+
+      @media (max-width: 768px) {
+        flex-direction: column;
+      }
+    `,
+    funnelButtonStyle: css`
+      display: none;
+
+      @media (max-width: 768px) {
+        display: flex;
+        position: fixed;
+        bottom: 24px;
+        left: 24px;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.85);
+        border: 2px solid ${THEME.accentGreen};
+        z-index: 150;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: ${THEME.accentGreen};
+        transition: all 0.2s;
+
+        &:hover {
+          background: rgba(0, 255, 0, 0.1);
+          text-shadow: 0 0 8px ${THEME.accentGreen};
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
+    `,
+  };
+
+  // Empty state component
+  const EmptyState = () => (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(10, 10, 10, 0.98)',
-      border: '1px solid rgba(255,255,255,0.1)',
-      zIndex: 100,
       display: 'flex',
-      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: 1,
+      color: '#999',
+      fontSize: '14px',
     }}>
+      Select one or more sessions to view analysis
+    </div>
+  );
+
+  return (
+    <div css={styles.outerStyle}>
       {/* Header */}
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        flexShrink: 0,
-      }}>
-        <h1 style={{ margin: '0 0 12px 0', fontSize: '20px', color: '#fff' }}>Session History</h1>
-        <DateFilterBar currentRange={dateRange} onDateChange={handleDateChange} />
-        <ExerciseTypeFilterBar
-          distinctTypes={distinctExerciseTypes}
-          selectedTypes={selectedExerciseTypes}
-          onSelectedTypesChange={handleExerciseTypeChange}
-        />
+      <div css={styles.headerStyle}>
+        <h1>Session History</h1>
+        {!isMobile && (
+          <>
+            <DateFilterBar currentRange={dateRange} onDateChange={handleDateChange} />
+            <ExerciseTypeFilterBar
+              distinctTypes={distinctExerciseTypes}
+              selectedTypes={selectedExerciseTypes}
+              onSelectedTypesChange={handleExerciseTypeChange}
+            />
+          </>
+        )}
       </div>
 
       {/* Main content */}
-      <div style={{
-        display: 'flex',
-        flex: 1,
-        overflow: 'hidden',
-      }}>
-        {/* List side */}
-        <div style={{
-          width: 'fit-content',
-          minWidth: '300px',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          borderRight: '1px solid rgba(255,255,255,0.1)',
-        }}>
+      <div css={styles.mainContentStyle}>
+        {/* Left Panel (Desktop only) */}
+        <div css={styles.leftPanelStyle}>
           {loading ? (
             <div style={{
               display: 'flex',
@@ -253,6 +371,8 @@ export function HistoryPage({}: HistoryPageProps) {
                 <SelectionBar
                   selectedCount={selectedCount}
                   filteredSessionCount={filteredSessions.length}
+                  visibleSelectedCount={visibleSelectedCount}
+                  hiddenCount={hiddenCount}
                   onSelectAll={handleSelectAll}
                   onSelectNone={handleSelectNone}
                   onExport={handleExport}
@@ -263,39 +383,61 @@ export function HistoryPage({}: HistoryPageProps) {
           )}
         </div>
 
-        {/* Detail side */}
-        <div style={{
-          flex: 1,
-          borderLeft: '1px solid rgba(255,255,255,0.1)',
-          overflow: 'auto',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          {selectedCount === 0 && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flex: 1,
-              color: '#999',
-              fontSize: '14px',
-            }}>
-              Select one or more sessions to view analysis
-            </div>
-          )}
-
-          {selectedCount === 1 && selectedSessions.length > 0 && (
+        {/* Right Panel */}
+        <div css={styles.rightPanelStyle}>
+          {drillDownSessionId !== null ? (
+            /* Case 1: User drilled down from multi-session to single session */
+            (() => {
+              const session = allSessions.find(s => s.sessionId === drillDownSessionId);
+              return session
+                ? <SingleSessionView session={session} onBack={() => setDrillDownSessionId(null)} />
+                : null;
+            })()
+          ) : selectedCount === 0 ? (
+            /* Case 2: No sessions selected - show empty state */
+            <EmptyState />
+          ) : selectedCount === 1 && selectedSessions.length > 0 ? (
+            /* Case 3a: Exactly 1 session selected - show that session (no back button) */
             <SingleSessionView session={selectedSessions[0]} />
-          )}
-
-          {selectedCount > 1 && (
+          ) : (
+            /* Case 3b: Multiple sessions selected - show analysis with drill-down */
             <MultiSessionAnalysisView
               sessions={selectedSessions}
+              onDrillDown={(sessionId) => setDrillDownSessionId(sessionId)}
             />
           )}
         </div>
       </div>
+
+      {/* Mobile SessionDrawer */}
+      <SessionDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        dateRange={dateRange}
+        onDateChange={handleDateChange}
+        distinctExerciseTypes={distinctExerciseTypes}
+        selectedExerciseTypes={selectedExerciseTypes}
+        onExerciseTypeChange={handleExerciseTypeChange}
+        sessions={filteredSessions}
+        selectedIds={state.selectedSessions}
+        onRowClick={handleRowClick}
+        selectedCount={selectedCount}
+        hiddenCount={hiddenCount}
+        onSelectNone={handleSelectNone}
+        onSelectAll={handleSelectAll}
+        onExport={handleExport}
+        onDelete={handleDelete}
+      />
+
+      {/* Mobile Floating Funnel Button */}
+      <button
+        css={styles.funnelButtonStyle}
+        onClick={() => setIsDrawerOpen(true)}
+        aria-label="Open session list"
+        title="Open session filter and list"
+      >
+        ⧩
+      </button>
     </div>
   );
 }
