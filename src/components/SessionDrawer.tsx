@@ -34,6 +34,10 @@ const backdropStyle = css`
   visibility: hidden;
   transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
 
+  @media (min-width: 769px) {
+    display: none;
+  }
+
   &.open {
     opacity: 1;
     visibility: visible;
@@ -53,6 +57,10 @@ const drawerStyle = css`
   transition: transform 0.3s ease-in-out;
   display: flex;
   flex-direction: column;
+
+  @media (min-width: 769px) {
+    display: none;
+  }
 
   &.open {
     transform: translateX(0);
