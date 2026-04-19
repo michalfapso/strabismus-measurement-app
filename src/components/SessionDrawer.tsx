@@ -29,7 +29,7 @@ const backdropStyle = css`
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 200;
+  z-index: 998;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
@@ -52,7 +52,7 @@ const drawerStyle = css`
   width: 100%;
   height: 100vh;
   background: ${THEME.background};
-  z-index: 201;
+  z-index: 999;
   transform: translateX(-100%);
   transition: transform 0.3s ease-in-out;
   display: flex;
@@ -261,8 +261,12 @@ export function SessionDrawer({
           <h2 css={titleStyle}>Sessions</h2>
           <button
             css={closeButtonStyle}
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             aria-label="Close drawer"
+            type="button"
           >
             ✕
           </button>
