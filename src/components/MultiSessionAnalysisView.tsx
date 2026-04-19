@@ -5,7 +5,6 @@ import { calculateProgressInsight, calculateExerciseInsights, calculateSessionQu
 import { getGlobalSettings } from '../utils/globalSettings';
 import { AnalysisMetricsBanner } from './AnalysisMetricsBanner';
 import { ProgressGraphs } from './ProgressGraphs';
-import { UnifiedSessionPanel } from './UnifiedSessionPanel';
 import { useSessionAnalysisState } from '../hooks/useSessionAnalysisState';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
@@ -15,6 +14,7 @@ type AnalysisMetric = 'deviation' | 'rotation';
 
 interface MultiSessionAnalysisViewProps {
   sessions: Session[];
+  onDrillDown?: (sessionId: string) => void;
 }
 
 const SUSTAINED_FUSION_DAYS = 7;
@@ -331,33 +331,20 @@ function MetricGroup({
   );
 }
 
-export default function MultiSessionAnalysisView({ sessions }: MultiSessionAnalysisViewProps) {
+export default function MultiSessionAnalysisView({ sessions, onDrillDown }: MultiSessionAnalysisViewProps) {
   const settings = getGlobalSettings();
   const { selectedMetrics, thresholds } = settings;
   const { state, setState } = useSessionAnalysisState();
 
   // Handler for drill-down: user clicks a graph point to see session details
   const handleDrillDown = (sessionId: string) => {
-    setState({ ...state, drilledDownSessionId: sessionId });
+    onDrillDown?.(sessionId);
   };
 
   // Handler for exercise filter changes
   const handleExerciseFilterChange = (exerciseFilter?: string) => {
     setState({ ...state, exerciseFilter });
   };
-
-  // If user is viewing a drilled-down session, show UnifiedSessionPanel instead
-  if (state.drilledDownSessionId) {
-    const session = sessions.find(s => s.sessionId === state.drilledDownSessionId);
-    if (session) {
-      return (
-        <UnifiedSessionPanel
-          session={session}
-          onBack={() => setState({ ...state, drilledDownSessionId: undefined })}
-        />
-      );
-    }
-  }
 
   // Filter to only metrics supported by the analysis pipeline
   const analysisMetrics = selectedMetrics.filter(
