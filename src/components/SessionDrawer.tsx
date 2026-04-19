@@ -252,7 +252,7 @@ export function SessionDrawer({
         className={isOpen ? 'open' : ''}
         data-component="SessionDrawer"
         style={{
-          transform: drawerTransform,
+          transform: isOpen ? drawerTransform : 'translateX(-100%)',
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -264,7 +264,6 @@ export function SessionDrawer({
           <button
             css={closeButtonStyle}
             onClick={(e) => {
-              console.log('Close button clicked, onClose:', typeof onClose);
               e.stopPropagation();
               onClose?.();
             }}
