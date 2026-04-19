@@ -45,6 +45,7 @@ if (!React.act) {
 
 // Now we can safely import @testing-library/react
 import { cleanup } from '@testing-library/react';
+import '@testing-library/dom';
 
 // Cleanup after each test
 afterEach(() => {

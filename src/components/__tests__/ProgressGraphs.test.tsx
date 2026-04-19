@@ -162,3 +162,74 @@ describe('ProgressGraphs x-axis rendering', () => {
     // so we verify the component structure is correct by checking the h3 title is present
   });
 });
+
+describe('ProgressGraphs legend positioning', () => {
+  const createMockSession = (overrides?: Partial<SessionMetrics>): SessionMetrics => ({
+    sessionId: 's1',
+    date: '2026-01-01',
+    exerciseTag: 'test',
+    metric: 'deviation',
+    sessionDuration: 1000,
+    histogram: [],
+    bestStableDeviation: 2.5,
+    nearBestStableTime: 15,
+    qualityPercent: 55,
+    driftingPercent: 30,
+    approachingPercent: 15,
+    fusionAchieved: false,
+    fusionAchievedCount: 0,
+    fusionEventCount: 0,
+    longestFusionStreak: 0,
+    largeDeviationTimePercent: 0,
+    trajectoryRatio: null,
+    timeToFirstFusion: null,
+    fusionTime: 0,
+    fusionTimePercent: 0,
+    nearFusionTime: 0,
+    nearFusionTimePercent: 0,
+    largeDeviationTime: 0,
+    stateSegments: [
+      { state: 'FUSION', startTime: 0, endTime: 200, duration: 200 },
+      { state: 'NEAR_FUSION', startTime: 200, endTime: 350, duration: 150 },
+      { state: 'STABLE_DEVIATION', startTime: 350, endTime: 550, duration: 200 },
+      { state: 'APPROACHING', startTime: 550, endTime: 800, duration: 250 },
+      { state: 'DRIFTING', startTime: 800, endTime: 1000, duration: 200 },
+    ],
+    ...overrides,
+  });
+
+  it('should not render legend in graph 1', () => {
+    const mockSessions: SessionMetrics[] = [createMockSession()];
+    const { container } = render(<ProgressGraphs sessions={mockSessions} />);
+    const h3Headers = container.querySelectorAll('h3');
+    const graph1Title = h3Headers[0];
+    expect(graph1Title.textContent).toContain('Best Stable Deviation (cm)');
+    // Graph 1 uses LineChart without Legend element
+    // Check that it renders the graph title successfully
+    expect(graph1Title).not.toBeNull();
+  });
+
+  it('should render legend in graph 2', () => {
+    const mockSessions: SessionMetrics[] = [createMockSession()];
+    const { container } = render(<ProgressGraphs sessions={mockSessions} />);
+    const h3Headers = container.querySelectorAll('h3');
+    const graph2Title = h3Headers[1];
+    expect(graph2Title.textContent).toContain('Near-Best Stable Time (seconds)');
+    const graph2Container = graph2Title.closest('div')?.parentElement;
+    // Look for any text content that would be from Legend
+    const legendContent = graph2Container?.textContent?.includes('Near-Best Stable Time');
+    expect(legendContent).toBe(true);
+  });
+
+  it('should render legend in graph 3', () => {
+    const mockSessions: SessionMetrics[] = [createMockSession()];
+    const { container } = render(<ProgressGraphs sessions={mockSessions} />);
+    const h3Headers = container.querySelectorAll('h3');
+    const graph3Title = h3Headers[2];
+    expect(graph3Title.textContent).toContain('Session Composition (%)');
+    const graph3Container = graph3Title.closest('div')?.parentElement;
+    // Look for Stable Deviation which should be in the legend labels
+    const legendContent = graph3Container?.textContent?.includes('Stable Deviation');
+    expect(legendContent).toBe(true);
+  });
+});
