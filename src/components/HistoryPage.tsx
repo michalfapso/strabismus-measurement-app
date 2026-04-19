@@ -298,7 +298,7 @@ export function HistoryPage({}: HistoryPageProps) {
         border-radius: 50%;
         background: rgba(0, 0, 0, 0.85);
         border: 2px solid ${THEME.accentGreen};
-        z-index: 150;
+        z-index: 201;
         cursor: pointer;
         align-items: center;
         justify-content: center;
