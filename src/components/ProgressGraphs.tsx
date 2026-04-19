@@ -464,25 +464,12 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
-              tickFormatter={(index) => {
-                if (visibleData && visibleData[index]) {
-                  return formatDatetimeLabel(visibleData[index].date);
-                }
-                return index.toString();
-              }}
-              angle={-45}
-              textAnchor="end"
-              height={80}
-            />
+            {/* XAxis removed from Graph 1 */}
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Tooltip
               active={!lockedSession}
               content={(props: any) => (
@@ -511,23 +498,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
-              tickFormatter={(index) => {
-                if (visibleData && visibleData[index]) {
-                  return formatDatetimeLabel(visibleData[index].date);
-                }
-                return index.toString();
-              }}
-              angle={-45}
-              textAnchor="end"
-              height={80}
-            />
+            {/* XAxis removed from Graph 2 */}
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
             <Tooltip
