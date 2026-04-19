@@ -136,7 +136,7 @@ const buttonGroupStyle = css`
   button {
     padding: 6px 10px;
     font-size: 12px;
-    background-color: rgba(0, 255, 0, 0.1);
+    background-color: ${THEME.accentGreenLight};
     border: 1px solid ${THEME.accentGreen};
     border-radius: 3px;
     color: ${THEME.accentGreen};
@@ -144,11 +144,11 @@ const buttonGroupStyle = css`
     transition: background-color 0.2s;
 
     &:hover {
-      background-color: rgba(0, 255, 0, 0.2);
+      background-color: ${THEME.accentGreenBorder};
     }
 
     &:active {
-      background-color: rgba(0, 255, 0, 0.3);
+      background-color: ${THEME.accentGreenActive};
     }
   }
 `;
@@ -161,7 +161,7 @@ const advancedControlsStyle = css`
     flex: 1;
     padding: 8px 12px;
     font-size: 12px;
-    background-color: rgba(0, 255, 0, 0.1);
+    background-color: ${THEME.accentGreenLight};
     border: 1px solid ${THEME.accentGreen};
     border-radius: 3px;
     color: ${THEME.accentGreen};
@@ -169,11 +169,11 @@ const advancedControlsStyle = css`
     transition: background-color 0.2s;
 
     &:hover {
-      background-color: rgba(0, 255, 0, 0.2);
+      background-color: ${THEME.accentGreenBorder};
     }
 
     &:active {
-      background-color: rgba(0, 255, 0, 0.3);
+      background-color: ${THEME.accentGreenActive};
     }
   }
 `;
