@@ -438,6 +438,7 @@ export function HistoryPage({}: HistoryPageProps) {
         onClick={() => setIsDrawerOpen(true)}
         aria-label="Open session list"
         title="Open session filter and list"
+        data-component="FunnelButton"
       >
         ⧩
       </button>
