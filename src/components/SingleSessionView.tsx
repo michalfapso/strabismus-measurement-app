@@ -30,6 +30,22 @@ const sectionTitleStyle = css`
   letter-spacing: 0.05em;
 `;
 
+const backButtonStyle = css`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: ${THEME.textPrimary};
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
 const sectionCardStyle = css`
   border: 1px solid ${THEME.borderPrimary};
   border-radius: 4px;
@@ -83,20 +99,7 @@ export default function SingleSessionView({ session, onBack }: SingleSessionView
     `}>
       {/* Back Button */}
       {onBack && (
-        <button
-          onClick={onBack}
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '4px',
-            padding: '8px 12px',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500',
-            marginBottom: '12px',
-          }}
-        >
+        <button onClick={onBack} css={backButtonStyle}>
           ← Back to Analysis
         </button>
       )}
