@@ -220,6 +220,146 @@ function ProgressGraphsTooltipContent({
   );
 }
 
+const styles = {
+  container: css`
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+
+    @media (max-width: 768px) {
+      padding: 12px;
+      gap: 12px;
+    }
+  `,
+  controls: css`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    button {
+      padding: 6px 12px;
+      border: 1px solid ${THEME.accentGreen};
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.8);
+      color: ${THEME.accentGreen};
+      cursor: pointer;
+      font-weight: 500;
+
+      &:hover {
+        background: rgba(0, 255, 0, 0.1);
+        text-shadow: 0 0 8px ${THEME.accentGreen};
+      }
+
+      &:active {
+        background: rgba(0, 255, 0, 0.2);
+      }
+    }
+
+    @media (max-width: 768px) {
+      gap: 4px;
+
+      button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+    }
+  `,
+  zoomInfo: css`
+    font-size: 12px;
+    color: ${THEME.textSecondary};
+    margin-left: auto;
+
+    @media (max-width: 768px) {
+      font-size: 11px;
+    }
+  `,
+  graphContainer: css`
+    border: 1px solid ${THEME.borderPrimary};
+    border-radius: 4px;
+    padding: 12px;
+
+    @media (max-width: 768px) {
+      padding: 8px;
+
+      h3 {
+        font-size: 14px;
+        margin: 4px 0 8px 0;
+      }
+    }
+  `,
+  tooltip: css`
+    background: rgba(0, 0, 0, 1);
+    border: 1px solid ${THEME.borderPrimary};
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 12px;
+    color: ${THEME.textPrimary};
+
+    p {
+      margin: 4px 0;
+    }
+
+    hr {
+      margin: 4px 0;
+      border: none;
+      border-top: 1px solid ${THEME.borderSecondary || '#444'};
+    }
+  `,
+  closeButtonContainer: css`
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  `,
+  closeButton: css`
+    background: none;
+    border: none;
+    color: ${THEME.textPrimary};
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+
+    &:hover {
+      opacity: 0.7;
+    }
+
+    &:active {
+      opacity: 0.5;
+    }
+  `,
+  viewSessionButton: css`
+    margin-top: 8px;
+    width: 100%;
+    padding: 5px 0;
+    background: ${THEME.accentGreenLight};
+    border: 1px solid ${THEME.accentGreen};
+    border-radius: 3px;
+    color: ${THEME.accentGreen};
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 500;
+
+    &:hover {
+      background: rgba(0, 255, 0, 0.25);
+      box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+    }
+
+    &:active {
+      background: rgba(0, 255, 0, 0.35);
+    }
+  `,
+  lockedOverlay: css`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    pointer-events: auto;
+  `,
+};
+
 /**
  * ProgressGraphs: Three stacked graphs showing progression over multiple sessions
  * - Graph 1: bestStableDeviation (cm)
@@ -480,143 +620,3 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     </div>
   );
 }
-
-const styles = {
-  container: css`
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 20px;
-
-    @media (max-width: 768px) {
-      padding: 12px;
-      gap: 12px;
-    }
-  `,
-  controls: css`
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-
-    button {
-      padding: 6px 12px;
-      border: 1px solid ${THEME.accentGreen};
-      border-radius: 4px;
-      background: rgba(0, 0, 0, 0.8);
-      color: ${THEME.accentGreen};
-      cursor: pointer;
-      font-weight: 500;
-
-      &:hover {
-        background: rgba(0, 255, 0, 0.1);
-        text-shadow: 0 0 8px ${THEME.accentGreen};
-      }
-
-      &:active {
-        background: rgba(0, 255, 0, 0.2);
-      }
-    }
-
-    @media (max-width: 768px) {
-      gap: 4px;
-
-      button {
-        padding: 4px 8px;
-        font-size: 12px;
-      }
-    }
-  `,
-  zoomInfo: css`
-    font-size: 12px;
-    color: ${THEME.textSecondary};
-    margin-left: auto;
-
-    @media (max-width: 768px) {
-      font-size: 11px;
-    }
-  `,
-  graphContainer: css`
-    border: 1px solid ${THEME.borderPrimary};
-    border-radius: 4px;
-    padding: 12px;
-
-    @media (max-width: 768px) {
-      padding: 8px;
-
-      h3 {
-        font-size: 14px;
-        margin: 4px 0 8px 0;
-      }
-    }
-  `,
-  tooltip: css`
-    background: rgba(0, 0, 0, 1);
-    border: 1px solid ${THEME.borderPrimary};
-    border-radius: 4px;
-    padding: 8px;
-    font-size: 12px;
-    color: ${THEME.textPrimary};
-
-    p {
-      margin: 4px 0;
-    }
-
-    hr {
-      margin: 4px 0;
-      border: none;
-      border-top: 1px solid ${THEME.borderSecondary || '#444'};
-    }
-  `,
-  closeButtonContainer: css`
-    position: absolute;
-    top: 4px;
-    right: 4px;
-  `,
-  closeButton: css`
-    background: none;
-    border: none;
-    color: ${THEME.textPrimary};
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-
-    &:hover {
-      opacity: 0.7;
-    }
-
-    &:active {
-      opacity: 0.5;
-    }
-  `,
-  viewSessionButton: css`
-    margin-top: 8px;
-    width: 100%;
-    padding: 5px 0;
-    background: ${THEME.accentGreenLight};
-    border: 1px solid ${THEME.accentGreen};
-    border-radius: 3px;
-    color: ${THEME.accentGreen};
-    font-size: 11px;
-    cursor: pointer;
-    font-weight: 500;
-
-    &:hover {
-      background: rgba(0, 255, 0, 0.25);
-      box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
-    }
-
-    &:active {
-      background: rgba(0, 255, 0, 0.35);
-    }
-  `,
-  lockedOverlay: css`
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-    pointer-events: auto;
-  `,
-};
