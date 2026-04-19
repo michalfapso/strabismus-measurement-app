@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useMemo } from 'react';
+import { useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { css } from '@emotion/react';
 import { Session } from '../types';
@@ -31,6 +31,8 @@ export function HistoryPage({}: HistoryPageProps) {
     updateSelectedSessions,
   } = useViewState();
 
+  const autoSelectDoneRef = useRef(false);
+
   // Save the History page URL to localStorage whenever it changes
   useEffect(() => {
     const fullUrl = window.location.pathname + window.location.search;
@@ -51,8 +53,9 @@ export function HistoryPage({}: HistoryPageProps) {
         const sessions = await loadHistoricalSessions();
         setAllSessions(sessions);
 
-        // Auto-select last 30 sessions on first load
-        if (state.selectedSessions.size === 0 && sessions.length > 0) {
+        // Auto-select last 30 sessions on first load (only once)
+        if (!autoSelectDoneRef.current && state.selectedSessions.size === 0 && sessions.length > 0) {
+          autoSelectDoneRef.current = true;
           const sorted = [...sessions].sort((a, b) =>
             new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
           );
@@ -65,7 +68,7 @@ export function HistoryPage({}: HistoryPageProps) {
       }
     };
     loadSessions();
-  }, [loadHistoricalSessions, state.selectedSessions.size, updateSelectedSessions]);
+  }, [loadHistoricalSessions, updateSelectedSessions]);
 
   // Compute distinct exercise types from sessions
   const distinctExerciseTypes = useMemo(() => {
