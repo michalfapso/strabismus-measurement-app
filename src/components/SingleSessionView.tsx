@@ -96,7 +96,7 @@ export default function SingleSessionView({ session, onBack }: SingleSessionView
       padding: 16px;
       overflow-y: auto;
       flex: 1;
-    `}>
+    `} data-component="SingleSessionView">
       {/* Back Button */}
       {onBack && (
         <button onClick={onBack} css={backButtonStyle}>

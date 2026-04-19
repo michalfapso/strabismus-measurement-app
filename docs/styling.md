@@ -79,3 +79,13 @@ Box plot elements are stacked with all median/quartile/whisker/outlier markers a
 - Use `&&` prefix for specificity where needed
 - Dark theme applied via component inline styles
 - Props interfaces named `ComponentNameProps`
+
+## Component Debugging
+
+Add `data-component="ComponentName"` to the root element of each component for Playwright debugging:
+
+```typescript
+export function MyComponent() {
+  return <div data-component="MyComponent">...</div>;
+}
+```

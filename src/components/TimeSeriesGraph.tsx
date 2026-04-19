@@ -388,7 +388,7 @@ export function TimeSeriesGraph({ sessions, isSingleSession, selectedMetrics: pr
   const chartData = prepareChartData();
 
   return (
-    <div style={{ marginBottom: '20px' }}>
+    <div style={{ marginBottom: '20px' }} data-component="TimeSeriesGraph">
       {/* Aggregate-only controls */}
       {!isSingleSession && (
         <>

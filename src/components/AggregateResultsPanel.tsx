@@ -107,6 +107,7 @@ function StatCards({ sessions }: { sessions: Session[] }) {
         gap: '12px',
         marginBottom: '20px',
       }}
+      data-component="AggregateResultsPanel"
     >
       {cards.map((card) => (
         <div

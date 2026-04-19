@@ -40,6 +40,7 @@ export function UnifiedSessionPanel({ session, onBack }: UnifiedSessionPanelProp
         flexDirection: 'column',
         gap: '0',
       }}
+      data-component="UnifiedSessionPanel"
     >
       {/* Back button */}
       {onBack && (

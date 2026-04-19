@@ -329,7 +329,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   // Mode selection view - show when no mode selected (Back button or initial selection)
   if (mode === null) {
     return (
-      <div css={containerStyle}>
+      <div css={containerStyle} data-component="CalibrationScreen">
         <div css={instructionStyle}>
           <h1>Choose Calibration Method</h1>
           <p>Select the reference object you'll use to calibrate the measurement system.</p>
@@ -355,6 +355,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
     return (
       <div
         css={containerStyle}
+        data-component="CalibrationScreen"
         onMouseMove={handleCreditCardMouseMove}
         onMouseUp={handleMouseUp}
       >
@@ -405,6 +406,7 @@ export function CalibrationScreen({ onComplete, restoredCanvasState, recalibrati
   return (
     <div
       css={containerStyle}
+      data-component="CalibrationScreen"
       onMouseMove={handleLineMouseMove}
       onMouseUp={handleMouseUp}
     >

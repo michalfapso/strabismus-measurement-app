@@ -817,6 +817,7 @@ export function TimeSeriesSegmentationGraph({
         width: 100%;
         background: transparent;
       `}
+      data-component="TimeSeriesSegmentationGraph"
     >
       {metricDatasets.map((data, idx) => {
         const isLast = idx === metricDatasets.length - 1;

@@ -34,6 +34,7 @@ export function ExerciseSelector({
       css={selectStyle}
       value={value}
       onChange={(e) => onChange(e.target.value as ExerciseType)}
+      data-component="ExerciseSelector"
     >
       {PREDEFINED_EXERCISES.map((exercise) => (
         <option key={exercise} value={exercise}>

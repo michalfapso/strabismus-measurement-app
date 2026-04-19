@@ -132,7 +132,7 @@ export function DataCaptureControl({ currentCanvasPosition, onStartMeasurement }
 
   if (!currentSession) {
     return (
-      <div css={controlPanelStyle}>
+      <div css={controlPanelStyle} data-component="DataCaptureControl">
         <h2>Start Measurement</h2>
         <ExerciseSelector value={selectedExercise} onChange={setSelectedExercise} />
         <button css={startButtonStyle} onClick={handleStart}>
@@ -143,7 +143,7 @@ export function DataCaptureControl({ currentCanvasPosition, onStartMeasurement }
   }
 
   return (
-    <div css={controlPanelStyle}>
+    <div css={controlPanelStyle} data-component="DataCaptureControl">
       <h2>Active Measurement</h2>
       <div css={rowStyle}>
         <span>Exercise:</span>

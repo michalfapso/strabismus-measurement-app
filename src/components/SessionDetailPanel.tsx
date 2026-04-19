@@ -39,7 +39,7 @@ export function SessionDetailPanel({ session, onClose }: SessionDetailPanelProps
       display: 'flex',
       flexDirection: 'column',
       boxShadow: '-2px 0 10px rgba(0,0,0,0.5)',
-    }}>
+    }} data-component="SessionDetailPanel">
       {/* Header */}
       <div style={{
         display: 'flex',

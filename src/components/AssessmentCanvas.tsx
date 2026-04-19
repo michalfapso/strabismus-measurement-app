@@ -176,7 +176,7 @@ export function AssessmentCanvas({
   const lineExtent = Math.max(size.width, size.height) * 2;
 
   return (
-    <div css={canvasWrapperStyle}>
+    <div css={canvasWrapperStyle} data-component="AssessmentCanvas">
       <Stage
         ref={stageRef}
         width={size.width}

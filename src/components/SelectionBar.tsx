@@ -64,7 +64,7 @@ export function SelectionBar({
       padding: '12px 16px',
       color: THEME.textPrimary,
       minHeight: '48px',
-    }}>
+    }} data-component="SelectionBar">
       {/* Selection control buttons (left) */}
       <div style={{ display: 'flex', gap: '6px' }}>
         <button

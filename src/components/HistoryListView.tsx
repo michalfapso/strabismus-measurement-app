@@ -38,7 +38,7 @@ export function HistoryListView({
   const visibleIds = sessions.map(s => s.sessionId);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+    <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)' }} data-component="HistoryListView">
       {sessions.map((session) => {
         const isSelected = selectedIds.has(session.sessionId);
         const duration = getSessionDuration(session);

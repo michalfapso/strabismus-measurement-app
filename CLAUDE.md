@@ -35,3 +35,7 @@ Pencil Push-ups, Brock String, Extreme Rotation, Convergence Jumps, Left/Right-T
 - `docs/development.md` — read when setting up workflows, debugging known issues, or adding new features
 
 When making architectural changes, update the relevant file in `docs/`.
+
+## Component Conventions
+
+Add `data-component="ComponentName"` to root element of each component for Playwright debugging. See `docs/styling.md`.

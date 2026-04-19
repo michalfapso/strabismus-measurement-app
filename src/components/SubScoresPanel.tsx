@@ -20,7 +20,7 @@ export default function SubScoresPanel({ metrics }: SubScoresPanelProps) {
       border: 1px solid ${THEME.borderPrimary};
       border-radius: 4px;
       background-color: ${THEME.panelBg};
-    `}>
+    `} data-component="SubScoresPanel">
       <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Session Sub-Scores</h3>
       <table css={css`
         width: 100%;

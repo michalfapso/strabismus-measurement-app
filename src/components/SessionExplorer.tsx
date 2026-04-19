@@ -111,7 +111,7 @@ export function SessionExplorer() {
   };
 
   return (
-    <div css={explorerStyle}>
+    <div css={explorerStyle} data-component="SessionExplorer">
       <h2>Session History ({allSessions.length})</h2>
 
       {allSessions.length > 0 ? (

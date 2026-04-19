@@ -891,6 +891,7 @@ export function HistogramChart({ sessions, isSingleSession, viewState: passedVie
         borderRadius: '4px',
         width: '100%',
       }}
+      data-component="HistogramChart"
     >
       {/* Header with title */}
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px' }}>

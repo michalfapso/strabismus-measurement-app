@@ -46,6 +46,7 @@ export function ExerciseTypeFilterBar({
         borderBottom: '1px solid rgba(0, 255, 0, 0.2)',
         marginBottom: '12px',
       }}
+      data-component="ExerciseTypeFilterBar"
     >
       {/* Checkboxes first (left) */}
       <div

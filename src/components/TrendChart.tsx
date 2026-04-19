@@ -51,7 +51,7 @@ export function TrendChart({ sessions }: TrendChartProps) {
   const trend = regression.slope >= 0 ? 'improving' : 'declining';
 
   return (
-    <div style={{ marginBottom: '0' }}>
+    <div style={{ marginBottom: '0' }} data-component="TrendChart">
       <div
         style={{
           display: 'flex',

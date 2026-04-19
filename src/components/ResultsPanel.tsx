@@ -29,6 +29,7 @@ export function ResultsPanel({ session, visible, onDismiss }: ResultsPanelProps)
         flexDirection: 'column',
         animation: 'slideIn 0.3s ease-out',
       }}
+      data-component="ResultsPanel"
     >
       {/* Header with close button */}
       <div

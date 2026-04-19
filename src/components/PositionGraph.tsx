@@ -17,7 +17,7 @@ export function PositionGraph({ data, multiSession = false, title = 'Position Ov
   }
 
   return (
-    <div style={{ width: '100%', height: '300px' }}>
+    <div style={{ width: '100%', height: '300px' }} data-component="PositionGraph">
       <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#fff' }}>{title}</h3>
       <ResponsiveContainer width="100%" height={270}>
         <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>

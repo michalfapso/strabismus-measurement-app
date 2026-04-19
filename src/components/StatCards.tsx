@@ -44,7 +44,7 @@ export function StatCards({ positionRange, rotationRange, duration, meanDeviatio
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
       gap: '12px',
       width: '100%',
-    }}>
+    }} data-component="StatCards">
       {positionRange && (
         <div style={cardStyle}>
           <div style={labelStyle}>Position Range</div>

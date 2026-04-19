@@ -32,7 +32,7 @@ export default function StateSegmentationTimeline({
   }
 
   return (
-    <div css={css`padding: 16px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.panelBg};`}>
+    <div css={css`padding: 16px; border: 1px solid ${THEME.borderPrimary}; border-radius: 4px; background-color: ${THEME.panelBg};`} data-component="StateSegmentationTimeline">
       <h3 css={css`margin-top: 0; margin-bottom: 12px; color: ${THEME.textPrimary};`}>Session State Timeline</h3>
 
       {/* Timeline bar */}

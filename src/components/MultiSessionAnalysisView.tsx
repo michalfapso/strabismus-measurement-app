@@ -415,7 +415,7 @@ export default function MultiSessionAnalysisView({ sessions, onDrillDown }: Mult
       padding: 16px;
       overflow-y: auto;
       flex: 1;
-    `}>
+    `} data-component="MultiSessionAnalysisView">
       {/* Header */}
       <div>
         <h2 css={css`margin: 0 0 4px 0; color: ${THEME.textPrimary}; font-size: 18px;`}>

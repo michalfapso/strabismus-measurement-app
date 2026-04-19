@@ -220,7 +220,7 @@ export function SettingsPage() {
   const allMetrics: Array<'deviation' | 'x' | 'y' | 'rotation'> = ['deviation', 'x', 'y', 'rotation'];
 
   return (
-    <div css={containerStyle}>
+    <div css={containerStyle} data-component="SettingsPage">
       <div css={headerStyle}>
         <h1 css={titleStyle}>Settings</h1>
       </div>

@@ -70,7 +70,7 @@ export function AnalysisMetricsBanner({ mode, metric }: AnalysisMetricsBannerPro
     const threshold = settings.thresholds[metric] ?? 1.0;
     const unit = getUnit(metric);
     return (
-      <div css={bannerStyle}>
+      <div css={bannerStyle} data-component="AnalysisMetricsBanner">
         <span>
           Viewing: <strong>{formatMetricName(metric)}</strong> (threshold {threshold} {unit})
         </span>
@@ -91,7 +91,7 @@ export function AnalysisMetricsBanner({ mode, metric }: AnalysisMetricsBannerPro
     .join(', ');
 
   return (
-    <div css={bannerStyle}>
+    <div css={bannerStyle} data-component="AnalysisMetricsBanner">
       <span>
         Metrics: <strong>{metricsList}</strong>
       </span>

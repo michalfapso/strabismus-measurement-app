@@ -59,7 +59,7 @@ export function DateFilterBar({ onDateChange, currentRange }: DateFilterBarProps
       padding: '12px',
       backgroundColor: 'rgba(255,255,255,0.02)',
       borderRadius: '4px',
-    }}>
+    }} data-component="DateFilterBar">
       <label style={{ fontSize: '12px', color: '#aaa' }}>
         From:
         <input

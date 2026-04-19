@@ -196,7 +196,7 @@ function AppContent() {
       {routeElement}
 
       {/* Floating overlay — always visible */}
-      <div css={overlayStyle}>
+      <div css={overlayStyle} data-component="AppOverlay">
 
         {/* Top chip row */}
         <div css={chipRowStyle}>

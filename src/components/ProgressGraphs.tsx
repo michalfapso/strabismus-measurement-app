@@ -445,6 +445,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   return (
     <div
       css={styles.container}
+      data-component="ProgressGraphs"
       onTouchStart={touchHandlers.handleTouchStart}
       onTouchMove={touchHandlers.handleTouchMove}
       onTouchEnd={touchHandlers.handleTouchEnd}
