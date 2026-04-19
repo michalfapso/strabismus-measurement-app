@@ -144,37 +144,95 @@ interface ProgressGraphsTooltipPayload {
   driftingPercent: number;
 }
 
-interface SharedTooltipProps {
+interface ProgressGraphsTooltipContentProps {
   active?: boolean;
   payload?: Array<{
     payload: ProgressGraphsTooltipPayload;
   }>;
   label?: any;
+  isLocked?: boolean;
+  lockedSession?: ProgressGraphsTooltipPayload | null;
+  onCloseLocked?: () => void;
+  onDrillDown?: (sessionId: string) => void;
 }
 
-function SharedTooltip({ active, payload }: SharedTooltipProps) {
-  if (active && payload && payload.length > 0) {
-    const data = payload[0].payload;
-    return (
-      <div css={styles.tooltip}>
-        <p><strong>{data.date}</strong></p>
-        <p>Exercise: {data.exerciseTag}</p>
-        <p>Session #{data.sessionIndex + 1}</p>
-        <hr />
-        <p>Best Stable Deviation: {data.bestStableDeviation.toFixed(2)} cm</p>
-        <p>Near-Best Stable Time: {data.nearBestStableTime.toFixed(1)}s</p>
-        <p>Longest Quality Streak: {data.longestQualityStreak.toFixed(1)}s</p>
-        <p>Quality Episode Count: {data.qualityEpisodeCount}</p>
-        <hr />
-        <p>Fusion: {data.fusionPercent.toFixed(1)}%</p>
-        <p>Near Fusion: {data.nearFusionPercent.toFixed(1)}%</p>
-        <p>Stable Deviation: {data.stableDeviationPercent.toFixed(1)}%</p>
-        <p>Approaching: {data.approachingPercent.toFixed(1)}%</p>
-        <p>Drifting: {data.driftingPercent.toFixed(1)}%</p>
-      </div>
-    );
-  }
-  return null;
+function ProgressGraphsTooltipContent({
+  active,
+  payload,
+  isLocked = false,
+  lockedSession,
+  onCloseLocked,
+  onDrillDown,
+}: ProgressGraphsTooltipContentProps) {
+  // Get session data from payload (hover) or lockedSession (locked)
+  const data = isLocked ? lockedSession : (active && payload ? payload[0].payload : null);
+
+  if (!data) return null;
+
+  return (
+    <div
+      css={styles.tooltip}
+      style={{
+        borderColor: isLocked ? '#00ff00' : undefined,
+        position: 'relative',
+      }}
+    >
+      <p><strong>{data.date}</strong></p>
+      <p>Exercise: {data.exerciseTag}</p>
+      <p>Session #{data.sessionIndex + 1}</p>
+      <hr />
+      <p>Best Stable Deviation: {data.bestStableDeviation.toFixed(2)} cm</p>
+      <p>Near-Best Stable Time: {data.nearBestStableTime.toFixed(1)}s</p>
+      <p>Longest Quality Streak: {data.longestQualityStreak.toFixed(1)}s</p>
+      <p>Quality Episode Count: {data.qualityEpisodeCount}</p>
+      <hr />
+      <p>Fusion: {data.fusionPercent.toFixed(1)}%</p>
+      <p>Near Fusion: {data.nearFusionPercent.toFixed(1)}%</p>
+      <p>Stable Deviation: {data.stableDeviationPercent.toFixed(1)}%</p>
+      <p>Approaching: {data.approachingPercent.toFixed(1)}%</p>
+      <p>Drifting: {data.driftingPercent.toFixed(1)}%</p>
+
+      {/* Locked state controls */}
+      {isLocked && (
+        <>
+          <div style={{ position: 'absolute', top: '4px', right: '4px' }}>
+            <button
+              onClick={onCloseLocked}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDrillDown?.(data.sessionId);
+            }}
+            style={{
+              marginTop: '8px',
+              width: '100%',
+              padding: '5px 0',
+              background: 'rgba(0,255,0,0.15)',
+              border: '1px solid #00ff00',
+              borderRadius: '3px',
+              color: '#00ff00',
+              fontSize: '11px',
+              cursor: 'pointer',
+            }}
+          >
+            View Session →
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -184,6 +242,9 @@ function SharedTooltip({ active, payload }: SharedTooltipProps) {
  * - Graph 3: qualityPercent + driftingPercent + approachingPercent (%)
  */
 export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: ProgressGraphsProps) {
+  // Locked session state for click-to-lock tooltip
+  const [lockedSession, setLockedSession] = useState<ProgressGraphsTooltipPayload | null>(null);
+
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
     if (!exerciseFilter) return sessions;
@@ -228,6 +289,30 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     return graphData.slice(Math.floor(zoomStart), Math.ceil(zoomEnd));
   }, [graphData, zoomStart, zoomEnd]);
 
+  // Handle chart click to lock tooltip
+  const handleChartClick = (state: any) => {
+    if (state && state.activeTooltipIndex !== undefined) {
+      const sessionData = visibleData[state.activeTooltipIndex];
+      if (sessionData) {
+        setLockedSession({
+          sessionIndex: sessionData.sessionIndex,
+          sessionId: sessionData.sessionId,
+          date: sessionData.date,
+          exerciseTag: sessionData.exerciseTag,
+          bestStableDeviation: sessionData.bestStableDeviation,
+          nearBestStableTime: sessionData.nearBestStableTime,
+          longestQualityStreak: sessionData.longestQualityStreak,
+          qualityEpisodeCount: sessionData.qualityEpisodeCount,
+          fusionPercent: sessionData.fusionPercent,
+          nearFusionPercent: sessionData.nearFusionPercent,
+          stableDeviationPercent: sessionData.stableDeviationPercent,
+          approachingPercent: sessionData.approachingPercent,
+          driftingPercent: sessionData.driftingPercent,
+        });
+      }
+    }
+  };
+
   if (graphData.length === 0) {
     return <div>No sessions to display</div>;
   }
@@ -251,7 +336,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Best Stable Deviation (cm)</h3>
         <ResponsiveContainer width="100%" height={graphHeight}>
-          <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <LineChart
+            data={visibleData}
+            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            onClick={handleChartClick}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -268,7 +357,17 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             />
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
-            <Tooltip content={<SharedTooltip />} />
+            <Tooltip
+              content={(props: any) => (
+                <ProgressGraphsTooltipContent
+                  {...props}
+                  isLocked={!!lockedSession}
+                  lockedSession={lockedSession}
+                  onCloseLocked={() => setLockedSession(null)}
+                  onDrillDown={onDrillDown}
+                />
+              )}
+            />
             <Line
               type="monotone"
               dataKey="bestStableDeviation"
@@ -283,7 +382,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Near-Best Stable Time (seconds)</h3>
         <ResponsiveContainer width="100%" height={graphHeight}>
-          <LineChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <LineChart
+            data={visibleData}
+            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            onClick={handleChartClick}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -300,7 +403,17 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             />
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
-            <Tooltip content={<SharedTooltip />} />
+            <Tooltip
+              content={(props: any) => (
+                <ProgressGraphsTooltipContent
+                  {...props}
+                  isLocked={!!lockedSession}
+                  lockedSession={lockedSession}
+                  onCloseLocked={() => setLockedSession(null)}
+                  onDrillDown={onDrillDown}
+                />
+              )}
+            />
             <Line
               type="monotone"
               dataKey="nearBestStableTime"
@@ -324,7 +437,11 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
       <div css={styles.graphContainer}>
         <h3>Session Composition (%)</h3>
         <ResponsiveContainer width="100%" height={graphHeight}>
-          <AreaChart data={visibleData} margin={{ right: 30, left: 0, bottom: 60, top: 10 }}>
+          <AreaChart
+            data={visibleData}
+            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            onClick={handleChartClick}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
@@ -341,7 +458,17 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             />
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary }} />
-            <Tooltip content={<SharedTooltip />} />
+            <Tooltip
+              content={(props: any) => (
+                <ProgressGraphsTooltipContent
+                  {...props}
+                  isLocked={!!lockedSession}
+                  lockedSession={lockedSession}
+                  onCloseLocked={() => setLockedSession(null)}
+                  onDrillDown={onDrillDown}
+                />
+              )}
+            />
             <Area type="monotone" dataKey="fusionPercent" stackId="1" stroke={THEME.stateFusion} fill={THEME.stateFusion} name="Fusion" />
             <Area type="monotone" dataKey="nearFusionPercent" stackId="1" stroke={THEME.stateNearFusion} fill={THEME.stateNearFusion} name="Near Fusion" />
             <Area type="monotone" dataKey="stableDeviationPercent" stackId="1" stroke={THEME.stateStableDeviation} fill={THEME.stateStableDeviation} name="Stable Deviation" />
@@ -350,6 +477,27 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Locked tooltip overlay */}
+      {lockedSession && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1000,
+            pointerEvents: 'auto',
+          }}
+        >
+          <ProgressGraphsTooltipContent
+            isLocked={true}
+            lockedSession={lockedSession}
+            onCloseLocked={() => setLockedSession(null)}
+            onDrillDown={onDrillDown}
+          />
+        </div>
+      )}
     </div>
   );
 }
