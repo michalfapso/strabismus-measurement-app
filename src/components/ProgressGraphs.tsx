@@ -586,7 +586,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
+            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -594,7 +594,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
-            <YAxis />
+            <YAxis width={35} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph1" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -640,7 +640,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
+            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -648,7 +648,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
-            <YAxis />
+            <YAxis width={35} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph2" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -715,7 +715,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <AreaChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
+            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -731,9 +731,10 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               }}
               angle={-45}
               textAnchor="end"
-              height={80}
+              height={50}
+              tick={{ fontSize: 12 }}
             />
-            <YAxis domain={[0, 100]} />
+            <YAxis domain={[0, 100]} ticks={[0, 50, 100]} width={35} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph3" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
