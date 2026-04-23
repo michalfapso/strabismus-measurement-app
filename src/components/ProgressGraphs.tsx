@@ -587,7 +587,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
+            margin={{ right: 0, left: 0, bottom: 0, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -641,7 +641,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
+            margin={{ right: 0, left: 0, bottom: 0, top: 0 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -716,7 +716,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graph3Height}>
           <AreaChart
             data={visibleData}
-            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
+            margin={{ right: 0, left: 0, bottom: 10, top: 0 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
