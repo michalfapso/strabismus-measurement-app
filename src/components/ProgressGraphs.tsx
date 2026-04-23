@@ -79,8 +79,8 @@ function useTouchZoom(onZoom: (factor: number) => void) {
   return { handleTouchStart, handleTouchMove, handleTouchEnd };
 }
 
-function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement | null>) {
-  const [graphHeight, setGraphHeight] = useState(150);
+function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement | null>, extraHeight: number = 0) {
+  const [graphHeight, setGraphHeight] = useState(150 + extraHeight);
 
   useEffect(() => {
     const updateHeight = () => {
@@ -89,7 +89,7 @@ function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement |
         // Aspect ratio: 500px width -> 150px height (3.33:1)
         // Width >= 500px: height = 150px
         // Width < 500px: height = width * 0.3
-        const newHeight = width >= 500 ? 150 : width * 0.3;
+        const newHeight = (width >= 500 ? 150 : width * 0.3) + extraHeight;
         setGraphHeight(newHeight);
       }
     };
@@ -101,7 +101,7 @@ function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement |
     }
 
     return () => resizeObserver.disconnect();
-  }, [containerRef]);
+  }, [containerRef, extraHeight]);
 
   return graphHeight;
 }
@@ -464,6 +464,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
   // Responsive graph height with aspect ratio
   const graphHeight = useResponsiveGraphHeight(containerRef);
+  const graph3Height = useResponsiveGraphHeight(containerRef, 38);
 
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
@@ -586,7 +587,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -594,7 +595,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
-            <YAxis width={35} tick={{ fontSize: 12 }} />
+            <YAxis width={28} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph1" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -640,7 +641,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -648,7 +649,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
-            <YAxis width={35} tick={{ fontSize: 12 }} />
+            <YAxis width={28} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph2" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -712,10 +713,10 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           </div>
         </div>
 
-        <ResponsiveContainer width="100%" height={graphHeight}>
+        <ResponsiveContainer width="100%" height={graph3Height}>
           <AreaChart
             data={visibleData}
-            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 28, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -724,6 +725,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <XAxis
               dataKey="sessionIndex"
               tickFormatter={(index) => {
+                // Skip first tick label to prevent left overflow
+                if (index === 0) return '';
                 if (visibleData && visibleData[index]) {
                   return formatDatetimeLabel(visibleData[index].date);
                 }
@@ -734,7 +737,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               height={38}
               tick={{ fontSize: 12 }}
             />
-            <YAxis domain={[0, 100]} ticks={[0, 50, 100]} width={35} tick={{ fontSize: 12 }} />
+            <YAxis domain={[0, 100]} ticks={[0, 50, 100]} width={28} tick={{ fontSize: 12 }} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph3" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
