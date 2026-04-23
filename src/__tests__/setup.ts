@@ -43,6 +43,15 @@ if (!React.act) {
   };
 }
 
+// Mock ResizeObserver for tests
+if (!global.ResizeObserver) {
+  global.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as any;
+}
+
 // Now we can safely import @testing-library/react
 import { cleanup } from '@testing-library/react';
 import '@testing-library/dom';

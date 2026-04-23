@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { SessionMetrics } from '../types/analysis';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { css } from '@emotion/react';
@@ -77,6 +77,33 @@ function useTouchZoom(onZoom: (factor: number) => void) {
   };
 
   return { handleTouchStart, handleTouchMove, handleTouchEnd };
+}
+
+function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const [graphHeight, setGraphHeight] = useState(150);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.offsetWidth;
+        // Aspect ratio: 500px width -> 150px height (3.33:1)
+        // Width >= 500px: height = 150px
+        // Width < 500px: height = width * 0.3
+        const newHeight = width >= 500 ? 150 : width * 0.3;
+        setGraphHeight(newHeight);
+      }
+    };
+
+    updateHeight();
+    const resizeObserver = new ResizeObserver(updateHeight);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, [containerRef]);
+
+  return graphHeight;
 }
 
 function useZoomPan(dataLength: number) {
@@ -254,19 +281,20 @@ const styles = {
   `,
   controls: css`
     display: flex;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 12px;
     align-items: center;
     flex-wrap: wrap;
 
     button {
-      padding: 6px 12px;
+      padding: 4px 10px;
       border: 1px solid ${THEME.accentGreen};
       border-radius: 4px;
       background: rgba(0, 0, 0, 0.8);
       color: ${THEME.accentGreen};
       cursor: pointer;
       font-weight: 500;
+      font-size: 12px;
 
       &:hover {
         background: rgba(0, 255, 0, 0.1);
@@ -278,12 +306,12 @@ const styles = {
       }
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       gap: 4px;
 
       button {
-        padding: 4px 8px;
-        font-size: 12px;
+        padding: 3px 8px;
+        font-size: 11px;
       }
     }
   `,
@@ -425,11 +453,17 @@ const styles = {
  * - Graph 3: qualityPercent + driftingPercent + approachingPercent (%)
  */
 export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: ProgressGraphsProps) {
+  // Ref to measure container width for responsive height
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Locked session state for click-to-lock tooltip
   const [lockedSession, setLockedSession] = useState<LockedTooltipState | null>(null);
 
   // Shared hover state across all charts
   const { activeIndex, hoveredGraphId, cursorX, cursorY, setHover, clearHover } = useSharedHover();
+
+  // Responsive graph height with aspect ratio
+  const graphHeight = useResponsiveGraphHeight(containerRef);
 
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
@@ -466,9 +500,6 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   const touchHandlers = useTouchZoom((factor) => {
     handleZoom(factor > 1 ? ZOOM_OUT_FACTOR : ZOOM_IN_FACTOR);
   });
-
-  // Responsive graph height
-  const graphHeight = window.innerWidth < 768 ? 180 : 250;
 
   // Filter data based on zoom
   const visibleData = useMemo(() => {
@@ -534,6 +565,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
 
   return (
     <div
+      ref={containerRef}
       css={styles.container}
       data-component="ProgressGraphs"
       onTouchStart={touchHandlers.handleTouchStart}
@@ -561,7 +593,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           >
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
-            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
+            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
             <YAxis />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph1" && activeIndex !== null && visibleData[activeIndex] && (
@@ -615,7 +647,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           >
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
-            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
+            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} height={0} />
             <YAxis />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph2" && activeIndex !== null && visibleData[activeIndex] && (
@@ -701,7 +733,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               textAnchor="end"
               height={80}
             />
-            <YAxis />
+            <YAxis domain={[0, 100]} />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph3" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
