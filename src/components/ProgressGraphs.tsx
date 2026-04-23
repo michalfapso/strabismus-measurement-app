@@ -80,16 +80,17 @@ function useTouchZoom(onZoom: (factor: number) => void) {
 }
 
 function useResponsiveGraphHeight(containerRef: React.RefObject<HTMLDivElement | null>, extraHeight: number = 0) {
-  const [graphHeight, setGraphHeight] = useState(150 + extraHeight);
+  const GRAPH_HEIGHT_BASE = 120
+  const [graphHeight, setGraphHeight] = useState(GRAPH_HEIGHT_BASE + extraHeight);
 
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
         const width = containerRef.current.offsetWidth;
-        // Aspect ratio: 500px width -> 150px height (3.33:1)
-        // Width >= 500px: height = 150px
+        // Aspect ratio: 500px width -> GRAPH_HEIGHT_BASE height (3.33:1)
+        // Width >= 500px: height = GRAPH_HEIGHT_BASE
         // Width < 500px: height = width * 0.3
-        const newHeight = (width >= 500 ? 150 : width * 0.3) + extraHeight;
+        const newHeight = (width >= 500 ? GRAPH_HEIGHT_BASE : width * 0.3) + extraHeight;
         setGraphHeight(newHeight);
       }
     };
