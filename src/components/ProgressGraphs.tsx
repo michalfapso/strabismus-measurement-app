@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { SessionMetrics } from '../types/analysis';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { css } from '@emotion/react';
@@ -508,8 +508,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
     return graphData.slice(Math.floor(zoomStart), Math.ceil(zoomEnd));
   }, [graphData, zoomStart, zoomEnd]);
 
-  // Handle chart click to lock tooltip
-  const handleChartClick = (state: any) => {
+  // Memoized event handlers to prevent unnecessary re-renders
+  const handleChartClick = useMemo(() => (state: any) => {
     if (state && state.activeTooltipIndex !== undefined) {
       const sessionData = visibleData[state.activeTooltipIndex];
       if (sessionData) {
@@ -534,7 +534,29 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         });
       }
     }
-  };
+  }, [visibleData]);
+
+  const handleMouseMoveGraph1 = useCallback((state: any) => {
+    if (state && state.activeTooltipIndex !== undefined) {
+      setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY);
+    }
+  }, [setHover]);
+
+  const handleMouseMoveGraph2 = useCallback((state: any) => {
+    if (state && state.activeTooltipIndex !== undefined) {
+      setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY);
+    }
+  }, [setHover]);
+
+  const handleMouseMoveGraph3 = useCallback((state: any) => {
+    if (state && state.activeTooltipIndex !== undefined) {
+      setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY);
+    }
+  }, [setHover]);
+
+  const handleMouseLeaveCallback = useCallback(() => {
+    clearHover();
+  }, [clearHover]);
 
   // Recalculate locked session visibility on zoom/pan
   useEffect(() => {
@@ -590,8 +612,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 0, left: 0, bottom: 0, top: 10 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
-            onMouseLeave={() => clearHover()}
+            onMouseMove={handleMouseMoveGraph1}
+            onMouseLeave={handleMouseLeaveCallback}
           >
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
@@ -644,8 +666,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 0, left: 0, bottom: 0, top: 0 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
-            onMouseLeave={() => clearHover()}
+            onMouseMove={handleMouseMoveGraph2}
+            onMouseLeave={handleMouseLeaveCallback}
           >
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
@@ -719,8 +741,8 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 0, left: 0, bottom: 10, top: 0 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
-            onMouseLeave={() => clearHover()}
+            onMouseMove={handleMouseMoveGraph3}
+            onMouseLeave={handleMouseLeaveCallback}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
