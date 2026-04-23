@@ -394,12 +394,27 @@ const styles = {
   `,
   legendWrapper: css`
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    margin: 8px 0;
+    gap: 16px;
+    margin: 8px 0 12px 0;
+    font-size: 12px;
+    color: ${THEME.textSecondary};
 
     @media (max-width: 768px) {
-      margin: 4px 0;
+      margin: 4px 0 8px 0;
+      gap: 8px;
     }
+  `,
+  legendItem: css`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  `,
+  legendDot: css`
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
   `,
 };
 
@@ -539,7 +554,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
+            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -547,7 +562,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
-            <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
+            <YAxis />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph1" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -580,15 +595,20 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <h3>Near-Best Stable Time (seconds)</h3>
 
         <div css={styles.legendWrapper}>
-          <svg width={300} height={30}>
-            {/* Recharts Legend will render here */}
-          </svg>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateNearFusion }]} />
+            <span>Near-Best Stable Time</span>
+          </div>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: '#20b2aa' }]} />
+            <span>Longest Quality Streak</span>
+          </div>
         </div>
 
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
+            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -596,8 +616,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
             <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
-            <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
+            <YAxis />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph2" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
@@ -639,15 +658,32 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <h3>Session Composition (%)</h3>
 
         <div css={styles.legendWrapper}>
-          <svg width={300} height={30}>
-            {/* Recharts Legend will render here */}
-          </svg>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateFusion }]} />
+            <span>Fusion</span>
+          </div>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateNearFusion }]} />
+            <span>Near Fusion</span>
+          </div>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateStableDeviation }]} />
+            <span>Stable Deviation</span>
+          </div>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateApproaching }]} />
+            <span>Approaching</span>
+          </div>
+          <div css={styles.legendItem}>
+            <div css={[styles.legendDot, { backgroundColor: THEME.stateDrifting }]} />
+            <span>Drifting</span>
+          </div>
         </div>
 
         <ResponsiveContainer width="100%" height={graphHeight}>
           <AreaChart
             data={visibleData}
-            margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
+            margin={{ right: 30, left: 0, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -655,7 +691,6 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="sessionIndex"
-              label={{ value: 'Session Index', position: 'insideBottomRight', offset: -10, fill: THEME.textSecondary }}
               tickFormatter={(index) => {
                 if (visibleData && visibleData[index]) {
                   return formatDatetimeLabel(visibleData[index].date);
@@ -666,8 +701,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
               textAnchor="end"
               height={80}
             />
-            <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
-            <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
+            <YAxis />
             {/* Vertical line on non-hovered graphs */}
             {hoveredGraphId !== "graph3" && activeIndex !== null && visibleData[activeIndex] && (
               <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />

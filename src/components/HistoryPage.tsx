@@ -252,8 +252,7 @@ export function HistoryPage({}: HistoryPageProps) {
       }
     `,
     leftPanelStyle: css`
-      width: fit-content;
-      min-width: 180px;
+      width: 330px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
