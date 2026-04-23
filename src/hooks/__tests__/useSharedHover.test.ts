@@ -6,18 +6,20 @@ describe('useSharedHover', () => {
     const { result } = renderHook(() => useSharedHover());
 
     expect(result.current.activeIndex).toBe(null);
+    expect(result.current.hoveredGraphId).toBe(null);
     expect(result.current.cursorX).toBe(null);
     expect(result.current.cursorY).toBe(null);
   });
 
-  it('should set hover state with index and coordinates', () => {
+  it('should set hover state with index, graphId, and coordinates', () => {
     const { result } = renderHook(() => useSharedHover());
 
     act(() => {
-      result.current.setHover(5, 100, 200);
+      result.current.setHover(5, 'graph1', 100, 200);
     });
 
     expect(result.current.activeIndex).toBe(5);
+    expect(result.current.hoveredGraphId).toBe('graph1');
     expect(result.current.cursorX).toBe(100);
     expect(result.current.cursorY).toBe(200);
   });
@@ -30,6 +32,7 @@ describe('useSharedHover', () => {
     });
 
     expect(result.current.activeIndex).toBe(3);
+    expect(result.current.hoveredGraphId).toBe(null);
     expect(result.current.cursorX).toBe(null);
     expect(result.current.cursorY).toBe(null);
   });
@@ -38,7 +41,7 @@ describe('useSharedHover', () => {
     const { result } = renderHook(() => useSharedHover());
 
     act(() => {
-      result.current.setHover(5, 100, 200);
+      result.current.setHover(5, 'graph1', 100, 200);
     });
 
     expect(result.current.activeIndex).toBe(5);
@@ -48,6 +51,7 @@ describe('useSharedHover', () => {
     });
 
     expect(result.current.activeIndex).toBe(null);
+    expect(result.current.hoveredGraphId).toBe(null);
     expect(result.current.cursorX).toBe(null);
     expect(result.current.cursorY).toBe(null);
   });
@@ -56,7 +60,7 @@ describe('useSharedHover', () => {
     const { result } = renderHook(() => useSharedHover());
 
     act(() => {
-      result.current.setHover(5, 100, 200);
+      result.current.setHover(5, 'graph1', 100, 200);
     });
 
     act(() => {
@@ -64,6 +68,7 @@ describe('useSharedHover', () => {
     });
 
     expect(result.current.activeIndex).toBe(null);
+    expect(result.current.hoveredGraphId).toBe(null);
     expect(result.current.cursorX).toBe(null);
     expect(result.current.cursorY).toBe(null);
   });

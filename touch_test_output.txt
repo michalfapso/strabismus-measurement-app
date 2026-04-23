@@ -1,0 +1,5 @@
+
+> strabismus-measurement-app@1.0.0 test
+> vitest ProgressGraphs.touch.test.tsx -v
+
+vitest/4.1.2 linux-x64 node-v20.20.2

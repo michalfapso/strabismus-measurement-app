@@ -1,0 +1,13 @@
+
+> strabismus-measurement-app@1.0.0 test
+> vitest
+
+
+ RUN  v4.1.2 /workspace
+
+
+ Test Files  24 passed (24)
+      Tests  269 passed (269)
+   Start at  21:52:32
+   Duration  29.81s (transform 1.54s, setup 10.37s, import 4.53s, tests 3.44s, environment 58.01s)
+

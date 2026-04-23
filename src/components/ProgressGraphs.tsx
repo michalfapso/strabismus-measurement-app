@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { SessionMetrics } from '../types/analysis';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { css } from '@emotion/react';
 import { THEME } from '../theme';
 import { useSharedHover } from '../hooks/useSharedHover';
@@ -414,7 +414,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   const [lockedSession, setLockedSession] = useState<LockedTooltipState | null>(null);
 
   // Shared hover state across all charts
-  const { activeIndex, cursorX, cursorY, setHover, clearHover } = useSharedHover();
+  const { activeIndex, hoveredGraphId, cursorX, cursorY, setHover, clearHover } = useSharedHover();
 
   // Filter sessions by exercise if needed
   const filteredSessions = useMemo(() => {
@@ -541,14 +541,19 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            {/* XAxis removed from Graph 1 */}
+            {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
+            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
             <YAxis label={{ value: 'Deviation (cm)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
+            {/* Vertical line on non-hovered graphs */}
+            {hoveredGraphId !== "graph1" && activeIndex !== null && visibleData[activeIndex] && (
+              <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
+            )}
             <Tooltip
-              active={!lockedSession && activeIndex !== null}
+              active={!lockedSession && activeIndex !== null && hoveredGraphId === "graph1"}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -585,14 +590,20 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 20, top: 10 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
+            {/* Invisible XAxis for ReferenceLine positioning on non-hovered graphs */}
+            <XAxis dataKey="sessionIndex" tick={false} axisLine={false} />
             <YAxis label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
+            {/* Vertical line on non-hovered graphs */}
+            {hoveredGraphId !== "graph2" && activeIndex !== null && visibleData[activeIndex] && (
+              <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
+            )}
             <Tooltip
-              active={!lockedSession && activeIndex !== null}
+              active={!lockedSession && activeIndex !== null && hoveredGraphId === "graph2"}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -638,7 +649,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             data={visibleData}
             margin={{ right: 30, left: 0, bottom: 60, top: 10 }}
             onClick={handleChartClick}
-            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, state.chartX, state.chartY); } }}
+            onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -657,8 +668,12 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
             />
             <YAxis label={{ value: 'Percent (%)', angle: -90, position: 'insideLeft', fill: THEME.textSecondary }} />
             <Legend wrapperStyle={{ color: THEME.textPrimary, justifyContent: 'center', display: 'flex' }} />
+            {/* Vertical line on non-hovered graphs */}
+            {hoveredGraphId !== "graph3" && activeIndex !== null && visibleData[activeIndex] && (
+              <ReferenceLine x={visibleData[activeIndex].sessionIndex} stroke={THEME.textSecondary} strokeDasharray="3 3" />
+            )}
             <Tooltip
-              active={!lockedSession && activeIndex !== null}
+              active={!lockedSession && activeIndex !== null && hoveredGraphId === "graph3"}
               content={(props: any) => (
                 <ProgressGraphsTooltipContent
                   {...props}
@@ -678,44 +693,6 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
           </AreaChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Container-level shared tooltip for hover state */}
-      {!lockedSession && activeIndex !== null && visibleData[activeIndex] && (
-        <div
-          css={styles.sharedTooltipContainer}
-          style={{
-            left: `${cursorX}px`,
-            top: `${cursorY}px`,
-          }}
-        >
-          <ProgressGraphsTooltipContent
-            payload={[{ payload: visibleData[activeIndex] }]}
-            active={true}
-            isLocked={false}
-            onCloseLocked={() => setLockedSession(null)}
-            onDrillDown={onDrillDown}
-          />
-        </div>
-      )}
-
-      {/* Locked tooltip overlay */}
-      {lockedSession && lockedSession.visibleIndex !== null && visibleData[lockedSession.visibleIndex] && (
-        <div
-          css={styles.sharedTooltipContainer}
-          style={{
-            left: `${cursorX ?? 0}px`,
-            top: `${cursorY ?? 0}px`,
-          }}
-        >
-          <ProgressGraphsTooltipContent
-            isLocked={true}
-            lockedSession={lockedSession.sessionData}
-            dataLocked="true"
-            onCloseLocked={() => setLockedSession(null)}
-            onDrillDown={onDrillDown}
-          />
-        </div>
-      )}
     </div>
   );
 }
