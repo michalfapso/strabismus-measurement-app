@@ -461,7 +461,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
   const [lockedSession, setLockedSession] = useState<LockedTooltipState | null>(null);
 
   // Shared hover state across all charts
-  const { activeIndex, hoveredGraphId, cursorX, cursorY, setHover, clearHover } = useSharedHover();
+  const { activeIndex, hoveredGraphId, setHover, clearHover } = useSharedHover();
 
   // Responsive graph height with aspect ratio
   const graphHeight = useResponsiveGraphHeight(containerRef);
