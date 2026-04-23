@@ -6,3 +6,4 @@ dist/
 .env.local
 .worktrees/
 .playwright-mcp/
+*.swp
