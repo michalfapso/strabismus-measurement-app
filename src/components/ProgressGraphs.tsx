@@ -586,7 +586,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph1", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -640,7 +640,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <LineChart
             data={visibleData}
-            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph2", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -715,7 +715,7 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
         <ResponsiveContainer width="100%" height={graphHeight}>
           <AreaChart
             data={visibleData}
-            margin={{ right: 30, left: 35, bottom: 10, top: 10 }}
+            margin={{ right: 15, left: 35, bottom: 10, top: 10 }}
             onClick={handleChartClick}
             onMouseMove={(state: any) => { if (state && state.activeTooltipIndex !== undefined) { setHover(state.activeTooltipIndex, "graph3", state.chartX, state.chartY); } }}
             onMouseLeave={() => clearHover()}
@@ -729,9 +729,9 @@ export function ProgressGraphs({ sessions, onDrillDown, exerciseFilter }: Progre
                 }
                 return index.toString();
               }}
-              angle={-45}
+              angle={-30}
               textAnchor="end"
-              height={50}
+              height={38}
               tick={{ fontSize: 12 }}
             />
             <YAxis domain={[0, 100]} ticks={[0, 50, 100]} width={35} tick={{ fontSize: 12 }} />

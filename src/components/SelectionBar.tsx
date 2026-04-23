@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { THEME } from '../theme';
 
 export interface SelectionBarProps {
@@ -32,110 +33,123 @@ export function SelectionBar({
   onDelete,
   disabled = false,
 }: SelectionBarProps) {
+  const [expandedControls, setExpandedControls] = useState(false);
+
   const allSelected = visibleSelectedCount === filteredSessionCount && filteredSessionCount > 0;
   const noneSelected = selectedCount === 0;
   const selectAllEnabled = filteredSessionCount > 0 && !allSelected;
   const selectNoneEnabled = selectedCount > 0;
 
-  const selectButtonBaseStyle = {
+  const buttonBaseStyle = {
     padding: '6px 10px',
     fontSize: '12px',
     color: THEME.accentGreen,
     backgroundColor: THEME.accentGreenLight,
     border: `1px solid ${THEME.accentGreen}`,
     borderRadius: '3px',
-  };
-
-  const actionButtonBaseStyle = {
-    padding: '6px 12px',
-    fontSize: '12px',
-    backgroundColor: 'transparent',
-    borderRadius: '3px',
+    cursor: 'pointer',
   };
 
   return (
     <div style={{
       display: 'flex',
-      alignItems: 'center',
-      gap: '16px',
+      flexDirection: 'column',
+      gap: '8px',
       backgroundColor: THEME.accentGreenLight,
       border: `1px solid ${THEME.accentGreenBorder}`,
       borderRadius: '4px',
       padding: '12px 16px',
       color: THEME.textPrimary,
-      minHeight: '48px',
     }} data-component="SelectionBar">
-      {/* Selection control buttons (left) */}
-      <div style={{ display: 'flex', gap: '6px' }}>
-        <button
-          aria-label="Select all filtered sessions"
-          onClick={onSelectAll}
-          disabled={!selectAllEnabled || disabled}
-          style={{
-            ...selectButtonBaseStyle,
-            cursor: selectAllEnabled && !disabled ? 'pointer' : 'not-allowed',
-            opacity: selectAllEnabled && !disabled ? 1 : 0.5,
-          }}
-        >
-          All
-        </button>
-
-        <button
-          aria-label="Clear all session selections"
-          onClick={onSelectNone}
-          disabled={!selectNoneEnabled || disabled}
-          style={{
-            ...selectButtonBaseStyle,
-            cursor: selectNoneEnabled && !disabled ? 'pointer' : 'not-allowed',
-            opacity: selectNoneEnabled && !disabled ? 1 : 0.5,
-          }}
-        >
-          None
-        </button>
-      </div>
-
-      {/* Selection count (center) */}
-      <div style={{ flex: 1 }}>
-        <div>
-          <strong>{selectedCount}</strong> {selectedCount === 1 ? 'session' : 'sessions'} selected
-        </div>
-        {hiddenCount > 0 && (
-          <div style={{ fontSize: '11px', color: THEME.textMuted, marginTop: '2px' }}>
-            {hiddenCount} of them {hiddenCount === 1 ? 'is' : 'are'} hidden by filter
+      {/* Row 1: Always visible - selection count + All/None + expand toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1 }}>
+          <div>
+            <strong>{selectedCount}</strong> {selectedCount === 1 ? 'session' : 'sessions'} selected
           </div>
-        )}
+          {hiddenCount > 0 && (
+            <div style={{ fontSize: '11px', color: THEME.textMuted, marginTop: '2px' }}>
+              {hiddenCount} of them {hiddenCount === 1 ? 'is' : 'are'} hidden by filter
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', whiteSpace: 'nowrap' }}>
+          <button
+            aria-label="Select all filtered sessions"
+            onClick={onSelectAll}
+            disabled={!selectAllEnabled || disabled}
+            style={{
+              ...buttonBaseStyle,
+              cursor: selectAllEnabled && !disabled ? 'pointer' : 'not-allowed',
+              opacity: selectAllEnabled && !disabled ? 1 : 0.5,
+            }}
+          >
+            All
+          </button>
+
+          <button
+            aria-label="Clear all session selections"
+            onClick={onSelectNone}
+            disabled={!selectNoneEnabled || disabled}
+            style={{
+              ...buttonBaseStyle,
+              cursor: selectNoneEnabled && !disabled ? 'pointer' : 'not-allowed',
+              opacity: selectNoneEnabled && !disabled ? 1 : 0.5,
+            }}
+          >
+            None
+          </button>
+
+          <button
+            aria-label={expandedControls ? 'Collapse controls' : 'Expand controls'}
+            onClick={() => setExpandedControls(!expandedControls)}
+            title={expandedControls ? 'Collapse controls' : 'Expand controls'}
+            style={{
+              ...buttonBaseStyle,
+              padding: '6px 8px',
+              width: '32px',
+            }}
+          >
+            {expandedControls ? '⌃' : '⌄'}
+          </button>
+        </div>
       </div>
 
-      {/* Action buttons (right) */}
-      <button
-        aria-label="Export selected sessions to CSV"
-        onClick={onExport}
-        disabled={selectedCount === 0 || disabled}
-        style={{
-          ...actionButtonBaseStyle,
-          color: THEME.accentGreen,
-          border: `1px solid ${THEME.accentGreen}`,
-          cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
-          opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
-        }}
-      >
-        📥 Export CSV
-      </button>
+      {/* Row 2: Expandable advanced controls */}
+      {expandedControls && (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            aria-label="Export selected sessions to CSV"
+            onClick={onExport}
+            disabled={selectedCount === 0 || disabled}
+            style={{
+              ...buttonBaseStyle,
+              flex: 1,
+              cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
+              opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
+            }}
+          >
+            📥 Export CSV
+          </button>
 
-      <button
-        aria-label="Delete selected sessions"
-        onClick={onDelete}
-        disabled={selectedCount === 0 || disabled}
-        style={{
-          ...actionButtonBaseStyle,
-          color: THEME.stateDrifting,
-          border: `1px solid ${THEME.stateDrifting}`,
-          cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
-          opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
-        }}
-      >
-        🗑 Delete
-      </button>
+          <button
+            aria-label="Delete selected sessions"
+            onClick={onDelete}
+            disabled={selectedCount === 0 || disabled}
+            style={{
+              ...buttonBaseStyle,
+              flex: 1,
+              color: THEME.stateDrifting,
+              border: `1px solid ${THEME.stateDrifting}`,
+              cursor: selectedCount > 0 && !disabled ? 'pointer' : 'default',
+              opacity: selectedCount > 0 && !disabled ? 1 : 0.5,
+            }}
+          >
+            🗑 Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
