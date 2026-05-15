@@ -43,7 +43,7 @@ RUN npm install -g playwright && \
     chmod -R 755 /opt/playwright-browsers && \
     chown -R node:node /opt/playwright-browsers && \
     mkdir -p /opt/google/chrome && \
-    ln -sf /opt/playwright-browsers/chromium-1217/chrome-linux64/chrome /opt/google/chrome/chrome && \
+    ln -sf "$(find /opt/playwright-browsers -name 'chrome' -path '*/chrome-linux64/chrome' | head -1)" /opt/google/chrome/chrome && \
     npm cache clean --force && \
     rm -rf /home/node/.npm
 
