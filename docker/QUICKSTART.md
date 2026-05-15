@@ -48,7 +48,9 @@ docker-compose up -it
 
 ```bash
 docker run -it --rm \
-  -v /home/miso/projects/strabismus-measurement-app:/workspace \
+  -v ~/.claude-docker:/home/node/.claude \
+  -v ~/.claude-docker.json:/home/node/.claude.json \
+  -v .:/workspace \
   claude-code-sandbox
 ```
 

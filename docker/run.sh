@@ -6,7 +6,8 @@
 set -e  # Exit on error
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+#PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="$(pwd)"
 IMAGE_NAME="claude-code-sandbox"
 CONTAINER_NAME="claude-code-work"
 
@@ -109,7 +110,9 @@ RUN_CMD="docker run"
 
 # Add flags
 RUN_CMD="$RUN_CMD --rm"
-RUN_CMD="$RUN_CMD --name $CONTAINER_NAME"
+#RUN_CMD="$RUN_CMD --name $CONTAINER_NAME"
+RUN_CMD="$RUN_CMD -v ~/.claude-docker:/home/node/.claude"
+RUN_CMD="$RUN_CMD -v ~/.claude-docker.json:/home/node/.claude.json"
 RUN_CMD="$RUN_CMD -v $PROJECT_DIR:/workspace"
 
 # Add extra volumes if specified
