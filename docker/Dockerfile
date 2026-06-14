@@ -59,5 +59,5 @@ VOLUME /workspace
 # Set the entrypoint to bash
 ENTRYPOINT ["/bin/bash"]
 
-# Default command
-CMD ["-c", "echo 'Claude Code CLI Sandbox with Playwright MCP' && /bin/bash"]
+# Default command — configure git identity from host-forwarded env vars if present
+CMD ["-c", "[ -n \"$GIT_USER_NAME\" ] && git config --global user.name \"$GIT_USER_NAME\"; [ -n \"$GIT_USER_EMAIL\" ] && git config --global user.email \"$GIT_USER_EMAIL\"; echo 'Claude Code CLI Sandbox with Playwright MCP' && /bin/bash"]
