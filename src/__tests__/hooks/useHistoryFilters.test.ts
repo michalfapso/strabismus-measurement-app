@@ -100,7 +100,12 @@ describe('useHistoryFilters', () => {
   });
 
   it('should update filtered sessions when sessions array changes', () => {
-    const sessions1 = [createTestSession('2026-03-26T10:00:00Z', 'Test')];
+    const recent1 = new Date();
+    recent1.setDate(recent1.getDate() - 5);
+    const recent2 = new Date();
+    recent2.setDate(recent2.getDate() - 10);
+
+    const sessions1 = [createTestSession(recent1.toISOString(), 'Test')];
     const { result, rerender } = renderHook(
       ({ sessions }: { sessions: Session[] }) => useHistoryFilters(sessions),
       { initialProps: { sessions: sessions1 } }
@@ -109,8 +114,8 @@ describe('useHistoryFilters', () => {
     expect(result.current.filteredSessions).toHaveLength(1);
 
     const sessions2 = [
-      createTestSession('2026-03-26T10:00:00Z', 'Test'),
-      createTestSession('2026-03-25T10:00:00Z', 'Test'),
+      createTestSession(recent1.toISOString(), 'Test'),
+      createTestSession(recent2.toISOString(), 'Test'),
     ];
 
     rerender({ sessions: sessions2 });
